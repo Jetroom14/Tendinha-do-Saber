@@ -1,6 +1,6 @@
 import { Outlet, NavLink, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { LayoutDashboard, BookOpen, School2, FileText, ShoppingCart, Handshake, Users, Settings, ScrollText, LogOut, Upload, Home } from "lucide-react";
+import { LayoutDashboard, BookOpen, School2, FileText, ShoppingCart, Handshake, Users, Settings, ScrollText, LogOut, Upload, Home, Palette } from "lucide-react";
 import { useEffect } from "react";
 
 const NAV = [
@@ -11,6 +11,7 @@ const NAV = [
   { to: "/admin/encomendas", icon: ShoppingCart, label: "Encomendas" },
   { to: "/admin/vouchers", icon: FileText, label: "Vouchers MEGA" },
   { to: "/admin/parceiros", icon: Handshake, label: "Parceiros" },
+  { to: "/admin/brand", icon: Palette, label: "Identidade Visual" },
   { to: "/admin/logs", icon: ScrollText, label: "Atividade" },
   { to: "/admin/definicoes", icon: Settings, label: "Definições" },
   { to: "/admin/utilizadores", icon: Users, label: "Utilizadores", superOnly: true },
