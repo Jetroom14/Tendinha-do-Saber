@@ -59,10 +59,8 @@ class TestAuth:
         # Unique email to avoid affecting other tests
         email = f"TEST_bf_{uuid.uuid4().hex[:8]}@example.com"
         # 5 wrong attempts then 6th should be 429
-        last = None
         for i in range(5):
             r = api.post(f"{BASE_URL}/api/auth/login", json={"email": email, "password": "wrong"})
-            last = r
             assert r.status_code == 401, f"Attempt {i + 1}: {r.status_code} {r.text}"
         r = api.post(f"{BASE_URL}/api/auth/login", json={"email": email, "password": "wrong"})
         assert r.status_code == 429, f"Expected lockout 429, got {r.status_code}: {r.text}"
