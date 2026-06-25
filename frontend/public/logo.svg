@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Tendinha do Saber">
+  <title>Tendinha do Saber</title>
+  <!-- Background (transparent) -->
+  <defs>
+    <style>
+      .arc { fill: none; stroke: #A5BD5B; stroke-width: 6; stroke-linecap: round; }
+      .roof-outline { fill: #0B0B0B; }
+      .book-inner { fill: #A5C937; }
+      .chimney { fill: #0B0B0B; }
+      .smoke { fill: #BCC0C2; }
+    </style>
+  </defs>
+
+  <!-- Open circular border: top-left arc + bottom-right arc (broken circle) -->
+  <path class="arc" d="M 30 95 A 70 70 0 0 1 110 28" />
+  <path class="arc" d="M 170 105 A 70 70 0 0 1 90 172" />
+
+  <!-- Book / House hybrid -->
+  <!-- Inner book / page (lime green) — symmetrical triangle base -->
+  <path class="book-inner"
+        d="M 100 58
+           L 158 138
+           L 158 152
+           L 42 152
+           L 42 138 Z" />
+
+  <!-- Roof / book cover outer outline (black) — sits on top edges, forming the V of an open book -->
+  <path class="roof-outline"
+        d="M 100 50
+           L 162 138
+           L 152 144
+           L 100 70
+           L 48 144
+           L 38 138 Z" />
+
+  <!-- Open book center fold (subtle gap) -->
+  <path class="roof-outline" d="M 99 70 L 101 70 L 101 150 L 99 150 Z" opacity="0.85"/>
+
+  <!-- Book base spine (bottom black bar) -->
+  <rect class="roof-outline" x="42" y="148" width="116" height="6" rx="1.5"/>
+
+  <!-- Chimney on the right slope of the roof -->
+  <rect class="chimney" x="120" y="78" width="10" height="22" />
+
+  <!-- Smoke particles above chimney -->
+  <path class="smoke" d="M 123 70 l 5 -4 l 4 4 l -4 4 z" />
+  <path class="smoke" d="M 132 58 l 5 -4 l 4 5 l -5 4 z" />
+  <path class="smoke" d="M 124 50 l 4 -3 l 4 3 l -4 4 z" />
+  <path class="smoke" d="M 137 44 l 5 -3 l 4 4 l -4 4 z" />
+  <path class="smoke" d="M 128 36 l 4 -3 l 4 4 l -4 3 z" />
+</svg>
