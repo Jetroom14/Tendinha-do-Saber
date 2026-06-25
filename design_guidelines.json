@@ -1,0 +1,128 @@
+{
+  "theme": "light",
+  "archetype": "1 (Organic & Earthy)",
+  "brand_identity": {
+    "name": "Tendinha do Saber",
+    "description": "Professional Portuguese school bookstore e-commerce platform (V2.0) specializing in school manuals and workbooks. Based in Aveiro.",
+    "vibe": "Trustworthy, Professional, Warm, Scholarly, Established but with a regional touch.",
+    "forbidden_elements": [
+      "Inter, Roboto, Space Grotesk fonts",
+      "Generic purple or teal gradients",
+      "Childish or overly playful UI elements",
+      "Fully transparent headers over content"
+    ]
+  },
+  "typography": {
+    "strategy": "The 'Old Money Tech' & 'Editorial' mix. Clean and highly readable.",
+    "fonts": {
+      "headings": "Outfit",
+      "body": "IBM Plex Sans",
+      "accents": "Cormorant Garamond",
+      "admin_panel": "IBM Plex Sans"
+    },
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tight leading-none font-medium",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight font-medium",
+      "h3": "text-xl sm:text-2xl font-medium",
+      "body": "text-base leading-relaxed",
+      "small_labels": "text-xs tracking-[0.2em] uppercase font-semibold"
+    },
+    "installation_instructions": "Add Outfit, IBM Plex Sans, and Cormorant Garamond from Google Fonts via layout.js/html."
+  },
+  "colors": {
+    "storefront": {
+      "background_primary": "#FCFBF8",
+      "background_secondary": "#F4F1EA",
+      "text_primary": "#1A202C",
+      "text_secondary": "#4A5568",
+      "brand_accent": "#1B4965",
+      "brand_accent_hover": "#0F324A",
+      "alert_terracotta": "#C85A32",
+      "border": "#E2E8F0",
+      "stock_available": "#2F855A",
+      "stock_preorder": "#D69E2E",
+      "stock_unavailable": "#C53030"
+    },
+    "admin_panel": {
+      "background_primary": "#F8FAFC",
+      "background_secondary": "#FFFFFF",
+      "sidebar_background": "#0F172A",
+      "sidebar_text": "#F8FAFC",
+      "text_primary": "#0F172A",
+      "brand_accent": "#1B4965",
+      "border": "#E2E8F0"
+    }
+  },
+  "layout_and_spacing": {
+    "strategy": "Generous Spacing Philosophy. Bento Grids for catalog discovery, Control Room Grid for Admin.",
+    "containers": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
+    "bento_grid": "grid grid-cols-1 md:grid-cols-8 lg:grid-cols-12 gap-8 lg:gap-12",
+    "admin_grid": "grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 or gap-6",
+    "padding_scale": "Use p-6, p-8, p-12 for generous breathing room. Cards with borders must use internal padding like p-6.",
+    "alignment": "Left-align paragraphs, inputs, and dense content. Ensure optical alignment."
+  },
+  "surfaces_and_components": {
+    "storefront_cards": {
+      "style": "Neumorphic/Tactile hybrid: Flat background matching parent or crisp white, 1px subtle border, soft ambient shadow on hover (shadow-sm to shadow-md), rounded-sm or rounded-md (max 8px radius).",
+      "hover_state": "-translate-y-1 transition-transform duration-200 border-gray-300"
+    },
+    "header": {
+      "style": "Glassmorphism: backdrop-blur-xl bg-[#FCFBF8]/80 with 1px delicate bottom border. Must ensure text is strictly legible (APCA contrast). Sticky to top with z-50."
+    },
+    "buttons": {
+      "primary": "bg-[#1B4965] text-white rounded-md px-6 py-3 hover:bg-[#0F324A] transition-colors duration-200 font-medium",
+      "secondary": "bg-transparent border border-[#1B4965] text-[#1B4965] rounded-md px-6 py-3 hover:bg-[#1B4965] hover:text-white transition-colors duration-200",
+      "terracotta_cta": "bg-[#C85A32] text-white hover:bg-[#A34320]"
+    },
+    "admin_components": {
+      "strategy": "Shadcn/UI components heavily utilized. Dense, compact styling. Tables, Badges, Tabs, and Dialogs. Cardless or minimal 1px border cards."
+    },
+    "icons": {
+      "library": "lucide-react",
+      "style": "Stroke width 1.5, standard sizing."
+    }
+  },
+  "key_features_implementation": {
+    "cascading_school_selector": "Hero section bento box. 3 dropdowns (Shadcn Select). State managed sequentially: Ano -> Concelho -> Escola.",
+    "product_catalog": "CSS Grid (grid-cols-2 md:grid-cols-3 lg:grid-cols-4). Image container with max-h-[300px] object-contain. Badges for stock absolute positioned over image top-right.",
+    "product_detail_page": "Scrollytelling elements. 2-column layout (Image sticky left, details scroll right). Lamination service prominently displayed as a Shadcn Checkbox + Label (+2€).",
+    "cart_and_checkout": "Checkout features geofencing toggle: Hand Delivery vs Store Pickup. Promo code input with instant server-side validation feedback. Voucher PDF upload using standard input type='file' stylized.",
+    "admin_excel_import": "Drag and drop zone component for parsing book inventory. Clear success/error toast notifications via Sonner."
+  },
+  "motion_and_interactions": {
+    "hover_states": "All interactive elements must explicitly change state (e.g. hover:bg-slate-900 hover:text-white).",
+    "page_transitions": "Subtle fade-in for page loads.",
+    "catalog_load": "Staggered entrance animations for book cards in grid."
+  },
+  "testing": {
+    "attributes": "All interactive and key informational elements MUST include a `data-testid` attribute (e.g., data-testid='lamination-checkbox', data-testid='add-to-cart-btn')."
+  },
+  "media": {
+    "images": [
+      {
+        "category": "Hero/Aveiro Theme",
+        "url": "https://images.unsplash.com/photo-1556572912-ba2085f0ff28?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzV8MHwxfHNlYXJjaHwxfHxwb3J0dWdhbCUyMGF2ZWlybyUyMGNpdHl8ZW58MHx8fHwxNzgyNDE4MTgxfDA&ixlib=rb-4.1.0&q=85",
+        "description": "Aveiro canal buildings. Use as a subtle faded background or hero abstract overlay."
+      },
+      {
+        "category": "Catalog Background / Promo",
+        "url": "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTJ8MHwxfHNlYXJjaHwxfHxzdGFjayUyMG9mJTIwc2Nob29sJTIwYm9va3N8ZW58MHx8fHwxNzgyNDE4MTgxfDA&ixlib=rb-4.1.0&q=85",
+        "description": "Shallow focus stack of books. Ideal for category headers or banner."
+      },
+      {
+        "category": "Testimonial / Student Context",
+        "url": "https://images.unsplash.com/photo-1741699428220-65f37f3fbbcb?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2MzR8MHwxfHNlYXJjaHwxfHxzdHVkZW50JTIwc3R1ZHlpbmclMjBsaWJyYXJ5fGVufDB8fHx8MTc4MjM0MjM1MXww&ixlib=rb-4.1.0&q=85",
+        "description": "Student studying in library. Use for 'About Us' or community section."
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Ensure strict usage of `data-testid` across all interactive elements for both storefront and admin interfaces.",
+    "Do not use generic Inter font. Apply Outfit for Headings, IBM Plex Sans for UI/Body, and Cormorant Garamond for literary/book title accents.",
+    "Maintain high APCA contrast ratios, especially for the #1B4965 primary brand color against light backgrounds.",
+    "Implement the storefront using custom semantic HTML with Tailwind for layouts (avoid rigid Shadcn cards for the marketing/catalog parts), but use Shadcn primitives for forms, selects, and dialogs.",
+    "Implement the admin panel entirely using Shadcn/UI for a dense, data-heavy layout (Soft Utility archetype).",
+    "In checkout, strictly implement logic for Aveiro geofencing (Hand Delivery) vs Store pickup, and the 2€ lamination service.",
+    "Use standard Lucide icons, sized properly, avoiding visual clutter."
+  ]
+}
