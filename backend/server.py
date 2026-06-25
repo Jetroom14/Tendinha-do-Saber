@@ -232,8 +232,7 @@ async def register(payload: RegisterIn):
 @api.post("/auth/login")
 async def login(payload: LoginIn, request: Request):
     email = payload.email.lower()
-    ip = request.client.host if request.client else "unknown"
-    identifier = f"{ip}:{email}"
+    identifier = email  # K8s ingress rotates client IPs; use email alone for reliable lockout
 
     # Brute force check
     rec = await db.login_attempts.find_one({"identifier": identifier})
