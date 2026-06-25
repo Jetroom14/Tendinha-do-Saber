@@ -1,55 +1,82 @@
-import { useEffect } from "react";
 import "@/App.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
-import { HOME } from "@/constants/testIds";
+import { Toaster } from "sonner";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { CartProvider } from "@/contexts/CartContext";
+import { SiteLayout } from "@/components/Layout";
+import { CookieBanner } from "@/components/CookieBanner";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+import HomePage from "@/pages/HomePage";
+import CatalogPage from "@/pages/CatalogPage";
+import BookDetailPage from "@/pages/BookDetailPage";
+import CartPage from "@/pages/CartPage";
+import CheckoutPage from "@/pages/CheckoutPage";
+import OrderConfirmationPage from "@/pages/OrderConfirmationPage";
+import VouchersPage from "@/pages/VouchersPage";
+import PartnersPage from "@/pages/PartnersPage";
+import ContactsPage from "@/pages/ContactsPage";
+import LegalPage from "@/pages/LegalPage";
+import AccountPage from "@/pages/AccountPage";
+import { LoginPage, RegisterPage } from "@/pages/AuthPages";
+import { AboutPage, FaqPage, VoucherGuidePage, TrackOrderPage, NotFoundPage } from "@/pages/ExtraPages";
 
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
-    }
-  };
+import AdminLayout from "@/components/AdminLayout";
+import AdminDashboard from "@/pages/admin/AdminDashboard";
+import AdminBooks from "@/pages/admin/AdminBooks";
+import AdminImport from "@/pages/admin/AdminImport";
+import AdminSchools from "@/pages/admin/AdminSchools";
+import { AdminVouchers, AdminOrders, AdminPartners, AdminLogs, AdminSettings, AdminUsers } from "@/pages/admin/AdminOther";
 
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
-
-  return (
-    <div>
-      <header className="App-header">
-        <a
-          data-testid={HOME.emergentLink}
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
-  );
-};
+const Site = ({ children }) => (
+  <SiteLayout>{children}</SiteLayout>
+);
 
 function App() {
   return (
-    <div className="App">
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </div>
+    <BrowserRouter>
+      <AuthProvider>
+        <CartProvider>
+          <Toaster position="top-right" richColors />
+          <CookieBanner />
+          <Routes>
+            {/* Public site */}
+            <Route path="/" element={<Site><HomePage/></Site>}/>
+            <Route path="/catalogo" element={<Site><CatalogPage/></Site>}/>
+            <Route path="/livro/:isbn13" element={<Site><BookDetailPage/></Site>}/>
+            <Route path="/carrinho" element={<Site><CartPage/></Site>}/>
+            <Route path="/checkout" element={<Site><CheckoutPage/></Site>}/>
+            <Route path="/encomenda/:orderNo" element={<Site><OrderConfirmationPage/></Site>}/>
+            <Route path="/seguir-encomenda" element={<Site><TrackOrderPage/></Site>}/>
+            <Route path="/vouchers" element={<Site><VouchersPage/></Site>}/>
+            <Route path="/como-funciona-voucher" element={<Site><VoucherGuidePage/></Site>}/>
+            <Route path="/parceiros" element={<Site><PartnersPage/></Site>}/>
+            <Route path="/contactos" element={<Site><ContactsPage/></Site>}/>
+            <Route path="/sobre" element={<Site><AboutPage/></Site>}/>
+            <Route path="/faq" element={<Site><FaqPage/></Site>}/>
+            <Route path="/legal/:slug" element={<Site><LegalPage/></Site>}/>
+            <Route path="/login" element={<Site><LoginPage/></Site>}/>
+            <Route path="/registar" element={<Site><RegisterPage/></Site>}/>
+            <Route path="/minha-conta" element={<Site><AccountPage/></Site>}/>
+
+            {/* Admin */}
+            <Route path="/admin" element={<AdminLayout/>}>
+              <Route index element={<AdminDashboard/>}/>
+              <Route path="livros" element={<AdminBooks/>}/>
+              <Route path="importar" element={<AdminImport/>}/>
+              <Route path="escolas" element={<AdminSchools/>}/>
+              <Route path="encomendas" element={<AdminOrders/>}/>
+              <Route path="vouchers" element={<AdminVouchers/>}/>
+              <Route path="parceiros" element={<AdminPartners/>}/>
+              <Route path="logs" element={<AdminLogs/>}/>
+              <Route path="definicoes" element={<AdminSettings/>}/>
+              <Route path="utilizadores" element={<AdminUsers/>}/>
+            </Route>
+
+            <Route path="*" element={<Site><NotFoundPage/></Site>}/>
+          </Routes>
+        </CartProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
 

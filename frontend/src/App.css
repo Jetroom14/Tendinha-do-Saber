@@ -1,34 +1,38 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
-}
-
-.App-header {
-    background-color: #0f0f10;
+/* Page-specific styles */
+.App {
     min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
 }
 
-.App-link {
-    color: #61dafb;
+.hero-aveiro {
+    background-image:
+        linear-gradient(135deg, rgba(20, 30, 18, 0.92) 0%, rgba(40, 56, 28, 0.88) 100%),
+        url('https://images.unsplash.com/photo-1497633762265-9d179a990aa6?crop=entropy&cs=srgb&fm=jpg&w=1600&q=80');
+    background-size: cover;
+    background-position: center;
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+.glass-header {
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    background-color: rgba(255, 255, 255, 0.92);
+    border-bottom: 1px solid rgba(226, 232, 240, 0.7);
 }
+
+.book-card {
+    transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+}
+.book-card:hover {
+    transform: translateY(-2px);
+    border-color: #84BC2C;
+    box-shadow: 0 6px 14px -8px rgba(132, 188, 44, 0.25);
+}
+
+.stock-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    display: inline-block;
+}
+.stock-dot.available { background: #2F855A; }
+.stock-dot.preorder { background: #D69E2E; }
+.stock-dot.unavailable { background: #C53030; }

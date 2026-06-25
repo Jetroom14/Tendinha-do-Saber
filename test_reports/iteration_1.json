@@ -1,0 +1,62 @@
+{
+  "summary": "First-round backend test on Tendinha do Saber V2.0 — 31/32 pytest cases pass (96.9%). Covered: auth (login super/admin, /me, register, brute-force, duplicate), books (seed count 291, filters by type/subject/school+grade, search q), municipalities/schools/grade-levels, partners (BEIRAMAR5/VISTAALEGRE5/ILIABUM5), cart validation (workbook-only 5% discount, manual untouched, lamination 2€/3€), postcode geofencing, orders create/get/hand-delivery rejection outside Aveiro, vouchers submit + admin status update, admin books CRUD, dashboard, super-only users guard, activity logs, settings persistence, customer wishlist add/list/remove. Fixed 2 critical bugs (ObjectId leak in register, FastAPI signature on /vouchers). 1 critical issue remains in brute-force protection.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/auth/login (brute-force lockout)",
+        "issue": "Lockout never triggers in production because request.client.host rotates across multiple K8s ingress internal IPs (observed 10.208.128.2 and 10.208.128.6 on consecutive requests). identifier=f'{ip}:{email}' fragments the attempt counter across rows, so 5 hits per identifier are never reached. Verified via mongo: db.login_attempts shows multiple rows for same email with attempts=3, attempts=4 — never 5. Fix recommendation: drop IP from identifier (use only normalized email), OR read X-Forwarded-For/X-Real-IP header. Without this, the 5-fail/30-min lockout requirement is effectively disabled in production.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "GET /api/admin/orders",
+        "issue": "Endpoint exists but no list-orders test included in current suite (tested create+get-single-by-no only). Add coverage in next iteration."
+      },
+      {
+        "endpoint": "POST /api/admin/books/import",
+        "issue": "Excel import endpoint not tested (left as-is to avoid disturbing seeded catalog). Functionality used at startup works (291 rows loaded)."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/conftest.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "CRITICAL: Fix brute-force identifier in POST /api/auth/login — drop request.client.host (use only email) or read X-Forwarded-For. Current logic is broken behind Kubernetes ingress because client IP is not stable.",
+    "Consider adding a fallback in /admin/orders for empty list + pagination.",
+    "server.py is 983 lines — consider splitting (auth, books, orders, admin) into separate routers for maintainability."
+  ],
+  "critical_code_review_comments": [
+    "server.py = 983 lines, exceeds 700-line guideline. Split into routers/auth.py, routers/books.py, routers/orders.py, routers/admin.py, services/cart.py.",
+    "Brute-force identifier coupling to request.client.host is unsafe behind a reverse proxy (real bug, see critical issue).",
+    "Bug fixed by tester: POST /api/auth/register returned 500 because the dict comprehension excluding password_hash still kept Mongo's mutated _id (ObjectId) → jsonable_encoder failure. Added '_id' to exclusion.",
+    "Bug fixed by tester: POST /api/vouchers had signature `payload: VoucherSubmitIn, user: Optional[dict] = None` — FastAPI saw two body-able params and required {'payload': {...}, 'user': null} wrapping. Removed unused `user` param.",
+    "POST /api/orders does NOT decrement stock_qty; future risk of overselling pre-orders.",
+    "POST /api/orders does not require auth — order creator email is trusted from request body (could be exploited for spam orders).",
+    "Inconsistency: log_action is fire-and-forget without try/except — if logs collection write fails, the parent operation fails too.",
+    "POST /api/vouchers public endpoint has no rate limit — vulnerable to spam submissions."
+  ],
+  "updated_files": [
+    "/app/backend/server.py (2 fixes: register _id exclusion, vouchers signature)",
+    "/app/backend/tests/conftest.py (new)",
+    "/app/backend/tests/backend_test.py (new)"
+  ],
+  "success_rate": {
+    "backend": "96.9% (31/32 pytest cases). Only brute-force lockout fails — real production bug, not test issue.",
+    "frontend": "N/A (frontend testing not requested)"
+  },
+  "test_credentials": "Super: jetroortej14@hotmail.com / ChangeMe!2026Super (login OK, role=super_admin). Admin: tendinhadosaber@gmail.com / ChangeMe!2026Admin (login OK, role=admin). Customer: auto-created per session via /api/auth/register.",
+  "seed_data_creation": "No persistent seed created. Tests use TEST_ prefix for emails, ISBNs starting with 9999, and TEST voucher codes. Admin book CRUD test creates and immediately deletes its own ISBN. Wishlist test adds/removes one entry per customer.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Pytest suite is at /app/backend/tests/. Run: `cd /app/backend && python -m pytest tests/ -v --junitxml=/app/test_reports/pytest/pytest_results.xml`. Pytest-xdist used (gw0/gw1). The brute-force test will keep failing until main agent fixes the identifier logic. Once fixed, expect 32/32. Lamination price test toggles settings 2.00→3.00→2.00; if a future test asserts the default, reset first.",
+  "rca_of_the_issue": "Bug #1 (register 500): Motor's insert_one mutates the inserted dict in place, adding mongo `_id: ObjectId`. The return statement excluded only `password_hash`, so `_id` leaked and FastAPI's jsonable_encoder failed (ObjectId is not iterable/JSON serializable). Fixed by extending the exclusion set. Bug #2 (vouchers 422): FastAPI detected two body-able params (VoucherSubmitIn pydantic model + plain dict) and switched to embedded-body mode, requiring `{\"payload\": {...}, \"user\": null}`. Removed the unused `user` param. Bug #3 (brute force, UNFIXED): `request.client.host` returns the immediate connecting peer IP, which behind multi-replica K8s ingress is a different pod IP each time (10.208.128.2 vs 10.208.128.6 observed). Identifier `{ip}:{email}` therefore fragments — counter never reaches 5 per identifier, lockout never engages. Reproduction: 6 sequential curl POSTs to /api/auth/login with wrong creds; mongo shows multiple login_attempts rows for same email. Mitigation: use only email (or normalized email) as identifier; or read `X-Forwarded-For` first hop; or use rate-limit middleware like slowapi keyed on remote_addr resolved correctly."
+}
