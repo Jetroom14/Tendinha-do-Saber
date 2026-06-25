@@ -34,7 +34,7 @@ export default function AdminLayout() {
       <aside className="w-64 bg-slate-900 text-slate-100 flex flex-col sticky top-0 h-screen">
         <div className="p-6 border-b border-slate-800">
           <Link to="/admin" className="flex items-center gap-2.5">
-            <img src="/logo.jpeg" alt="Tendinha" className="w-9 h-9 rounded object-cover"/>
+            <img src="/logo.svg" alt="Tendinha" className="w-9 h-9 object-contain bg-white rounded p-0.5"/>
             <div>
               <div className="font-display font-semibold text-sm">Tendinha · Admin</div>
               <div className="text-[10px] uppercase tracking-wider text-slate-400">v2.0</div>
