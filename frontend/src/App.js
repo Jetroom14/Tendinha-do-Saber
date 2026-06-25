@@ -26,6 +26,7 @@ import AdminBooks from "@/pages/admin/AdminBooks";
 import AdminImport from "@/pages/admin/AdminImport";
 import AdminSchools from "@/pages/admin/AdminSchools";
 import { AdminVouchers, AdminOrders, AdminPartners, AdminLogs, AdminSettings, AdminUsers } from "@/pages/admin/AdminOther";
+import AdminBrand from "@/pages/admin/AdminBrand";
 
 const Site = ({ children }) => (
   <SiteLayout>{children}</SiteLayout>
@@ -67,6 +68,7 @@ function App() {
               <Route path="encomendas" element={<AdminOrders/>}/>
               <Route path="vouchers" element={<AdminVouchers/>}/>
               <Route path="parceiros" element={<AdminPartners/>}/>
+              <Route path="brand" element={<AdminBrand/>}/>
               <Route path="logs" element={<AdminLogs/>}/>
               <Route path="definicoes" element={<AdminSettings/>}/>
               <Route path="utilizadores" element={<AdminUsers/>}/>

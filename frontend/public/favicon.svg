@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Tendinha">
+  <title>Tendinha — Favicon</title>
+  <rect width="32" height="32" rx="6" fill="#FFFFFF"/>
+  <path d="M 16 5 L 28 23 L 25 25 L 16 12 L 7 25 L 4 23 Z" fill="#0B0B0B"/>
+  <path d="M 16 9 L 26 24 L 6 24 Z" fill="#A5C937"/>
+  <rect x="20" y="11" width="2.5" height="5" fill="#0B0B0B"/>
+  <rect x="6" y="24" width="20" height="2" fill="#0B0B0B"/>
+</svg>
