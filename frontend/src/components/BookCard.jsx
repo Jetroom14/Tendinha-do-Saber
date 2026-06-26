@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { CoverImage } from "./CoverImage";
 
 export function StockBadge({ status }) {
   if (status === "PreOrder") return (
@@ -24,11 +25,7 @@ export function BookCard({ book, onAdd }) {
   return (
     <Link to={`/livro/${book.isbn13}`} className="book-card flex flex-col bg-white border border-[#E2E8F0] rounded-md overflow-hidden fade-up" data-testid={`book-card-${book.isbn13}`}>
       <div className="relative aspect-[3/4] bg-[#F5F8EC] overflow-hidden">
-        {book.image_url ? (
-          <img src={book.image_url} alt={book.title} className="w-full h-full object-cover"/>
-        ) : (
-          <div className="w-full h-full grid place-items-center font-serif italic text-[#4A5568] text-3xl">{book.title?.[0] || "?"}</div>
-        )}
+        <CoverImage book={book} className="w-full h-full object-cover" />
         <div className="absolute top-2 right-2"><StockBadge status={book.status}/></div>
         {book.type === "Workbook" && (
           <span className="absolute top-2 left-2 text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-[#5A8F1E] text-white">Caderno</span>

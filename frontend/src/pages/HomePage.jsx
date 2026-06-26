@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { BookCard } from "@/components/BookCard";
 import { useCart } from "@/contexts/CartContext";
+import SEO, { ORGANIZATION_JSONLD } from "@/components/SEO";
 import { ArrowRight, GraduationCap, MapPin, School, BookOpen, ShieldCheck, Truck, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
@@ -28,10 +29,13 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    if (mun) api.get(`/schools?municipality_id=${mun}`).then((r) => setSchools(r.data));
-    else setSchools([]);
+    if (mun) {
+      const qs = new URLSearchParams({ municipality_id: mun });
+      if (grade) qs.set("grade", grade);
+      api.get(`/schools?${qs.toString()}`).then((r) => setSchools(r.data));
+    } else setSchools([]);
     setSchool("");
-  }, [mun]);
+  }, [mun, grade]);
 
   const searchSchool = () => {
     if (!school || !grade) {
@@ -45,6 +49,7 @@ export default function HomePage() {
 
   return (
     <div data-testid="home-page">
+      <SEO path="/" jsonLd={ORGANIZATION_JSONLD} />
       {/* HERO */}
       <section className="hero-aveiro relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28 grid md:grid-cols-12 gap-10 items-center">
@@ -164,21 +169,14 @@ export default function HomePage() {
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
               {partners.map((p) => (
-                <div key={p.id} className="bg-white rounded-md p-6 border border-[#E2E8F0] flex flex-col" data-testid={`partner-${p.id}`}>
-                  <div className="flex items-center gap-3 mb-3">
-                    {p.logo_url && <img src={p.logo_url} alt={p.name} className="w-12 h-12 rounded-md object-cover"/>}
-                    <div>
-                      <div className="font-display font-medium text-[#1A202C]">{p.name}</div>
-                      <div className="text-xs text-[#4A5568]">{p.description}</div>
-                    </div>
-                  </div>
-                  <div className="mt-auto pt-4 border-t border-[#E2E8F0] flex items-center justify-between">
-                    <code className="font-mono text-sm bg-[#F5F8EC] px-2 py-1 rounded text-[#5A8F1E]">{p.promo_code}</code>
-                    <span className="text-[#E07A1F] font-semibold">−{p.discount_value}%</span>
-                  </div>
+                <div key={p.id} className="bg-white rounded-md p-6 border border-[#E2E8F0] flex flex-col items-center text-center" data-testid={`partner-${p.id}`}>
+                  {p.logo_url && <img src={p.logo_url} alt={p.name} className="w-16 h-16 rounded-md object-cover mb-3" loading="lazy"/>}
+                  <div className="font-display font-medium text-[#1A202C]">{p.name}</div>
+                  <div className="text-xs text-[#4A5568] mt-1">{p.description}</div>
                 </div>
               ))}
             </div>
+            <p className="text-center text-xs text-[#4A5568] mt-6">Use o código exclusivo fornecido pelo seu parceiro no carrinho.</p>
           </div>
         </section>
       )}

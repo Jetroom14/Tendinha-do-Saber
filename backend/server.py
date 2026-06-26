@@ -165,6 +165,7 @@ class MunicipalityIn(BaseModel):
 class SchoolIn(BaseModel):
     name: str
     municipality_id: str
+    grades_taught: Optional[List[str]] = None
 
 class SchoolBookIn(BaseModel):
     school_id: str
@@ -206,6 +207,11 @@ class OrderCreateIn(BaseModel):
 class SettingIn(BaseModel):
     lamination_price: Optional[float] = None
     aveiro_postcodes: Optional[List[str]] = None
+    google_analytics_id: Optional[str] = None
+    google_ads_id: Optional[str] = None
+    facebook_pixel_id: Optional[str] = None
+    google_site_verification: Optional[str] = None
+    site_url: Optional[str] = None
 
 class WishlistIn(BaseModel):
     isbn13: str
@@ -458,14 +464,52 @@ async def import_books(file: UploadFile = File(...), admin: dict = Depends(requi
     await log_action(admin["id"], "import", "books", None, {"created": created, "updated": updated, "anomalies": anomalies})
     return {"created": created, "updated": updated, "anomalies": anomalies, "issues": issues[:50]}
 
+# Enrich missing book covers via Google Books API
+@api.post("/admin/books/enrich-covers")
+async def enrich_covers(admin: dict = Depends(require_admin), limit: int = 100):
+    import httpx
+    updated = 0
+    cursor = db.books.find({"$or": [{"image_url": ""}, {"image_url": None}, {"image_url": {"$regex": "openlibrary"}}]}, {"_id": 0}).limit(limit)
+    async with httpx.AsyncClient(timeout=8.0) as client_http:
+        async for b in cursor:
+            isbn = b["isbn13"]
+            url = None
+            try:
+                r = await client_http.get(f"https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}")
+                data = r.json()
+                if data.get("totalItems", 0) > 0:
+                    info = data["items"][0].get("volumeInfo", {})
+                    links = info.get("imageLinks") or {}
+                    url = links.get("thumbnail") or links.get("smallThumbnail")
+                if not url:
+                    q = f'intitle:"{b.get("title","")}"+inauthor:"{b.get("author","")}"'
+                    r = await client_http.get(f"https://www.googleapis.com/books/v1/volumes?q={q}&maxResults=1")
+                    data = r.json()
+                    if data.get("totalItems", 0) > 0:
+                        info = data["items"][0].get("volumeInfo", {})
+                        links = info.get("imageLinks") or {}
+                        url = links.get("thumbnail") or links.get("smallThumbnail")
+                if url:
+                    url = url.replace("http://", "https://").replace("&edge=curl", "")
+                    await db.books.update_one({"isbn13": isbn}, {"$set": {"image_url": url}})
+                    updated += 1
+            except Exception:
+                continue
+    await log_action(admin["id"], "enrich", "covers", None, {"updated": updated})
+    return {"updated": updated}
+
 # ---------- Municipalities / Schools ----------
 @api.get("/municipalities")
 async def list_municipalities():
     return await db.municipalities.find({}, {"_id": 0}).sort("name", 1).to_list(500)
 
 @api.get("/schools")
-async def list_schools(municipality_id: Optional[str] = None):
-    filt = {"municipality_id": municipality_id} if municipality_id else {}
+async def list_schools(municipality_id: Optional[str] = None, grade: Optional[str] = None):
+    filt: Dict[str, Any] = {}
+    if municipality_id:
+        filt["municipality_id"] = municipality_id
+    if grade:
+        filt["grades_taught"] = grade
     return await db.schools.find(filt, {"_id": 0}).sort("name", 1).to_list(2000)
 
 @api.get("/grade-levels")
@@ -491,7 +535,12 @@ async def delete_mun(mid: str, admin: dict = Depends(require_admin)):
 
 @api.post("/admin/schools")
 async def create_school(payload: SchoolIn, admin: dict = Depends(require_admin)):
-    doc = {"id": gen_id(), "name": payload.name, "municipality_id": payload.municipality_id}
+    doc = {
+        "id": gen_id(),
+        "name": payload.name,
+        "municipality_id": payload.municipality_id,
+        "grades_taught": payload.grades_taught or _GRADES_ALL,
+    }
     await db.schools.insert_one(doc)
     await log_action(admin["id"], "create", "school", doc["id"])
     doc.pop("_id", None)
@@ -609,7 +658,7 @@ async def cart_validate(payload: PromoValidateIn):
 async def check_postcode(code: str):
     code_clean = code.strip().split("-")[0][:4] if code else ""
     settings = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
-    aveiro = settings.get("aveiro_postcodes", ["3800", "3810", "3830", "3840", "3850", "3860", "3870", "3880"])
+    aveiro = settings.get("aveiro_postcodes", _AVEIRO_DISTRICT_POSTCODES)
     return {"hand_delivery_available": code_clean in aveiro, "postcode": code_clean, "valid_zones": aveiro}
 
 # ---------- Orders ----------
@@ -817,35 +866,129 @@ def _grade_to_label(s: str) -> str:
     digits = re.search(r"(\d+)", s)
     return f"{digits.group(1)}.º Ano" if digits else s
 
+_GRADES_ALL = ["1.º Ano", "2.º Ano", "3.º Ano", "4.º Ano", "5.º Ano", "6.º Ano",
+               "7.º Ano", "8.º Ano", "9.º Ano", "10.º Ano", "11.º Ano", "12.º Ano"]
+_GRADES_EB1 = ["1.º Ano", "2.º Ano", "3.º Ano", "4.º Ano"]
+_GRADES_EB23 = ["5.º Ano", "6.º Ano", "7.º Ano", "8.º Ano", "9.º Ano"]
+_GRADES_SEC = ["10.º Ano", "11.º Ano", "12.º Ano"]
+_GRADES_EB_SEC = _GRADES_EB23 + _GRADES_SEC
+
+# Postcode prefixes for the entire Aveiro district (hand delivery zone)
+_AVEIRO_DISTRICT_POSTCODES = [
+    # Aveiro / Ílhavo / Vagos
+    "3800", "3810", "3830", "3840", "3850", "3860",
+    # Ovar / Estarreja / Murtosa / Albergaria
+    "3870", "3880", "3885", "3860", "3865",
+    # Águeda / Anadia / Oliveira do Bairro
+    "3750", "3754", "3770", "3780",
+    # Oliveira de Azeméis / S. João da Madeira / Vale de Cambra
+    "3700", "3720", "3730", "3740",
+    # Espinho / Feira
+    "4500", "4520", "4535",
+    # Arouca / Castelo de Paiva / Sever do Vouga
+    "4540", "4550", "3740",
+    # Mealhada (sul do distrito)
+    "3050",
+]
+
 def _cover_url(isbn: str) -> str:
     return f"https://covers.openlibrary.org/b/isbn/{isbn}-L.jpg"
 
 async def seed_demo_data():
     if await db.municipalities.count_documents({}) > 0:
         return
-    # Municipalities (Aveiro region)
-    muns_data = ["Aveiro", "Ílhavo", "Vagos", "Águeda", "Oliveira do Bairro"]
+    # Aveiro district — 19 municipalities
+    muns_data = [
+        "Águeda", "Albergaria-a-Velha", "Anadia", "Arouca", "Aveiro",
+        "Castelo de Paiva", "Espinho", "Estarreja", "Ílhavo", "Mealhada",
+        "Murtosa", "Oliveira de Azeméis", "Oliveira do Bairro", "Ovar",
+        "Santa Maria da Feira", "São João da Madeira", "Sever do Vouga",
+        "Vagos", "Vale de Cambra",
+    ]
     mun_ids = {}
     for m in muns_data:
         mid = gen_id()
         await db.municipalities.insert_one({"id": mid, "name": m})
         mun_ids[m] = mid
 
-    # Schools
+    # Schools — multiple per municipality covering different cycles
+    # (name, municipality, grades_taught)
     schools_data = [
-        ("EB 2,3 João Afonso de Aveiro", "Aveiro"),
-        ("Escola Secundária José Estêvão", "Aveiro"),
-        ("Escola Secundária Homem Cristo", "Aveiro"),
-        ("EB 2,3 Gafanha da Nazaré", "Ílhavo"),
-        ("Escola Secundária Dr. João Carlos Celestino Gomes", "Ílhavo"),
-        ("EB 2,3 de Vagos", "Vagos"),
-        ("Escola Secundária Marques de Castilho", "Águeda"),
-        ("EB 2,3 Acácio de Azevedo", "Oliveira do Bairro"),
+        # Aveiro (concelho de referência — todas as escolas reais conhecidas)
+        ("Agrupamento de Escolas de Aveiro", "Aveiro", _GRADES_ALL),
+        ("Escola Secundária José Estêvão", "Aveiro", _GRADES_SEC),
+        ("Escola Secundária Homem Cristo", "Aveiro", _GRADES_SEC),
+        ("Escola Secundária Dr. Mário Sacramento", "Aveiro", _GRADES_SEC),
+        ("EB 2,3 João Afonso de Aveiro", "Aveiro", _GRADES_EB23),
+        ("EB 2,3 de Esgueira", "Aveiro", _GRADES_EB23),
+        ("EB 1 de Aveiro – Glória", "Aveiro", _GRADES_EB1),
+        ("EB 1 de Aveiro – Vera Cruz", "Aveiro", _GRADES_EB1),
+        ("EB 1 de Esgueira", "Aveiro", _GRADES_EB1),
+        ("EB 1 de Cacia", "Aveiro", _GRADES_EB1),
+        # Ílhavo
+        ("Escola Secundária Dr. João Carlos Celestino Gomes", "Ílhavo", _GRADES_SEC),
+        ("EB 2,3 Gafanha da Nazaré", "Ílhavo", _GRADES_EB23),
+        ("EB 2,3 José Ferreira Pinto Basto", "Ílhavo", _GRADES_EB23),
+        ("EB 1 da Gafanha da Encarnação", "Ílhavo", _GRADES_EB1),
+        ("EB 1 da Vista Alegre", "Ílhavo", _GRADES_EB1),
+        # Vagos
+        ("Escola Secundária de Vagos", "Vagos", _GRADES_SEC),
+        ("EB 2,3 de Vagos", "Vagos", _GRADES_EB23),
+        ("EB 1 de Vagos", "Vagos", _GRADES_EB1),
+        # Águeda
+        ("Escola Secundária Marques de Castilho", "Águeda", _GRADES_SEC),
+        ("Escola Secundária Adolfo Portela", "Águeda", _GRADES_SEC),
+        ("EB 2,3 Fernando Caldeira", "Águeda", _GRADES_EB23),
+        ("EB 1 de Águeda", "Águeda", _GRADES_EB1),
+        # Oliveira do Bairro
+        ("Escola Secundária de Oliveira do Bairro", "Oliveira do Bairro", _GRADES_SEC),
+        ("EB 2,3 Acácio de Azevedo", "Oliveira do Bairro", _GRADES_EB23),
+        ("EB 1 de Oliveira do Bairro", "Oliveira do Bairro", _GRADES_EB1),
+        # Ovar
+        ("Escola Secundária Júlio Dinis", "Ovar", _GRADES_SEC),
+        ("EB 2,3 Florbela Espanca", "Ovar", _GRADES_EB23),
+        ("EB 1 de Ovar", "Ovar", _GRADES_EB1),
+        # Estarreja
+        ("Escola Secundária de Estarreja", "Estarreja", _GRADES_SEC),
+        ("EB 2,3 Padre Donaciano de Abreu Freire", "Estarreja", _GRADES_EB23),
+        # Albergaria-a-Velha
+        ("Escola Secundária de Albergaria-a-Velha", "Albergaria-a-Velha", _GRADES_SEC),
+        ("EB 2,3 de Albergaria-a-Velha", "Albergaria-a-Velha", _GRADES_EB23),
+        # Anadia
+        ("Escola Secundária de Anadia", "Anadia", _GRADES_SEC),
+        ("EB 2,3 de Anadia", "Anadia", _GRADES_EB23),
+        # Arouca
+        ("Escola Secundária de Arouca", "Arouca", _GRADES_SEC),
+        ("EB 2,3 de Arouca", "Arouca", _GRADES_EB23),
+        # Espinho
+        ("Escola Secundária Dr. Manuel Laranjeira", "Espinho", _GRADES_SEC),
+        ("EB 2,3 Sá Couto", "Espinho", _GRADES_EB23),
+        # Murtosa
+        ("EB 2,3 / Secundária da Murtosa", "Murtosa", _GRADES_EB_SEC),
+        # Mealhada
+        ("Escola Secundária da Mealhada", "Mealhada", _GRADES_SEC),
+        ("EB 2,3 da Mealhada", "Mealhada", _GRADES_EB23),
+        # Oliveira de Azeméis
+        ("Escola Secundária Dr. Ferreira da Silva", "Oliveira de Azeméis", _GRADES_SEC),
+        ("EB 2,3 de Cucujães", "Oliveira de Azeméis", _GRADES_EB23),
+        # São João da Madeira
+        ("Escola Secundária Serafim Leite", "São João da Madeira", _GRADES_SEC),
+        ("EB 2,3 de S. João da Madeira", "São João da Madeira", _GRADES_EB23),
+        # Vale de Cambra
+        ("Escola Secundária de Vale de Cambra", "Vale de Cambra", _GRADES_SEC),
+        # Santa Maria da Feira
+        ("Escola Secundária Coelho e Castro", "Santa Maria da Feira", _GRADES_SEC),
+        ("EB 2,3 de Lobão", "Santa Maria da Feira", _GRADES_EB23),
+        # Sever do Vouga
+        ("Escola Secundária de Sever do Vouga", "Sever do Vouga", _GRADES_SEC),
+        # Castelo de Paiva
+        ("Escola Secundária de Castelo de Paiva", "Castelo de Paiva", _GRADES_SEC),
     ]
     school_ids = {}
-    for name, mun in schools_data:
+    for entry in schools_data:
+        name, mun, grades = entry
         sid = gen_id()
-        await db.schools.insert_one({"id": sid, "name": name, "municipality_id": mun_ids[mun]})
+        await db.schools.insert_one({"id": sid, "name": name, "municipality_id": mun_ids[mun], "grades_taught": grades})
         school_ids[name] = sid
 
     # Import real catalog from seed Excel if present
@@ -928,19 +1071,18 @@ async def seed_demo_data():
         b["created_at"] = iso(now_utc())
         await db.books.insert_one(b)
 
-    # Link books to schools: associate every imported book to every Aveiro school for its grade
-    school_list = list(school_ids.values())
+    # Link books to schools: associate every imported book to schools that teach that grade
     for isbn, grade in imported_isbn_grade.items():
-        for sid in school_list:
+        async for s in db.schools.find({"grades_taught": grade}, {"_id": 0, "id": 1}):
             await db.school_books.insert_one({
-                "id": gen_id(), "school_id": sid, "isbn13": isbn, "grade_level": grade,
+                "id": gen_id(), "school_id": s["id"], "isbn13": isbn, "grade_level": grade,
             })
 
-    # Partners (real Aveiro partners)
+    # Partners (real Aveiro partners) — logos via UI Avatars (hotlink-friendly)
     partners_data = [
-        {"name": "Academia do Beira-Mar", "logo_url": "https://upload.wikimedia.org/wikipedia/en/8/8b/SC_Beira-Mar.png", "description": "Os atletas da Academia do Beira-Mar beneficiam de 5% de desconto nos cadernos de atividades.", "promo_code": "BEIRAMAR5", "discount_value": 5.0, "order": 1, "active": True},
-        {"name": "Academia Vista Alegre", "logo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Vista_Alegre_logo.svg/200px-Vista_Alegre_logo.svg.png", "description": "Os atletas da Academia Vista Alegre beneficiam de 5% de desconto nos cadernos de atividades.", "promo_code": "VISTAALEGRE5", "discount_value": 5.0, "order": 2, "active": True},
-        {"name": "Iliabum Clube", "logo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Iliabum_Clube.png/200px-Iliabum_Clube.png", "description": "Os atletas do Iliabum Clube beneficiam de 5% de desconto nos cadernos de atividades.", "promo_code": "ILIABUM5", "discount_value": 5.0, "order": 3, "active": True},
+        {"name": "Academia do Beira-Mar", "logo_url": "https://ui-avatars.com/api/?name=Beira+Mar&background=000000&color=ffffff&size=240&font-size=0.45&bold=true", "description": "Os atletas da Academia do Beira-Mar beneficiam de um desconto exclusivo nos cadernos de fichas.", "promo_code": "BEIRAMAR5", "discount_value": 5.0, "order": 1, "active": True},
+        {"name": "Academia Vista Alegre", "logo_url": "https://ui-avatars.com/api/?name=Vista+Alegre&background=1B4965&color=ffffff&size=240&font-size=0.40&bold=true", "description": "Os atletas da Academia Vista Alegre beneficiam de um desconto exclusivo nos cadernos de fichas.", "promo_code": "VISTAALEGRE5", "discount_value": 5.0, "order": 2, "active": True},
+        {"name": "Iliabum Clube", "logo_url": "https://ui-avatars.com/api/?name=Iliabum+Clube&background=5A8F1E&color=ffffff&size=240&font-size=0.42&bold=true", "description": "Os atletas do Iliabum Clube beneficiam de um desconto exclusivo nos cadernos de fichas.", "promo_code": "ILIABUM5", "discount_value": 5.0, "order": 3, "active": True},
     ]
     for p in partners_data:
         p["id"] = gen_id()
@@ -950,7 +1092,7 @@ async def seed_demo_data():
     await db.settings.insert_one({
         "id": "global",
         "lamination_price": LAMINATION_PRICE,
-        "aveiro_postcodes": ["3800", "3810", "3830", "3840", "3850", "3860", "3870", "3880"],
+        "aveiro_postcodes": _AVEIRO_DISTRICT_POSTCODES,
     })
     logger.info("Demo data seeded")
 
@@ -968,6 +1110,37 @@ async def shutdown():
 @api.get("/")
 async def root():
     return {"message": "Tendinha do Saber API", "version": "2.0"}
+
+# ---------- SEO endpoints (public) ----------
+@api.get("/seo/tracking")
+async def seo_tracking():
+    s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
+    return {
+        "google_analytics_id": s.get("google_analytics_id") or "",
+        "google_ads_id": s.get("google_ads_id") or "",
+        "facebook_pixel_id": s.get("facebook_pixel_id") or "",
+        "google_site_verification": s.get("google_site_verification") or "",
+    }
+
+@api.get("/seo/sitemap.xml")
+async def seo_sitemap(request: Request):
+    from fastapi.responses import Response
+    s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
+    base = s.get("site_url") or str(request.base_url).rstrip("/").replace("/api", "")
+    # Static public pages
+    static_paths = ["/", "/catalogo", "/parceiros", "/vouchers", "/como-funciona-voucher",
+                    "/sobre", "/faq", "/contactos", "/seguir-encomenda",
+                    "/legal/privacidade", "/legal/termos", "/legal/ral"]
+    today = now_utc().date().isoformat()
+    urls = [f"<url><loc>{base}{p}</loc><lastmod>{today}</lastmod><changefreq>weekly</changefreq><priority>{'1.0' if p=='/' else '0.7'}</priority></url>" for p in static_paths]
+    # All books
+    async for b in db.books.find({"status": {"$ne": "Unavailable"}}, {"isbn13": 1, "_id": 0}):
+        urls.append(f"<url><loc>{base}/livro/{b['isbn13']}</loc><lastmod>{today}</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>")
+    xml = f"""<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">
+{''.join(urls)}
+</urlset>"""
+    return Response(content=xml, media_type="application/xml")
 
 # ---------- Register router ----------
 app.include_router(api)

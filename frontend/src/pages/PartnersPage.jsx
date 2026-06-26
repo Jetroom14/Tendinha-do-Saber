@@ -1,31 +1,34 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
+import SEO from "@/components/SEO";
 
 export default function PartnersPage() {
   const [partners, setPartners] = useState([]);
   useEffect(() => { api.get("/partners").then((r) => setPartners(r.data)); }, []);
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16" data-testid="partners-page">
+      <SEO title="Parceiros" path="/parceiros" description="Conheça os parceiros da Tendinha do Saber em Aveiro — clubes, associações e municípios que oferecem benefícios aos seus membros."/>
       <div className="text-[10px] tracking-[0.2em] uppercase text-[#4A5568] font-semibold mb-2">Parceiros</div>
-      <h1 className="font-display text-3xl md:text-5xl font-medium mb-3">Códigos de desconto</h1>
+      <h1 className="font-display text-3xl md:text-5xl font-medium mb-3">Os nossos parceiros</h1>
       <p className="text-[#4A5568] mb-12 max-w-2xl">
-        Trabalhamos com clubes, associações de pais e municípios da região de Aveiro. Use o código do seu parceiro no carrinho —
-        <strong> 5% de desconto</strong> aplicado a todos os cadernos de fichas.
+        Trabalhamos com clubes, associações de pais e municípios da região de Aveiro. Se é membro de um dos nossos parceiros, peça-lhes o <strong>código exclusivo</strong> para aplicar no carrinho.
       </p>
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
         {partners.map((p) => (
           <div key={p.id} className="bg-white border border-[#E2E8F0] rounded-md overflow-hidden hover:border-[#5A8F1E] transition-colors" data-testid={`partner-card-${p.id}`}>
-            {p.logo_url && <div className="aspect-[16/9] bg-[#F5F8EC]"><img src={p.logo_url} alt={p.name} className="w-full h-full object-cover"/></div>}
+            {p.logo_url && <div className="aspect-[16/9] bg-[#F5F8EC] grid place-items-center p-6"><img src={p.logo_url} alt={p.name} className="max-h-full object-contain" loading="lazy"/></div>}
             <div className="p-6">
               <h3 className="font-display text-xl font-medium text-[#1A202C] mb-1">{p.name}</h3>
-              <p className="text-sm text-[#4A5568] mb-4">{p.description}</p>
-              <div className="flex items-center justify-between border-t border-[#E2E8F0] pt-4">
-                <code className="font-mono text-sm bg-[#F5F8EC] px-3 py-1.5 rounded text-[#5A8F1E]">{p.promo_code}</code>
-                <span className="text-[#E07A1F] font-semibold">−{p.discount_value}%</span>
-              </div>
+              <p className="text-sm text-[#4A5568]">{p.description}</p>
             </div>
           </div>
         ))}
+      </div>
+      <div className="bg-[#F5F8EC] border border-[#E2E8F0] rounded-md p-6 max-w-2xl mx-auto text-center">
+        <p className="text-sm text-[#1A202C] leading-relaxed">
+          <strong>É parceiro ou representante de um clube/associação?</strong><br/>
+          Contacte-nos em <a href="mailto:tendinhadosaber@gmail.com" className="text-[#5A8F1E] hover:underline">tendinhadosaber@gmail.com</a> para criarmos uma parceria.
+        </p>
       </div>
     </div>
   );

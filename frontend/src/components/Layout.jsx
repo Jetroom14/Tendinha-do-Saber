@@ -4,7 +4,8 @@ import { useCart } from "@/contexts/CartContext";
 import { Search, ShoppingBag, User, Menu, Instagram, MapPin, Phone, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import api from "@/lib/api";
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -95,6 +96,8 @@ export function Header() {
 }
 
 export function Footer() {
+  const [partners, setPartners] = useState([]);
+  useEffect(() => { api.get("/partners").then((r) => setPartners(r.data)).catch(() => {}); }, []);
   return (
     <footer className="bg-[#0F1F2E] text-[#E2E8F0] mt-24" data-testid="site-footer">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 grid grid-cols-1 md:grid-cols-4 gap-10">
@@ -147,6 +150,21 @@ export function Footer() {
             <li><a href="https://www.livroreclamacoes.pt" target="_blank" rel="noreferrer" className="hover:text-white">Livro de Reclamações</a></li>
           </ul>
         </div>
+      </div>
+      <div className="border-t border-[#1E2F44]">
+        {partners.length > 0 && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-7" data-testid="footer-partners">
+            <div className="text-[10px] tracking-[0.2em] uppercase text-[#A0AEC0] mb-4 text-center font-semibold">Em parceria com</div>
+            <div className="flex flex-wrap items-center justify-center gap-6">
+              {partners.map((p) => (
+                <Link key={p.id} to="/parceiros" className="flex items-center gap-2 opacity-80 hover:opacity-100 transition-opacity" data-testid={`footer-partner-${p.id}`}>
+                  {p.logo_url && <img src={p.logo_url} alt={p.name} className="w-10 h-10 rounded object-cover bg-white/10" loading="lazy"/>}
+                  <span className="text-xs text-[#CBD5E0] hidden sm:inline">{p.name}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
       <div className="border-t border-[#1E2F44]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-[#A0AEC0]">
