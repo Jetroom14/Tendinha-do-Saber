@@ -1,10 +1,13 @@
 import "@/App.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "sonner";
+import { HelmetProvider } from "react-helmet-async";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { SiteLayout } from "@/components/Layout";
 import { CookieBanner } from "@/components/CookieBanner";
+import ScrollToTop from "@/components/ScrollToTop";
+import TrackingLoader from "@/components/TrackingLoader";
 
 import HomePage from "@/pages/HomePage";
 import CatalogPage from "@/pages/CatalogPage";
@@ -34,12 +37,15 @@ const Site = ({ children }) => (
 
 function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <CartProvider>
-          <Toaster position="top-right" richColors />
-          <CookieBanner />
-          <Routes>
+    <HelmetProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <CartProvider>
+            <Toaster position="top-right" richColors />
+            <CookieBanner />
+            <ScrollToTop />
+            <TrackingLoader />
+            <Routes>
             {/* Public site */}
             <Route path="/" element={<Site><HomePage/></Site>}/>
             <Route path="/catalogo" element={<Site><CatalogPage/></Site>}/>
@@ -75,10 +81,11 @@ function App() {
             </Route>
 
             <Route path="*" element={<Site><NotFoundPage/></Site>}/>
-          </Routes>
-        </CartProvider>
-      </AuthProvider>
-    </BrowserRouter>
+            </Routes>
+          </CartProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </HelmetProvider>
   );
 }
 

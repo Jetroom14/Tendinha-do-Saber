@@ -1,0 +1,22 @@
+User-agent: *
+Allow: /
+Allow: /catalogo
+Allow: /livro/
+Allow: /parceiros
+Allow: /vouchers
+Allow: /como-funciona-voucher
+Allow: /sobre
+Allow: /faq
+Allow: /contactos
+Allow: /seguir-encomenda
+
+Disallow: /admin
+Disallow: /admin/
+Disallow: /checkout
+Disallow: /carrinho
+Disallow: /minha-conta
+Disallow: /login
+Disallow: /registar
+Disallow: /api/
+
+Sitemap: /api/seo/sitemap.xml
