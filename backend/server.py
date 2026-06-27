@@ -9,8 +9,10 @@ import os
 import re
 import uuid
 import json
+import shutil
 import logging
 import secrets
+import mimetypes
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any, Annotated
 
@@ -19,7 +21,7 @@ import jwt
 import pandas as pd
 from io import BytesIO
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, UploadFile, File, Form, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
@@ -33,6 +35,15 @@ JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MIN = 60 * 24  # 24h
 JWT_SECRET = os.environ["JWT_SECRET"]
 LAMINATION_PRICE = float(os.environ.get("LAMINATION_PRICE", "2.00"))
+SHIPPING_FLAT_RATE = float(os.environ.get("SHIPPING_FLAT_RATE", "4.90"))
+
+# Private, non-public storage for MEGA voucher PDFs. NEVER place this under
+# frontend/public or mount it as a FastAPI StaticFiles route — it must only
+# ever be readable through the authenticated /admin/vouchers/{id}/pdf route.
+VOUCHERS_DIR = ROOT_DIR / "private_storage" / "vouchers"
+VOUCHERS_DIR.mkdir(parents=True, exist_ok=True)
+VOUCHER_MAX_BYTES = 8 * 1024 * 1024  # 8MB
+VOUCHER_RETENTION_DAYS = 365  # RGPD: purge PDFs of completed orders after 1 year
 
 app = FastAPI(title="Tendinha do Saber API")
 api = APIRouter(prefix="/api")
@@ -101,9 +112,38 @@ async def get_current_user(request: Request) -> dict:
     except jwt.InvalidTokenError:
         raise HTTPException(401, "Token inválido")
 
+async def get_current_user_optional(request: Request) -> Optional[dict]:
+    """Same as get_current_user but never raises — returns None for
+    anonymous requests. Used by public endpoints (voucher submission)
+    that should still associate a customer_id when the caller happens
+    to be logged in."""
+    auth = request.headers.get("Authorization", "")
+    token = None
+    if auth.startswith("Bearer "):
+        token = auth[7:]
+    if not token:
+        token = request.cookies.get("access_token")
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        if payload.get("type") != "access":
+            return None
+        return await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0})
+    except jwt.PyJWTError:
+        return None
+
 async def require_admin(user: dict = Depends(get_current_user)) -> dict:
-    if user.get("role") not in ("admin", "super_admin"):
+    if user.get("role") not in ("staff", "admin", "super_admin"):
         raise HTTPException(403, "Acesso restrito a administradores")
+    return user
+
+async def require_manager(user: dict = Depends(get_current_user)) -> dict:
+    """Admin/Super Admin only — excludes 'staff'. Use for customer
+    block/delete, financial reports, partners/promo-codes, content and
+    settings management."""
+    if user.get("role") not in ("admin", "super_admin"):
+        raise HTTPException(403, "Acesso restrito a administradores com permissões de gestão")
     return user
 
 async def require_super_admin(user: dict = Depends(get_current_user)) -> dict:
@@ -178,6 +218,10 @@ class PartnerIn(BaseModel):
     description: Optional[str] = ""
     promo_code: str
     discount_value: float = 5.0
+    valid_from: Optional[str] = None
+    valid_until: Optional[str] = None
+    usage_limit: Optional[int] = None
+    active: bool = True
 
 class VoucherSubmitIn(BaseModel):
     code: Optional[str] = None
@@ -199,7 +243,7 @@ class OrderCreateIn(BaseModel):
     customer_name: str
     customer_email: EmailStr
     customer_phone: str
-    delivery_method: str  # hand_delivery | store_pickup
+    delivery_method: str  # hand_delivery | shipping
     address: Optional[str] = ""
     postal_code: Optional[str] = ""
     notes: Optional[str] = ""
@@ -207,14 +251,34 @@ class OrderCreateIn(BaseModel):
 class SettingIn(BaseModel):
     lamination_price: Optional[float] = None
     aveiro_postcodes: Optional[List[str]] = None
+    shipping_flat_rate: Optional[float] = None
     google_analytics_id: Optional[str] = None
     google_ads_id: Optional[str] = None
     facebook_pixel_id: Optional[str] = None
     google_site_verification: Optional[str] = None
     site_url: Optional[str] = None
+    # Optional cover URL template for the publisher (e.g. Porto Editora / WOOK).
+    # Use {isbn} as the placeholder, e.g. "https://.../{isbn}.jpg". Tried FIRST
+    # when enriching covers, so when the publisher publishes a manual's cover it
+    # is picked up automatically on the next "Procurar capas" run.
+    publisher_cover_template: Optional[str] = None
 
 class WishlistIn(BaseModel):
     isbn13: str
+
+class CategoryIn(BaseModel):
+    name: str
+    is_active: bool = True
+
+class ContentIn(BaseModel):
+    about_us: Optional[str] = None
+    hero_title: Optional[str] = None
+    hero_subtitle: Optional[str] = None
+    footer_text: Optional[str] = None
+    instagram_handle: Optional[str] = None
+    instagram_url: Optional[str] = None
+    partners_cta: Optional[str] = None
+    promotions_label: Optional[str] = None
 
 # ---------- Auth routes ----------
 @api.post("/auth/register")
@@ -258,6 +322,9 @@ async def login(payload: LoginIn, request: Request):
             update["attempts"] = 0
         await db.login_attempts.update_one({"identifier": identifier}, {"$set": update}, upsert=True)
         raise HTTPException(401, "Credenciais inválidas")
+
+    if user.get("is_blocked"):
+        raise HTTPException(403, "Esta conta foi bloqueada. Contacte a Tendinha do Saber para mais informações.")
 
     # If admin has pending first-login flow
     if user.get("must_change_password"):
@@ -324,8 +391,9 @@ async def list_books(
     status: Optional[str] = None,
     school_id: Optional[str] = None,
     grade_level: Optional[str] = None,
-    limit: int = 60,
+    limit: int = 20,
     skip: int = 0,
+    page: Optional[int] = None,
 ):
     filt: Dict[str, Any] = {}
     if q:
@@ -349,8 +417,20 @@ async def list_books(
         isbns = await db.school_books.distinct("isbn13", sb_filter)
         filt["isbn13"] = {"$in": isbns}
 
+    limit = max(1, min(limit, 200))
+    if page is not None:
+        skip = max(0, (page - 1)) * limit
+
+    total = await db.books.count_documents(filt)
     cursor = db.books.find(filt, {"_id": 0}).skip(skip).limit(limit)
-    return await cursor.to_list(length=limit)
+    items = await cursor.to_list(length=limit)
+    return {
+        "items": items,
+        "total": total,
+        "page": (skip // limit) + 1 if limit else 1,
+        "page_size": limit,
+        "pages": max(1, (total + limit - 1) // limit),
+    }
 
 @api.get("/books/subjects")
 async def list_subjects():
@@ -395,48 +475,160 @@ async def delete_book(isbn13: str, admin: dict = Depends(require_admin)):
     return {"ok": True}
 
 # ---------- Excel Import ----------
-@api.post("/admin/books/import")
-async def import_books(file: UploadFile = File(...), admin: dict = Depends(require_admin)):
-    content = await file.read()
+def _normalize_import_df(content: bytes):
+    """Reads the Excel and normalizes column names to the internal schema.
+    Returns the dataframe. Raises HTTPException(400) on unreadable files."""
     try:
         df = pd.read_excel(BytesIO(content))
     except Exception as e:
         raise HTTPException(400, f"Falha ao ler ficheiro Excel: {e}")
-
     df.columns = [str(c).strip().lower() for c in df.columns]
     col_map = {
-        "ciclo": "cycle", "ano": "grade_level", "disciplina": "subject",
-        "editora": "publisher", "título": "title", "titulo": "title",
-        "isbn": "isbn13", "artigo": "type", "pvp": "price", "autor": "author",
+        "ciclo": "cycle", "ciclo de ensino": "cycle",
+        "ano": "grade_level", "ano de escolaridade": "grade_level",
+        "disciplina": "subject", "editora": "publisher",
+        "título": "title", "titulo": "title",
+        "isbn": "isbn13", "artigo": "type", "pvp": "price",
+        "preço": "price", "preco": "price",
+        "autor": "author", "autor(es)": "author", "autores": "author",
     }
     df.rename(columns={k: v for k, v in col_map.items() if k in df.columns}, inplace=True)
+    return df
 
-    created = updated = anomalies = 0
-    issues = []
-    for _, row in df.iterrows():
+
+def _classify_import_rows(df) -> List[dict]:
+    """Validates and classifies every row WITHOUT touching the database.
+    Each returned record has an 'action' of 'new' | 'update' | 'error' and,
+    for valid rows, a normalized 'data' dict ready to be persisted."""
+    rows: List[dict] = []
+    for idx, row in df.iterrows():
+        line_no = int(idx) + 2  # +2: header row + 1-based for humans
         isbn = strip_isbn(str(row.get("isbn13", "")))
         title = str(row.get("title", "")).strip()
         try:
             price = float(row.get("price", 0) or 0)
         except Exception:
             price = 0.0
+
+        problems = []
+        if len(isbn) != 13:
+            problems.append("ISBN inválido (deve ter 13 dígitos)")
+        if price <= 0:
+            problems.append("preço em falta ou ≤ 0")
+        if not title:
+            problems.append("título em falta")
+
+        if problems:
+            rows.append({
+                "line": line_no, "isbn": isbn, "title": title,
+                "action": "error", "issue": "; ".join(problems),
+            })
+            continue
+
+        item_type = "Workbook" if ("caderno" in str(row.get("type", "")).lower()
+                                   or "workbook" in str(row.get("type", "")).lower()) else "Manual"
+        rows.append({
+            "line": line_no,
+            "isbn": isbn,
+            "title": title,
+            "action": "pending",  # resolved to new/update during preview against DB
+            "data": {
+                "isbn13": isbn,
+                "title": title,
+                "author": str(row.get("author", "") or ""),
+                "publisher": str(row.get("publisher", "") or ""),
+                "subject": str(row.get("subject", "") or ""),
+                "price": round(price, 2),
+                "type": item_type,
+                "cycle": str(row.get("cycle", "") or ""),
+                "grade_level": str(row.get("grade_level", "") or ""),
+            },
+        })
+    return rows
+
+
+@api.post("/admin/books/import/preview")
+async def import_books_preview(file: UploadFile = File(...), admin: dict = Depends(require_admin)):
+    """PHASE 1 — dry run. Parses and validates the Excel, reports how many
+    rows would be created / updated / rejected, and returns the validated
+    payload (base64) to be sent back to /commit. The database is NOT touched."""
+    content = await file.read()
+    df = _normalize_import_df(content)
+    classified = _classify_import_rows(df)
+
+    valid_rows = []
+    new_count = update_count = 0
+    for r in classified:
+        if r["action"] == "error":
+            continue
+        existing = await db.books.find_one({"isbn13": r["data"]["isbn13"]}, {"_id": 0, "isbn13": 1})
+        r["action"] = "update" if existing else "new"
+        if existing:
+            update_count += 1
+        else:
+            new_count += 1
+        valid_rows.append(r)
+
+    errors = [r for r in classified if r["action"] == "error"]
+    # Token carries only the validated rows, so /commit re-validates nothing
+    # the user didn't already see in the preview.
+    import base64 as _b64
+    token = _b64.b64encode(json.dumps([r["data"] for r in valid_rows]).encode()).decode()
+
+    return {
+        "summary": {
+            "new": new_count,
+            "update": update_count,
+            "errors": len(errors),
+            "total": len(classified),
+        },
+        "preview": (
+            [{"line": r["line"], "isbn": r["isbn"], "title": r["title"], "action": r["action"]} for r in valid_rows[:100]]
+            + [{"line": r["line"], "isbn": r["isbn"], "title": r["title"], "action": "error", "issue": r["issue"]} for r in errors[:100]]
+        ),
+        "errors": [{"line": r["line"], "isbn": r["isbn"], "title": r["title"], "issue": r["issue"]} for r in errors],
+        "commit_token": token,
+    }
+
+
+class ImportCommitIn(BaseModel):
+    commit_token: str
+
+
+@api.post("/admin/books/import/commit")
+async def import_books_commit(payload: ImportCommitIn, admin: dict = Depends(require_admin)):
+    """PHASE 2 — apply. Takes the validated payload from /preview and performs
+    the UPSERT. Existing ISBNs update price/type/title/publisher/author/subject
+    but preserve manually-curated synopsis and cover image. Invalid rows never
+    reach this stage."""
+    import base64 as _b64
+    try:
+        rows = json.loads(_b64.b64decode(payload.commit_token).decode())
+    except Exception:
+        raise HTTPException(400, "Token de importação inválido. Repita a pré-visualização.")
+    if not isinstance(rows, list):
+        raise HTTPException(400, "Token de importação corrompido.")
+
+    created = updated = 0
+    for data in rows:
+        isbn = strip_isbn(str(data.get("isbn13", "")))
+        try:
+            price = float(data.get("price", 0) or 0)
+        except Exception:
+            price = 0.0
         if len(isbn) != 13 or price <= 0:
-            anomalies += 1
-            issues.append({"isbn": isbn, "title": title, "issue": "ISBN inválido ou preço 0"})
-            if len(isbn) != 13:
-                continue
-        item_type = "Workbook" if "caderno" in str(row.get("type", "")).lower() or "workbook" in str(row.get("type", "")).lower() else "Manual"
+            continue  # defensive: invalid rows never persist
         existing = await db.books.find_one({"isbn13": isbn})
         if existing:
             await db.books.update_one(
                 {"isbn13": isbn},
                 {"$set": {
-                    "price": price,
-                    "type": item_type,
-                    "title": title or existing.get("title", ""),
-                    "publisher": str(row.get("publisher", existing.get("publisher", ""))),
-                    "author": str(row.get("author", existing.get("author", ""))),
-                    "subject": str(row.get("subject", existing.get("subject", ""))),
+                    "price": round(price, 2),
+                    "type": data.get("type", "Manual"),
+                    "title": data.get("title") or existing.get("title", ""),
+                    "publisher": data.get("publisher", existing.get("publisher", "")),
+                    "author": data.get("author", existing.get("author", "")),
+                    "subject": data.get("subject", existing.get("subject", "")),
                     "updated_at": iso(now_utc()),
                 }},
             )
@@ -445,58 +637,183 @@ async def import_books(file: UploadFile = File(...), admin: dict = Depends(requi
             doc = {
                 "id": gen_id(),
                 "isbn13": isbn,
-                "title": title,
-                "author": str(row.get("author", "")),
-                "publisher": str(row.get("publisher", "")),
-                "subject": str(row.get("subject", "")),
-                "price": price,
-                "type": item_type,
-                "status": "Available" if price > 0 else "Unavailable",
+                "title": data.get("title", ""),
+                "author": data.get("author", ""),
+                "publisher": data.get("publisher", ""),
+                "subject": data.get("subject", ""),
+                "price": round(price, 2),
+                "type": data.get("type", "Manual"),
+                "status": "Available",
                 "stock_qty": 0,
                 "synopsis": "",
-                "features": {"cycle": str(row.get("cycle", "")), "grade": str(row.get("grade_level", ""))},
+                "features": {"cycle": data.get("cycle", ""), "grade": data.get("grade_level", "")},
                 "image_url": "",
                 "is_lamination_eligible": True,
                 "created_at": iso(now_utc()),
             }
             await db.books.insert_one(doc)
             created += 1
+
+    await log_action(admin["id"], "import", "books", None, {"created": created, "updated": updated})
+    return {"created": created, "updated": updated}
+
+
+@api.post("/admin/books/import")
+async def import_books(file: UploadFile = File(...), admin: dict = Depends(require_admin)):
+    """Legacy one-shot import kept for backward compatibility. Now also
+    enforces the 'never import invalid rows' rule (price <= 0 are skipped)."""
+    content = await file.read()
+    df = _normalize_import_df(content)
+    classified = _classify_import_rows(df)
+
+    created = updated = anomalies = 0
+    issues = []
+    for r in classified:
+        if r["action"] == "error":
+            anomalies += 1
+            issues.append({"isbn": r["isbn"], "title": r["title"], "issue": r["issue"]})
+            continue
+        data = r["data"]
+        isbn = data["isbn13"]
+        existing = await db.books.find_one({"isbn13": isbn})
+        if existing:
+            await db.books.update_one(
+                {"isbn13": isbn},
+                {"$set": {
+                    "price": data["price"], "type": data["type"],
+                    "title": data["title"] or existing.get("title", ""),
+                    "publisher": data["publisher"] or existing.get("publisher", ""),
+                    "author": data["author"] or existing.get("author", ""),
+                    "subject": data["subject"] or existing.get("subject", ""),
+                    "updated_at": iso(now_utc()),
+                }},
+            )
+            updated += 1
+        else:
+            await db.books.insert_one({
+                "id": gen_id(), "isbn13": isbn, "title": data["title"],
+                "author": data["author"], "publisher": data["publisher"],
+                "subject": data["subject"], "price": data["price"], "type": data["type"],
+                "status": "Available", "stock_qty": 0, "synopsis": "",
+                "features": {"cycle": data["cycle"], "grade": data["grade_level"]},
+                "image_url": "", "is_lamination_eligible": True,
+                "created_at": iso(now_utc()),
+            })
+            created += 1
     await log_action(admin["id"], "import", "books", None, {"created": created, "updated": updated, "anomalies": anomalies})
     return {"created": created, "updated": updated, "anomalies": anomalies, "issues": issues[:50]}
 
 # Enrich missing book covers via Google Books API
+async def _resolve_cover_url(client_http, book: dict, publisher_template: Optional[str] = None) -> Optional[str]:
+    """Tries several public sources, in order of reliability, and returns the
+    first WORKING cover URL (or None):
+      0. Publisher template (configurable, e.g. Porto Editora / WOOK) — if set
+      1. Google Books by ISBN
+      2. Google Books by title + author
+      3. Open Library by ISBN
+    A URL only counts if the image actually exists (HTTP 200 + image/* + real
+    size), so we never store a dead link that would just fall back to the
+    themed placeholder. This means a publisher template can be left configured
+    permanently: while a manual's cover doesn't exist yet it's simply skipped,
+    and the day the publisher publishes it, the next run picks it up."""
+    isbn = book.get("isbn13", "")
+    title = book.get("title", "")
+    author = book.get("author", "")
+
+    async def _image_ok(url: str) -> bool:
+        try:
+            r = await client_http.get(url, follow_redirects=True)
+            ctype = r.headers.get("content-type", "")
+            # Some CDNs return a 1x1 "not found" pixel; require a real-sized image.
+            return r.status_code == 200 and ctype.startswith("image") and len(r.content) > 1500
+        except Exception:
+            return False
+
+    # 0. Publisher cover template (configured in Settings). Tried first because,
+    #    for this catalog (mostly Porto Editora group), it's the most accurate
+    #    source once the manual is on sale.
+    if publisher_template and "{isbn}" in publisher_template:
+        pub_url = publisher_template.replace("{isbn}", isbn)
+        if await _image_ok(pub_url):
+            return pub_url
+
+    # 1. Google Books by ISBN (best coverage for PT trade + many schoolbooks)
+    try:
+        r = await client_http.get(f"https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}&country=PT")
+        data = r.json()
+        if data.get("totalItems", 0) > 0:
+            links = (data["items"][0].get("volumeInfo", {}).get("imageLinks") or {})
+            u = links.get("thumbnail") or links.get("smallThumbnail")
+            if u:
+                return u.replace("http://", "https://").replace("&edge=curl", "")
+    except Exception:
+        pass
+
+    # 2. Google Books by title + author (catches editions indexed without ISBN)
+    if title:
+        try:
+            q = f'intitle:"{title}"'
+            if author:
+                q += f'+inauthor:"{author}"'
+            r = await client_http.get(f"https://www.googleapis.com/books/v1/volumes?q={q}&maxResults=1&country=PT")
+            data = r.json()
+            if data.get("totalItems", 0) > 0:
+                links = (data["items"][0].get("volumeInfo", {}).get("imageLinks") or {})
+                u = links.get("thumbnail") or links.get("smallThumbnail")
+                if u:
+                    return u.replace("http://", "https://").replace("&edge=curl", "")
+        except Exception:
+            pass
+
+    # 3. Open Library by ISBN — ?default=false makes it 404 instead of returning
+    #    a blank placeholder, so _image_ok correctly rejects misses.
+    ol_url = f"https://covers.openlibrary.org/b/isbn/{isbn}-L.jpg?default=false"
+    if await _image_ok(ol_url):
+        return ol_url
+
+    return None
+
+
+@api.get("/admin/books/covers-status")
+async def covers_status(admin: dict = Depends(require_admin)):
+    """How many books still need a real cover (so the UI can show progress)."""
+    total = await db.books.count_documents({})
+    missing = await db.books.count_documents(
+        {"$or": [{"image_url": ""}, {"image_url": None}, {"image_url": {"$regex": "openlibrary"}}]}
+    )
+    return {"total": total, "with_cover": total - missing, "missing": missing}
+
+
 @api.post("/admin/books/enrich-covers")
-async def enrich_covers(admin: dict = Depends(require_admin), limit: int = 100):
+async def enrich_covers(admin: dict = Depends(require_admin), limit: int = 50):
+    """Fills in missing book covers from public sources (see _resolve_cover_url).
+    Processes up to `limit` books per call so a large catalog can be done in
+    batches without timing out. Returns how many were updated and how many
+    still have no cover, so the front end can keep calling until done."""
     import httpx
     updated = 0
-    cursor = db.books.find({"$or": [{"image_url": ""}, {"image_url": None}, {"image_url": {"$regex": "openlibrary"}}]}, {"_id": 0}).limit(limit)
-    async with httpx.AsyncClient(timeout=8.0) as client_http:
+    processed = 0
+    settings = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
+    publisher_template = settings.get("publisher_cover_template") or None
+    cursor = db.books.find(
+        {"$or": [{"image_url": ""}, {"image_url": None}, {"image_url": {"$regex": "openlibrary"}}]},
+        {"_id": 0},
+    ).limit(limit)
+    async with httpx.AsyncClient(timeout=10.0, headers={"User-Agent": "TendinhaDoSaber/1.0"}) as client_http:
         async for b in cursor:
-            isbn = b["isbn13"]
-            url = None
+            processed += 1
             try:
-                r = await client_http.get(f"https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}")
-                data = r.json()
-                if data.get("totalItems", 0) > 0:
-                    info = data["items"][0].get("volumeInfo", {})
-                    links = info.get("imageLinks") or {}
-                    url = links.get("thumbnail") or links.get("smallThumbnail")
-                if not url:
-                    q = f'intitle:"{b.get("title","")}"+inauthor:"{b.get("author","")}"'
-                    r = await client_http.get(f"https://www.googleapis.com/books/v1/volumes?q={q}&maxResults=1")
-                    data = r.json()
-                    if data.get("totalItems", 0) > 0:
-                        info = data["items"][0].get("volumeInfo", {})
-                        links = info.get("imageLinks") or {}
-                        url = links.get("thumbnail") or links.get("smallThumbnail")
+                url = await _resolve_cover_url(client_http, b, publisher_template)
                 if url:
-                    url = url.replace("http://", "https://").replace("&edge=curl", "")
-                    await db.books.update_one({"isbn13": isbn}, {"$set": {"image_url": url}})
+                    await db.books.update_one({"isbn13": b["isbn13"]}, {"$set": {"image_url": url}})
                     updated += 1
             except Exception:
                 continue
-    await log_action(admin["id"], "enrich", "covers", None, {"updated": updated})
-    return {"updated": updated}
+    remaining = await db.books.count_documents(
+        {"$or": [{"image_url": ""}, {"image_url": None}, {"image_url": {"$regex": "openlibrary"}}]}
+    )
+    await log_action(admin["id"], "enrich", "covers", None, {"updated": updated, "processed": processed})
+    return {"updated": updated, "processed": processed, "remaining": remaining, "done": remaining == 0}
 
 # ---------- Municipalities / Schools ----------
 @api.get("/municipalities")
@@ -570,16 +887,98 @@ async def unlink_school_book(link_id: str, admin: dict = Depends(require_admin))
     await db.school_books.delete_one({"id": link_id})
     return {"ok": True}
 
+@api.post("/admin/school-books/import")
+async def import_school_books(file: UploadFile = File(...), admin: dict = Depends(require_admin)):
+    """Imports the Escola<->ISBN relationships file: columns ISBN | Município
+    (Municipality) | Escola (School) | Disciplina (Subject) | Ano (Grade
+    Level). Municípios and Escolas are found-or-created by name so this can
+    run standalone even before any school exists yet."""
+    content = await file.read()
+    try:
+        df = pd.read_excel(BytesIO(content))
+    except Exception as e:
+        raise HTTPException(400, f"Falha ao ler ficheiro Excel: {e}")
+
+    df.columns = [str(c).strip().lower() for c in df.columns]
+    col_map = {
+        "isbn": "isbn13", "município": "municipality", "municipio": "municipality",
+        "municipality": "municipality", "escola": "school", "school": "school",
+        "disciplina": "subject", "subject": "subject",
+        "ano": "grade_level", "ano de escolaridade": "grade_level", "grade level": "grade_level", "grade_level": "grade_level",
+    }
+    df.rename(columns={k: v for k, v in col_map.items() if k in df.columns}, inplace=True)
+
+    mun_cache: Dict[str, str] = {}
+    school_cache: Dict[tuple, str] = {}
+    created_links = updated_links = created_schools = created_munis = anomalies = 0
+    issues = []
+
+    for _, row in df.iterrows():
+        isbn = strip_isbn(str(row.get("isbn13", "")))
+        mun_name = str(row.get("municipality", "")).strip()
+        school_name = str(row.get("school", "")).strip()
+        grade = _grade_to_label(row.get("grade_level", ""))
+        if len(isbn) != 13 or not school_name or not mun_name or not grade:
+            anomalies += 1
+            issues.append({"isbn": isbn, "school": school_name, "issue": "ISBN/Município/Escola/Ano em falta ou inválido"})
+            continue
+
+        mun_key = mun_name.lower()
+        if mun_key not in mun_cache:
+            mun_doc = await db.municipalities.find_one({"name": {"$regex": f"^{re.escape(mun_name)}$", "$options": "i"}})
+            if not mun_doc:
+                mun_doc = {"id": gen_id(), "name": mun_name}
+                await db.municipalities.insert_one(mun_doc)
+                created_munis += 1
+            mun_cache[mun_key] = mun_doc["id"]
+        mun_id = mun_cache[mun_key]
+
+        school_key = (school_name.lower(), mun_id)
+        if school_key not in school_cache:
+            school_doc = await db.schools.find_one({"name": {"$regex": f"^{re.escape(school_name)}$", "$options": "i"}, "municipality_id": mun_id})
+            if not school_doc:
+                school_doc = {"id": gen_id(), "name": school_name, "municipality_id": mun_id, "grades_taught": _GRADES_ALL}
+                await db.schools.insert_one(school_doc)
+                created_schools += 1
+            school_cache[school_key] = school_doc["id"]
+        school_id = school_cache[school_key]
+
+        existing = await db.school_books.find_one({"school_id": school_id, "isbn13": isbn, "grade_level": grade})
+        if existing:
+            updated_links += 1
+            continue
+        await db.school_books.insert_one({
+            "id": gen_id(), "school_id": school_id, "isbn13": isbn, "grade_level": grade,
+            "subject": str(row.get("subject", "")).strip(),
+        })
+        created_links += 1
+
+    await log_action(admin["id"], "import", "school_books", None, {
+        "created_links": created_links, "created_schools": created_schools,
+        "created_municipalities": created_munis, "anomalies": anomalies,
+    })
+    return {
+        "created_links": created_links, "already_existing_links": updated_links,
+        "created_schools": created_schools, "created_municipalities": created_munis,
+        "anomalies": anomalies, "issues": issues[:50],
+    }
+
 # ---------- Partners ----------
 @api.get("/partners")
 async def list_partners():
-    return await db.partners.find({}, {"_id": 0}).to_list(200)
+    return await db.partners.find({"active": {"$ne": False}}, {"_id": 0}).sort("order", 1).to_list(200)
+
+@api.get("/admin/partners")
+async def admin_list_partners(admin: dict = Depends(require_admin)):
+    return await db.partners.find({}, {"_id": 0}).sort("order", 1).to_list(200)
 
 @api.post("/admin/partners")
-async def create_partner(payload: PartnerIn, admin: dict = Depends(require_admin)):
+async def create_partner(payload: PartnerIn, admin: dict = Depends(require_manager)):
     doc = payload.model_dump()
     doc["id"] = gen_id()
     doc["promo_code"] = doc["promo_code"].upper()
+    doc["usage_count"] = 0
+    doc["order"] = await db.partners.count_documents({})
     if await db.partners.find_one({"promo_code": doc["promo_code"]}):
         raise HTTPException(400, "Código promocional já existe")
     await db.partners.insert_one(doc)
@@ -587,16 +986,121 @@ async def create_partner(payload: PartnerIn, admin: dict = Depends(require_admin
     doc.pop("_id", None)
     return doc
 
-@api.delete("/admin/partners/{pid}")
-async def delete_partner(pid: str, admin: dict = Depends(require_admin)):
-    await db.partners.delete_one({"id": pid})
+@api.put("/admin/partners/{pid}")
+async def update_partner(pid: str, payload: PartnerIn, admin: dict = Depends(require_manager)):
+    update = payload.model_dump()
+    update["promo_code"] = update["promo_code"].upper()
+    dup = await db.partners.find_one({"promo_code": update["promo_code"], "id": {"$ne": pid}})
+    if dup:
+        raise HTTPException(400, "Código promocional já está a ser usado por outro parceiro")
+    res = await db.partners.update_one({"id": pid}, {"$set": update})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Parceiro não encontrado")
+    await log_action(admin["id"], "update", "partner", pid)
+    return clean_doc(await db.partners.find_one({"id": pid}))
+
+@api.put("/admin/partners/{pid}/reorder")
+async def reorder_partner(pid: str, order: int = Form(...), admin: dict = Depends(require_manager)):
+    await db.partners.update_one({"id": pid}, {"$set": {"order": order}})
     return {"ok": True}
+
+@api.delete("/admin/partners/{pid}")
+async def delete_partner(pid: str, admin: dict = Depends(require_manager)):
+    await db.partners.delete_one({"id": pid})
+    await log_action(admin["id"], "delete", "partner", pid)
+    return {"ok": True}
+
+def _promo_is_valid(promo: dict) -> bool:
+    if not promo or promo.get("active") is False:
+        return False
+    now = now_utc()
+    if promo.get("valid_from"):
+        try:
+            if now < datetime.fromisoformat(promo["valid_from"]).replace(tzinfo=timezone.utc):
+                return False
+        except Exception:
+            pass
+    if promo.get("valid_until"):
+        try:
+            if now > datetime.fromisoformat(promo["valid_until"]).replace(tzinfo=timezone.utc):
+                return False
+        except Exception:
+            pass
+    limit = promo.get("usage_limit")
+    if limit is not None and promo.get("usage_count", 0) >= limit:
+        return False
+    return True
+
+# ---------- Categories (future-proofing: mochilas, calculadoras, etc.) ----------
+@api.get("/categories")
+async def list_categories():
+    return await db.categories.find({"is_active": True}, {"_id": 0}).sort("name", 1).to_list(200)
+
+@api.get("/admin/categories")
+async def admin_list_categories(admin: dict = Depends(require_admin)):
+    return await db.categories.find({}, {"_id": 0}).sort("name", 1).to_list(200)
+
+@api.post("/admin/categories")
+async def create_category(payload: CategoryIn, admin: dict = Depends(require_admin)):
+    if await db.categories.find_one({"name": payload.name}):
+        raise HTTPException(400, "Categoria já existe")
+    doc = {"id": gen_id(), **payload.model_dump()}
+    await db.categories.insert_one(doc)
+    await log_action(admin["id"], "create", "category", doc["id"])
+    doc.pop("_id", None)
+    return doc
+
+@api.put("/admin/categories/{cid}")
+async def update_category(cid: str, payload: CategoryIn, admin: dict = Depends(require_admin)):
+    res = await db.categories.update_one({"id": cid}, {"$set": payload.model_dump()})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Categoria não encontrada")
+    await log_action(admin["id"], "update", "category", cid)
+    return {"ok": True}
+
+@api.delete("/admin/categories/{cid}")
+async def delete_category(cid: str, admin: dict = Depends(require_admin)):
+    await db.categories.delete_one({"id": cid})
+    await log_action(admin["id"], "delete", "category", cid)
+    return {"ok": True}
+
+# ---------- Content / CMS ----------
+_CONTENT_DEFAULTS = {
+    "about_us": (
+        "A Tendinha do Saber nasceu em Aveiro com um objetivo simples: tornar a compra de manuais "
+        "escolares e cadernos de atividades mais fácil, rápida e próxima das famílias. Trabalhamos "
+        "diretamente com as escolas do concelho para que cada encomenda corresponda exatamente à "
+        "lista do ano e da turma do seu filho — sem confusões, sem stress de início de ano letivo."
+    ),
+    "hero_title": "Os manuais escolares de que precisa, de forma simples, rápida e com a confiança de uma livraria de proximidade.",
+    "hero_subtitle": "Encontre os manuais e cadernos de atividades da sua escola, utilize o Voucher MEGA e escolha a plastificação dos seus livros.",
+    "footer_text": "Mais do que uma livraria, um parceiro das famílias na escolha dos manuais escolares.",
+    "instagram_handle": "@tendinhadosaber",
+    "instagram_url": "https://instagram.com/tendinhadosaber",
+    "partners_cta": "Tem interesse em tornar-se parceiro da Tendinha do Saber?",
+    "promotions_label": "Desconto exclusivo para parceiros",
+}
+
+@api.get("/content")
+async def get_content():
+    doc = await db.site_content.find_one({"id": "main"}, {"_id": 0}) or {}
+    return {**_CONTENT_DEFAULTS, **{k: v for k, v in doc.items() if v not in (None, "") and k != "id"}}
+
+@api.put("/admin/content")
+async def update_content(payload: ContentIn, admin: dict = Depends(require_manager)):
+    update = {k: v for k, v in payload.model_dump().items() if v is not None}
+    await db.site_content.update_one({"id": "main"}, {"$set": {**update, "id": "main"}}, upsert=True)
+    await log_action(admin["id"], "update", "content", "main", update)
+    doc = await db.site_content.find_one({"id": "main"}, {"_id": 0}) or {}
+    return {**_CONTENT_DEFAULTS, **{k: v for k, v in doc.items() if v not in (None, "") and k != "id"}}
 
 # ---------- Cart / Promo ----------
 async def _compute_cart(items: List[CartItem], promo_code: Optional[str]) -> dict:
     promo = None
     if promo_code:
-        promo = await db.partners.find_one({"promo_code": promo_code.upper()}, {"_id": 0})
+        candidate = await db.partners.find_one({"promo_code": promo_code.upper()}, {"_id": 0})
+        if candidate and _promo_is_valid(candidate):
+            promo = candidate
 
     settings = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
     lam_price = float(settings.get("lamination_price", LAMINATION_PRICE))
@@ -647,19 +1151,48 @@ async def _compute_cart(items: List[CartItem], promo_code: Optional[str]) -> dic
         "total": round(total, 2),
         "promo": {"code": promo["promo_code"], "discount_value": promo["discount_value"], "partner": promo["name"]} if promo else None,
         "lamination_price": lam_price,
+        "shipping_flat_rate": float(settings.get("shipping_flat_rate", SHIPPING_FLAT_RATE)),
     }
 
 @api.post("/cart/validate")
 async def cart_validate(payload: PromoValidateIn):
     return await _compute_cart(payload.items, payload.promo_code)
 
-# ---------- Postcodes (Aveiro geofencing) ----------
+# ---------- Postcodes (Aveiro geofencing — concelho, not distrito) ----------
 @api.get("/postcode/check")
 async def check_postcode(code: str):
     code_clean = code.strip().split("-")[0][:4] if code else ""
     settings = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
-    aveiro = settings.get("aveiro_postcodes", _AVEIRO_DISTRICT_POSTCODES)
+    aveiro = settings.get("aveiro_postcodes", _AVEIRO_CONCELHO_POSTCODES)
     return {"hand_delivery_available": code_clean in aveiro, "postcode": code_clean, "valid_zones": aveiro}
+
+# ---------- Stock reservation ----------
+async def _reserve_stock(lines: List[dict]) -> List[dict]:
+    """Atomically decrements stock for 'Available' lines so the same
+    physical copy can't be sold twice. Returns the adjustments actually
+    applied, so they can be rolled back (compensating action on a later
+    failure, or stock restored if the order is later cancelled)."""
+    reserved: List[dict] = []
+    for line in lines:
+        book = await db.books.find_one({"isbn13": line["isbn13"]}, {"_id": 0})
+        if not book or book.get("status") == "Unavailable":
+            await _restore_stock(reserved)
+            raise HTTPException(400, f"'{line.get('title', line['isbn13'])}' já não está disponível.")
+        if book.get("status") == "Available":
+            res = await db.books.update_one(
+                {"isbn13": line["isbn13"], "stock_qty": {"$gte": line["qty"]}},
+                {"$inc": {"stock_qty": -line["qty"]}},
+            )
+            if res.matched_count == 0:
+                await _restore_stock(reserved)
+                raise HTTPException(409, f"Já não há stock suficiente de '{book.get('title')}'.")
+            reserved.append({"isbn13": line["isbn13"], "qty": line["qty"]})
+        # status == PreOrder: nothing physical to reserve, always allowed.
+    return reserved
+
+async def _restore_stock(adjustments: List[dict]):
+    for adj in adjustments:
+        await db.books.update_one({"isbn13": adj["isbn13"]}, {"$inc": {"stock_qty": adj["qty"]}})
 
 # ---------- Orders ----------
 @api.post("/orders")
@@ -667,12 +1200,30 @@ async def create_order(payload: OrderCreateIn):
     summary = await _compute_cart(payload.items, payload.promo_code)
     if not summary["lines"]:
         raise HTTPException(400, "Carrinho vazio ou livros indisponíveis")
+
+    shipping_cost = 0.0
     if payload.delivery_method == "hand_delivery":
         chk = await check_postcode(payload.postal_code)
         if not chk["hand_delivery_available"]:
-            raise HTTPException(400, "Entrega em mão não disponível para este código postal")
+            raise HTTPException(400, "Entrega em mão disponível apenas no concelho de Aveiro para este código postal.")
+    elif payload.delivery_method == "shipping":
+        if not payload.address or not payload.postal_code:
+            raise HTTPException(400, "Indique a morada e o código postal para envio.")
+        settings = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
+        shipping_cost = float(settings.get("shipping_flat_rate", SHIPPING_FLAT_RATE))
+    else:
+        raise HTTPException(400, "Método de entrega inválido. Use 'hand_delivery' ou 'shipping'.")
 
+    # Reserve stock atomically before committing the order (prevents overselling).
+    stock_adjustments = await _reserve_stock(summary["lines"])
+
+    total_with_shipping = round(summary["total"] + shipping_cost, 2)
     order_no = f"TS-{int(now_utc().timestamp())}"
+
+    customer_match = await db.users.find_one(
+        {"email": payload.customer_email.lower(), "role": "customer"}, {"_id": 0, "password_hash": 0}
+    )
+
     doc = {
         "id": gen_id(),
         "order_no": order_no,
@@ -682,10 +1233,12 @@ async def create_order(payload: OrderCreateIn):
             "subtotal_workbooks": summary["subtotal_workbooks"],
             "discount_workbooks": summary["discount_workbooks"],
             "lamination_total": summary["lamination_total"],
-            "total": summary["total"],
+            "shipping_cost": round(shipping_cost, 2),
+            "total": total_with_shipping,
         },
         "promo": summary.get("promo"),
         "customer": {
+            "id": customer_match["id"] if customer_match else None,
             "name": payload.customer_name,
             "email": payload.customer_email.lower(),
             "phone": payload.customer_phone,
@@ -700,12 +1253,17 @@ async def create_order(payload: OrderCreateIn):
         "payment_status": "pending",
         "payment_provider": "ifthenpay_mocked",
         "invoice_status": "not_issued",
+        "stock_adjustments": stock_adjustments,
         "created_at": iso(now_utc()),
     }
     await db.orders.insert_one(doc)
     doc.pop("_id", None)
+
+    if summary.get("promo"):
+        await db.partners.update_one({"promo_code": summary["promo"]["code"]}, {"$inc": {"usage_count": 1}})
+
     # MOCKED payment + invoice hook
-    logger.info(f"[MOCKED IFTHENPAY] Order {order_no} created, total={summary['total']}€")
+    logger.info(f"[MOCKED IFTHENPAY] Order {order_no} created, total={total_with_shipping}€")
     return doc
 
 @api.get("/orders/{order_no}")
@@ -722,9 +1280,15 @@ async def admin_list_orders(admin: dict = Depends(require_admin), status: Option
 
 @api.put("/admin/orders/{order_no}/status")
 async def admin_update_order(order_no: str, status: str = Form(...), admin: dict = Depends(require_admin)):
-    res = await db.orders.update_one({"order_no": order_no}, {"$set": {"status": status, "updated_at": iso(now_utc())}})
-    if res.matched_count == 0:
+    order = await db.orders.find_one({"order_no": order_no})
+    if not order:
         raise HTTPException(404, "Encomenda não encontrada")
+    was_cancelled = (order.get("status") or "").lower().startswith("cancel")
+    will_cancel = status.lower().startswith("cancel")
+    if will_cancel and not was_cancelled:
+        await _restore_stock(order.get("stock_adjustments", []))
+
+    await db.orders.update_one({"order_no": order_no}, {"$set": {"status": status, "updated_at": iso(now_utc())}})
     await log_action(admin["id"], "update_status", "order", order_no, {"status": status})
     if status == "paid":
         logger.info(f"[MOCKED INVOICEXPRESS] Fatura-Recibo gerada para {order_no}")
@@ -732,16 +1296,70 @@ async def admin_update_order(order_no: str, status: str = Form(...), admin: dict
     return {"ok": True}
 
 # ---------- Vouchers ----------
+async def _check_voucher_rate_limit(identifier: str):
+    """Simple sliding-window throttle: max 8 voucher submissions per
+    identifier (email or IP) per hour. Protects the public, unauthenticated
+    endpoint from spam."""
+    window_start = iso(now_utc() - timedelta(hours=1))
+    count = await db.voucher_submissions.count_documents({"identifier": identifier, "at": {"$gte": window_start}})
+    if count >= 8:
+        raise HTTPException(429, "Demasiadas submissões de voucher. Tente novamente mais tarde ou contacte-nos.")
+    await db.voucher_submissions.insert_one({"identifier": identifier, "at": iso(now_utc())})
+
 @api.post("/vouchers")
-async def submit_voucher(payload: VoucherSubmitIn):
-    # public submission (anonymous)
+async def submit_voucher(payload: VoucherSubmitIn, request: Request, user: Optional[dict] = Depends(get_current_user_optional)):
+    """Legacy/simple path: code only, or (back-compat) an external pdf_url.
+    For a real private PDF upload use POST /vouchers/upload instead."""
+    identifier = (user["email"] if user else request.client.host) or "anon"
+    await _check_voucher_rate_limit(identifier)
     doc = {
         "id": gen_id(),
         "code": (payload.code or "").upper().strip() or None,
         "pdf_url": payload.pdf_url,
+        "pdf_storage_path": None,
         "notes": payload.notes,
         "status": "Pending",
-        "customer_id": None,
+        "customer_id": user["id"] if user else None,
+        "order_id": None,
+        "created_at": iso(now_utc()),
+    }
+    await db.vouchers.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+@api.post("/vouchers/upload")
+async def upload_voucher(
+    request: Request,
+    file: UploadFile = File(...),
+    code: Optional[str] = Form(None),
+    notes: Optional[str] = Form(None),
+    user: Optional[dict] = Depends(get_current_user_optional),
+):
+    """Real, private PDF upload for a MEGA voucher. The file is validated,
+    renamed to a server-generated UUID, and stored OUTSIDE any publicly
+    served directory. It can only be read back via the authenticated
+    GET /admin/vouchers/{id}/pdf endpoint (no public URL ever exists)."""
+    identifier = (user["email"] if user else request.client.host) or "anon"
+    await _check_voucher_rate_limit(identifier)
+
+    content = await file.read()
+    if len(content) > VOUCHER_MAX_BYTES:
+        raise HTTPException(400, f"Ficheiro demasiado grande (máx. {VOUCHER_MAX_BYTES // (1024*1024)}MB).")
+    if not content.startswith(b"%PDF"):
+        raise HTTPException(400, "O ficheiro tem de ser um PDF válido.")
+
+    stored_name = f"{gen_id()}.pdf"
+    with open(VOUCHERS_DIR / stored_name, "wb") as f:
+        f.write(content)
+
+    doc = {
+        "id": gen_id(),
+        "code": (code or "").upper().strip() or None,
+        "pdf_url": None,
+        "pdf_storage_path": stored_name,
+        "notes": notes,
+        "status": "Pending",
+        "customer_id": user["id"] if user else None,
         "order_id": None,
         "created_at": iso(now_utc()),
     }
@@ -753,6 +1371,18 @@ async def submit_voucher(payload: VoucherSubmitIn):
 async def admin_vouchers(admin: dict = Depends(require_admin), status: Optional[str] = None):
     filt = {"status": status} if status else {}
     return await db.vouchers.find(filt, {"_id": 0}).sort("created_at", -1).to_list(500)
+
+@api.get("/admin/vouchers/{vid}/pdf")
+async def admin_voucher_pdf(vid: str, admin: dict = Depends(require_admin)):
+    """The only way to read a voucher PDF — requires a valid admin/staff JWT.
+    There is no public or guessable URL for these files."""
+    voucher = await db.vouchers.find_one({"id": vid}, {"_id": 0})
+    if not voucher or not voucher.get("pdf_storage_path"):
+        raise HTTPException(404, "PDF não encontrado para este voucher")
+    path = VOUCHERS_DIR / voucher["pdf_storage_path"]
+    if not path.exists():
+        raise HTTPException(404, "Ficheiro já não existe (pode ter sido removido por retenção RGPD)")
+    return FileResponse(path, media_type="application/pdf", filename=f"voucher-{vid}.pdf")
 
 @api.put("/admin/vouchers/{vid}/status")
 async def admin_update_voucher(vid: str, status: str = Form(...), admin: dict = Depends(require_admin)):
@@ -766,6 +1396,21 @@ async def admin_update_voucher(vid: str, status: str = Form(...), admin: dict = 
         if cust:
             logger.info(f"[MOCKED EMAIL] Voucher {vid} -> {status} to {cust.get('email')}")
     return {"ok": True}
+
+async def _purge_old_voucher_pdfs():
+    """RGPD: there is no cron infra in this environment, so this sweep runs
+    once per backend startup instead of daily. For a long-running production
+    deployment, wire this into a real scheduler (e.g. APScheduler/Celery
+    beat) so it also runs between restarts."""
+    cutoff = iso(now_utc() - timedelta(days=VOUCHER_RETENTION_DAYS))
+    async for v in db.vouchers.find({"pdf_storage_path": {"$ne": None}, "created_at": {"$lt": cutoff}}, {"_id": 0}):
+        path = VOUCHERS_DIR / v["pdf_storage_path"]
+        try:
+            if path.exists():
+                path.unlink()
+        except Exception:
+            pass
+        await db.vouchers.update_one({"id": v["id"]}, {"$set": {"pdf_storage_path": None, "pdf_purged_at": iso(now_utc())}})
 
 # ---------- Wishlist ----------
 @api.get("/wishlist")
@@ -805,6 +1450,77 @@ async def admin_dashboard(admin: dict = Depends(require_admin)):
         "recent_orders": recent_orders,
     }
 
+# ---------- Customers (distinct from admin/staff Users) ----------
+@api.get("/admin/customers")
+async def admin_list_customers(admin: dict = Depends(require_admin), q: Optional[str] = None):
+    filt: Dict[str, Any] = {"role": "customer"}
+    if q:
+        regex = {"$regex": re.escape(q), "$options": "i"}
+        filt["$or"] = [{"name": regex}, {"email": regex}]
+    return await db.users.find(filt, {"_id": 0, "password_hash": 0}).sort("created_at", -1).to_list(1000)
+
+@api.get("/admin/customers/{cid}")
+async def admin_customer_detail(cid: str, admin: dict = Depends(require_admin)):
+    cust = await db.users.find_one({"id": cid, "role": "customer"}, {"_id": 0, "password_hash": 0})
+    if not cust:
+        raise HTTPException(404, "Cliente não encontrado")
+    orders = await db.orders.find({"customer.id": cid}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    vouchers = await db.vouchers.find({"customer_id": cid}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    return {"customer": cust, "orders": orders, "vouchers": vouchers}
+
+@api.put("/admin/customers/{cid}/block")
+async def admin_block_customer(cid: str, blocked: bool = Form(...), admin: dict = Depends(require_manager)):
+    """Block/unblock — manager-tier only. Staff must not be able to do this."""
+    res = await db.users.update_one({"id": cid, "role": "customer"}, {"$set": {"is_blocked": blocked}})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Cliente não encontrado")
+    await log_action(admin["id"], "block" if blocked else "unblock", "customer", cid)
+    return {"ok": True}
+
+@api.delete("/admin/customers/{cid}")
+async def admin_delete_customer(cid: str, admin: dict = Depends(require_manager)):
+    """Delete — manager-tier only. Staff must not be able to do this."""
+    res = await db.users.delete_one({"id": cid, "role": "customer"})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Cliente não encontrado")
+    await log_action(admin["id"], "delete", "customer", cid)
+    return {"ok": True}
+
+# ---------- Reports (financial — manager-tier only, NOT staff) ----------
+@api.get("/admin/reports")
+async def admin_reports(admin: dict = Depends(require_manager), days: int = 365):
+    since = iso(now_utc() - timedelta(days=days))
+    paid_filter = {"payment_status": "paid", "created_at": {"$gte": since}}
+
+    revenue_total = 0.0
+    monthly: Dict[str, float] = {}
+    book_sales: Dict[str, Dict[str, Any]] = {}
+    async for o in db.orders.find(paid_filter, {"_id": 0}):
+        total = float((o.get("totals") or {}).get("total", 0) or 0)
+        revenue_total += total
+        month_key = (o.get("created_at") or "")[:7]
+        monthly[month_key] = round(monthly.get(month_key, 0.0) + total, 2)
+        for it in o.get("items", []):
+            isbn = it.get("isbn13")
+            if not isbn:
+                continue
+            rec = book_sales.setdefault(isbn, {"isbn13": isbn, "title": it.get("title", ""), "qty": 0, "revenue": 0.0})
+            rec["qty"] += it.get("qty", 0)
+            rec["revenue"] = round(rec["revenue"] + it.get("line_total", 0), 2)
+
+    bestsellers = sorted(book_sales.values(), key=lambda r: r["qty"], reverse=True)[:10]
+    total_orders_paid = await db.orders.count_documents(paid_filter)
+    pending_payment = await db.orders.count_documents({"status": "pending_payment"})
+
+    return {
+        "revenue_total": round(revenue_total, 2),
+        "monthly_revenue": dict(sorted(monthly.items())),
+        "bestsellers": bestsellers,
+        "paid_orders": total_orders_paid,
+        "pending_payment_orders": pending_payment,
+        "period_days": days,
+    }
+
 @api.get("/admin/users")
 async def admin_users(admin: dict = Depends(require_super_admin)):
     return await db.users.find({}, {"_id": 0, "password_hash": 0}).to_list(1000)
@@ -814,16 +1530,17 @@ async def admin_logs(admin: dict = Depends(require_admin), limit: int = 200):
     return await db.activity_logs.find({}, {"_id": 0}).sort("timestamp", -1).limit(limit).to_list(limit)
 
 @api.get("/admin/settings")
-async def get_settings(admin: dict = Depends(require_admin)):
+async def get_settings(admin: dict = Depends(require_manager)):
     s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {
         "id": "global",
         "lamination_price": LAMINATION_PRICE,
-        "aveiro_postcodes": ["3800", "3810", "3830", "3840", "3850", "3860", "3870", "3880"],
+        "shipping_flat_rate": SHIPPING_FLAT_RATE,
+        "aveiro_postcodes": _AVEIRO_CONCELHO_POSTCODES,
     }
     return s
 
 @api.put("/admin/settings")
-async def update_settings(payload: SettingIn, admin: dict = Depends(require_admin)):
+async def update_settings(payload: SettingIn, admin: dict = Depends(require_manager)):
     update = {k: v for k, v in payload.model_dump().items() if v is not None}
     await db.settings.update_one({"id": "global"}, {"$set": {**update, "id": "global"}}, upsert=True)
     await log_action(admin["id"], "update", "settings", "global", update)
@@ -836,6 +1553,9 @@ async def ensure_indexes():
     await db.school_books.create_index([("school_id", 1), ("isbn13", 1), ("grade_level", 1)])
     await db.login_attempts.create_index("identifier")
     await db.password_reset_tokens.create_index("expires_at")
+    await db.categories.create_index("name", unique=True)
+    await db.partners.create_index("promo_code", unique=True)
+    await db.voucher_submissions.create_index([("identifier", 1), ("at", 1)])
 
 async def seed_admins():
     admins = [
@@ -873,26 +1593,27 @@ _GRADES_EB23 = ["5.º Ano", "6.º Ano", "7.º Ano", "8.º Ano", "9.º Ano"]
 _GRADES_SEC = ["10.º Ano", "11.º Ano", "12.º Ano"]
 _GRADES_EB_SEC = _GRADES_EB23 + _GRADES_SEC
 
-# Postcode prefixes for the entire Aveiro district (hand delivery zone)
-_AVEIRO_DISTRICT_POSTCODES = [
-    # Aveiro / Ílhavo / Vagos
-    "3800", "3810", "3830", "3840", "3850", "3860",
-    # Ovar / Estarreja / Murtosa / Albergaria
-    "3870", "3880", "3885", "3860", "3865",
-    # Águeda / Anadia / Oliveira do Bairro
-    "3750", "3754", "3770", "3780",
-    # Oliveira de Azeméis / S. João da Madeira / Vale de Cambra
-    "3700", "3720", "3730", "3740",
-    # Espinho / Feira
-    "4500", "4520", "4535",
-    # Arouca / Castelo de Paiva / Sever do Vouga
-    "4540", "4550", "3740",
-    # Mealhada (sul do distrito)
-    "3050",
+# Postcode prefixes for the concelho (município) de Aveiro ONLY — NOT the
+# wider Aveiro district. The district has 19 different municípios (Ílhavo,
+# Vagos, Estarreja, Ovar, Espinho, Santa Maria da Feira, etc.) which must
+# NOT be included here, since "entrega em mão" is concelho-scoped per spec.
+# Verified against CTT/codigo-postal.pt: 3800-38xx and 3810-38xx cover the
+# Aveiro city freguesias (Esgueira, Aradas, Glória, Vera Cruz, Santa Joana,
+# Cacia, Eixo e Eirol, Oliveirinha, S. Bernardo, S. Jacinto, Requeixo).
+# This is an editable STARTING default (see /admin/settings) — Francisco/
+# Jetro should fine-tune the exact prefix list to match the real delivery
+# radius they're willing to cover on foot/bike within the concelho.
+_AVEIRO_CONCELHO_POSTCODES = [
+    "3800", "3801", "3802", "3803", "3804",
+    "3810", "3811", "3812", "3813", "3814",
 ]
 
 def _cover_url(isbn: str) -> str:
-    return f"https://covers.openlibrary.org/b/isbn/{isbn}-L.jpg"
+    # Books start with NO cover URL. Real covers are fetched on demand from
+    # multiple sources via the "Procurar capas" action (see /admin/books/enrich-covers).
+    # Returning "" means the storefront shows its themed placeholder until a
+    # genuine cover is found, instead of a broken Open Library image.
+    return ""
 
 async def seed_demo_data():
     if await db.municipalities.count_documents({}) > 0:
@@ -1030,7 +1751,7 @@ async def seed_demo_data():
                     "synopsis": f"{title} — material escolar oficial para o {grade}, da editora {publisher}.",
                     "features": {"cycle": cycle, "grade": grade, "format": book_type},
                     "image_url": _cover_url(isbn),
-                    "is_lamination_eligible": book_type == "Manual",
+                    "is_lamination_eligible": True,  # lamination applies to Manuals AND Workbooks alike
                     "created_at": iso(now_utc()),
                 }
                 try:
@@ -1053,12 +1774,12 @@ async def seed_demo_data():
         {"isbn13": "9789897078815", "title": "Português 9 - Mensagens", "author": "Lúcia Vidal Soares", "publisher": "Texto Editores", "year": 2024, "subject": "Português", "price": 34.80, "type": "Manual", "is_lamination_eligible": True, "synopsis": "Manual de Português para o 9.º ano.", "image_url": "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=400&q=80"},
         {"isbn13": "9789897078816", "title": "Novo Espaço 11 - Matemática A", "author": "Belmiro Costa", "publisher": "Porto Editora", "year": 2024, "subject": "Matemática A", "price": 38.50, "type": "Manual", "is_lamination_eligible": True, "synopsis": "Manual de Matemática A para o 11.º ano.", "image_url": "https://images.unsplash.com/photo-1518744386442-2d48ac47a7eb?w=400&q=80"},
         # Workbooks
-        {"isbn13": "9789897078901", "title": "Caderno de Fichas Pasta Mágica 1", "author": "Angelina Rodrigues", "publisher": "Areal Editores", "year": 2024, "subject": "Português", "price": 12.30, "type": "Workbook", "is_lamination_eligible": False, "synopsis": "Caderno de fichas de Português 1.º ano.", "image_url": "https://images.unsplash.com/photo-1455390582262-044cdead277a?w=400&q=80"},
-        {"isbn13": "9789897078902", "title": "Caderno Alfa Matemática 1.º", "author": "Eva Lima", "publisher": "Porto Editora", "year": 2024, "subject": "Matemática", "price": 12.80, "type": "Workbook", "is_lamination_eligible": False, "synopsis": "Caderno de atividades de Matemática 1.º ano.", "image_url": "https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&q=80"},
-        {"isbn13": "9789897078903", "title": "Caderno Diálogos 5", "author": "Helena Vaz", "publisher": "Porto Editora", "year": 2024, "subject": "Português", "price": 14.20, "type": "Workbook", "is_lamination_eligible": False, "synopsis": "Caderno de atividades de Português 5.º ano.", "image_url": "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=400&q=80"},
-        {"isbn13": "9789897078904", "title": "Caderno MSI 5", "author": "Maria Neves", "publisher": "Porto Editora", "year": 2024, "subject": "Matemática", "price": 14.50, "type": "Workbook", "is_lamination_eligible": False, "synopsis": "Caderno de fichas de Matemática 5.º ano.", "image_url": "https://images.unsplash.com/photo-1576094792933-2f29e7e5fe71?w=400&q=80"},
-        {"isbn13": "9789897078905", "title": "Caderno Mensagens 9", "author": "Lúcia Soares", "publisher": "Texto Editores", "year": 2024, "subject": "Português", "price": 15.10, "type": "Workbook", "is_lamination_eligible": False, "synopsis": "Caderno de Português 9.º ano.", "image_url": "https://images.unsplash.com/photo-1491841550275-ad7854e35ca6?w=400&q=80"},
-        {"isbn13": "9789897078906", "title": "Caderno Novo Espaço 11", "author": "Belmiro Costa", "publisher": "Porto Editora", "year": 2024, "subject": "Matemática A", "price": 16.40, "type": "Workbook", "is_lamination_eligible": False, "synopsis": "Caderno de Matemática A 11.º ano.", "image_url": "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&q=80"},
+        {"isbn13": "9789897078901", "title": "Caderno de Fichas Pasta Mágica 1", "author": "Angelina Rodrigues", "publisher": "Areal Editores", "year": 2024, "subject": "Português", "price": 12.30, "type": "Workbook", "is_lamination_eligible": True, "synopsis": "Caderno de fichas de Português 1.º ano.", "image_url": "https://images.unsplash.com/photo-1455390582262-044cdead277a?w=400&q=80"},
+        {"isbn13": "9789897078902", "title": "Caderno Alfa Matemática 1.º", "author": "Eva Lima", "publisher": "Porto Editora", "year": 2024, "subject": "Matemática", "price": 12.80, "type": "Workbook", "is_lamination_eligible": True, "synopsis": "Caderno de atividades de Matemática 1.º ano.", "image_url": "https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&q=80"},
+        {"isbn13": "9789897078903", "title": "Caderno Diálogos 5", "author": "Helena Vaz", "publisher": "Porto Editora", "year": 2024, "subject": "Português", "price": 14.20, "type": "Workbook", "is_lamination_eligible": True, "synopsis": "Caderno de atividades de Português 5.º ano.", "image_url": "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=400&q=80"},
+        {"isbn13": "9789897078904", "title": "Caderno MSI 5", "author": "Maria Neves", "publisher": "Porto Editora", "year": 2024, "subject": "Matemática", "price": 14.50, "type": "Workbook", "is_lamination_eligible": True, "synopsis": "Caderno de fichas de Matemática 5.º ano.", "image_url": "https://images.unsplash.com/photo-1576094792933-2f29e7e5fe71?w=400&q=80"},
+        {"isbn13": "9789897078905", "title": "Caderno Mensagens 9", "author": "Lúcia Soares", "publisher": "Texto Editores", "year": 2024, "subject": "Português", "price": 15.10, "type": "Workbook", "is_lamination_eligible": True, "synopsis": "Caderno de Português 9.º ano.", "image_url": "https://images.unsplash.com/photo-1491841550275-ad7854e35ca6?w=400&q=80"},
+        {"isbn13": "9789897078906", "title": "Caderno Novo Espaço 11", "author": "Belmiro Costa", "publisher": "Porto Editora", "year": 2024, "subject": "Matemática A", "price": 16.40, "type": "Workbook", "is_lamination_eligible": True, "synopsis": "Caderno de Matemática A 11.º ano.", "image_url": "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&q=80"},
         {"isbn13": "9789897078920", "title": "Inglês 5 - Step Up", "author": "Cristina Cunha", "publisher": "Porto Editora", "year": 2024, "subject": "Inglês", "price": 28.40, "type": "Manual", "is_lamination_eligible": True, "synopsis": "Manual de Inglês 5.º ano.", "image_url": "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=400&q=80", "status": "PreOrder", "stock_qty": 0},
         {"isbn13": "9789897078921", "title": "Físico-Química 8 - Eureka!", "author": "Filomena Caldeira", "publisher": "Asa Editores", "year": 2024, "subject": "Físico-Química", "price": 30.20, "type": "Manual", "is_lamination_eligible": True, "synopsis": "Manual de FQ 8.º ano.", "image_url": "https://images.unsplash.com/photo-1554475901-4538ddfbccc2?w=400&q=80", "status": "Unavailable", "stock_qty": 0},
     ]
@@ -1086,13 +1807,18 @@ async def seed_demo_data():
     ]
     for p in partners_data:
         p["id"] = gen_id()
+        p.setdefault("usage_count", 0)
+        p.setdefault("valid_from", None)
+        p.setdefault("valid_until", None)
+        p.setdefault("usage_limit", None)
         await db.partners.insert_one(p)
 
     # Settings
     await db.settings.insert_one({
         "id": "global",
         "lamination_price": LAMINATION_PRICE,
-        "aveiro_postcodes": _AVEIRO_DISTRICT_POSTCODES,
+        "shipping_flat_rate": SHIPPING_FLAT_RATE,
+        "aveiro_postcodes": _AVEIRO_CONCELHO_POSTCODES,
     })
     logger.info("Demo data seeded")
 
@@ -1101,6 +1827,7 @@ async def startup():
     await ensure_indexes()
     await seed_admins()
     await seed_demo_data()
+    await _purge_old_voucher_pdfs()
 
 @app.on_event("shutdown")
 async def shutdown():
