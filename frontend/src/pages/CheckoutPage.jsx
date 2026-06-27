@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
-import { Truck, Store, Check, AlertTriangle, CreditCard } from "lucide-react";
+import { Truck, Package, Check, AlertTriangle, CreditCard } from "lucide-react";
 
 export default function CheckoutPage() {
   const { items, summary, promoCode, clear } = useCart();
@@ -19,7 +19,7 @@ export default function CheckoutPage() {
     name: user?.name || "",
     email: user?.email || "",
     phone: "",
-    delivery_method: "store_pickup",
+    delivery_method: "hand_delivery",
     address: "",
     postal_code: "",
     notes: "",
@@ -95,47 +95,45 @@ export default function CheckoutPage() {
           <section className="bg-white border border-[#E2E8F0] rounded-md p-6">
             <h2 className="font-display text-lg font-medium mb-4">Método de entrega</h2>
             <RadioGroup value={form.delivery_method} onValueChange={(v) => setForm({...form, delivery_method: v})} className="space-y-3">
-              <label className="flex items-start gap-3 p-4 border border-[#E2E8F0] rounded-md cursor-pointer hover:bg-[#F5F8EC]" data-testid="delivery-pickup-option">
-                <RadioGroupItem value="store_pickup" id="pickup" className="mt-1"/>
-                <Store className="w-5 h-5 text-[#5A8F1E] mt-0.5" strokeWidth={1.5}/>
-                <div className="flex-1">
-                  <div className="font-display font-medium">Levantamento na loja</div>
-                  <div className="text-sm text-[#4A5568]">Combinado por contacto direto · Aveiro</div>
-                </div>
-                <span className="text-sm font-medium text-[#2F855A]">Grátis</span>
-              </label>
               <label className="flex items-start gap-3 p-4 border border-[#E2E8F0] rounded-md cursor-pointer hover:bg-[#F5F8EC]" data-testid="delivery-hand-option">
                 <RadioGroupItem value="hand_delivery" id="hand" className="mt-1"/>
                 <Truck className="w-5 h-5 text-[#5A8F1E] mt-0.5" strokeWidth={1.5}/>
                 <div className="flex-1">
                   <div className="font-display font-medium">Entrega em Mão (Aveiro)</div>
-                  <div className="text-sm text-[#4A5568]">Apenas para códigos postais da região</div>
+                  <div className="text-sm text-[#4A5568]">Apenas para códigos postais do concelho de Aveiro</div>
                 </div>
                 <span className="text-sm font-medium text-[#2F855A]">Grátis</span>
               </label>
+              <label className="flex items-start gap-3 p-4 border border-[#E2E8F0] rounded-md cursor-pointer hover:bg-[#F5F8EC]" data-testid="delivery-shipping-option">
+                <RadioGroupItem value="shipping" id="shipping" className="mt-1"/>
+                <Package className="w-5 h-5 text-[#5A8F1E] mt-0.5" strokeWidth={1.5}/>
+                <div className="flex-1">
+                  <div className="font-display font-medium">Envio por transportadora</div>
+                  <div className="text-sm text-[#4A5568]">Entrega em qualquer endereço de Portugal Continental</div>
+                </div>
+                <span className="text-sm font-medium text-[#1A202C]" data-testid="shipping-fee">{(summary?.shipping_flat_rate ?? 4.90).toFixed(2)}€</span>
+              </label>
             </RadioGroup>
 
-            {form.delivery_method === "hand_delivery" && (
-              <div className="mt-5 space-y-4">
-                <div>
-                  <Label className="text-xs uppercase tracking-wider text-[#4A5568] mb-1.5 block">Morada *</Label>
-                  <Input required value={form.address} onChange={handle("address")} placeholder="Rua, número, andar" data-testid="checkout-address"/>
-                </div>
-                <div>
-                  <Label className="text-xs uppercase tracking-wider text-[#4A5568] mb-1.5 block">Código Postal *</Label>
-                  <Input required value={form.postal_code} onChange={handle("postal_code")} placeholder="3800-XXX" data-testid="checkout-postcode"/>
-                  {postcodeCheck && form.postal_code && (
-                    postcodeCheck.hand_delivery_available ? (
-                      <p className="text-xs text-[#2F855A] mt-1.5 flex items-center gap-1" data-testid="postcode-ok"><Check className="w-3.5 h-3.5"/> Entrega em mão disponível</p>
-                    ) : (
-                      <p className="text-xs text-[#C53030] mt-1.5 flex items-center gap-1" data-testid="postcode-bad">
-                        <AlertTriangle className="w-3.5 h-3.5"/> Fora da zona de entrega. Escolha levantamento em loja.
-                      </p>
-                    )
-                  )}
-                </div>
+            <div className="mt-5 space-y-4">
+              <div>
+                <Label className="text-xs uppercase tracking-wider text-[#4A5568] mb-1.5 block">Morada *</Label>
+                <Input required value={form.address} onChange={handle("address")} placeholder="Rua, número, andar" data-testid="checkout-address"/>
               </div>
-            )}
+              <div>
+                <Label className="text-xs uppercase tracking-wider text-[#4A5568] mb-1.5 block">Código Postal *</Label>
+                <Input required value={form.postal_code} onChange={handle("postal_code")} placeholder="3800-XXX" data-testid="checkout-postcode"/>
+                {form.delivery_method === "hand_delivery" && postcodeCheck && form.postal_code && (
+                  postcodeCheck.hand_delivery_available ? (
+                    <p className="text-xs text-[#2F855A] mt-1.5 flex items-center gap-1" data-testid="postcode-ok"><Check className="w-3.5 h-3.5"/> Entrega em mão disponível</p>
+                  ) : (
+                    <p className="text-xs text-[#C53030] mt-1.5 flex items-center gap-1" data-testid="postcode-bad">
+                      <AlertTriangle className="w-3.5 h-3.5"/> Fora do concelho de Aveiro. Escolha envio por transportadora.
+                    </p>
+                  )
+                )}
+              </div>
+            </div>
           </section>
 
           <section className="bg-white border border-[#E2E8F0] rounded-md p-6">
@@ -170,8 +168,11 @@ export default function CheckoutPage() {
               <div className="flex justify-between"><dt className="text-[#4A5568]">Cadernos</dt><dd>{summary?.subtotal_workbooks?.toFixed(2)}€</dd></div>
               {summary?.discount_workbooks > 0 && <div className="flex justify-between text-[#E07A1F]"><dt>Desconto</dt><dd>−{summary.discount_workbooks.toFixed(2)}€</dd></div>}
               {summary?.lamination_total > 0 && <div className="flex justify-between"><dt className="text-[#4A5568]">Plastificação</dt><dd>{summary.lamination_total.toFixed(2)}€</dd></div>}
+              {form.delivery_method === "shipping" && (
+                <div className="flex justify-between"><dt className="text-[#4A5568]">Envio</dt><dd data-testid="checkout-shipping-line">{(summary?.shipping_flat_rate ?? 4.90).toFixed(2)}€</dd></div>
+              )}
               <div className="flex justify-between text-lg font-display font-medium pt-3 border-t border-[#E2E8F0]">
-                <dt>Total</dt><dd>{summary?.total?.toFixed(2)}€</dd>
+                <dt>Total</dt><dd>{((summary?.total ?? 0) + (form.delivery_method === "shipping" ? (summary?.shipping_flat_rate ?? 4.90) : 0)).toFixed(2)}€</dd>
               </div>
             </dl>
             <Button type="submit" disabled={submitting} className="w-full mt-6 h-12 bg-[#E07A1F] hover:bg-[#B85F0E] text-white" data-testid="place-order-btn">

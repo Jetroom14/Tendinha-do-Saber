@@ -1,21 +1,41 @@
 import { Outlet, NavLink, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { LayoutDashboard, BookOpen, School2, FileText, ShoppingCart, Handshake, Users, Settings, ScrollText, LogOut, Upload, Home, Palette, Menu, X } from "lucide-react";
+import {
+  LayoutDashboard, BookOpen, School2, FileText, ShoppingCart, Handshake,
+  Users, Settings, ScrollText, LogOut, Upload, Home, Palette, Menu, X,
+  Tag, UserCircle, Ticket, BarChart3, FileEdit,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 
+// managerOnly → hidden from 'staff' (only admin / super_admin). Matches the
+// backend require_manager guard for customers, reports, promo codes, content.
+// superOnly → only super_admin (staff management).
 const NAV = [
   { to: "/admin", icon: LayoutDashboard, label: "Dashboard", end: true },
   { to: "/admin/livros", icon: BookOpen, label: "Livros" },
-  { to: "/admin/importar", icon: Upload, label: "Importar Excel" },
+  { to: "/admin/categorias", icon: Tag, label: "Categorias" },
+  { to: "/admin/importar", icon: Upload, label: "Importações" },
   { to: "/admin/escolas", icon: School2, label: "Escolas" },
   { to: "/admin/encomendas", icon: ShoppingCart, label: "Encomendas" },
+  { to: "/admin/clientes", icon: UserCircle, label: "Clientes", managerOnly: true },
   { to: "/admin/vouchers", icon: FileText, label: "Vouchers MEGA" },
-  { to: "/admin/parceiros", icon: Handshake, label: "Parceiros" },
-  { to: "/admin/brand", icon: Palette, label: "Identidade Visual" },
+  { to: "/admin/codigos", icon: Ticket, label: "Códigos Promo", managerOnly: true },
+  { to: "/admin/parceiros", icon: Handshake, label: "Parceiros", managerOnly: true },
+  { to: "/admin/conteudo", icon: FileEdit, label: "Conteúdo", managerOnly: true },
+  { to: "/admin/brand", icon: Palette, label: "Website" },
+  { to: "/admin/relatorios", icon: BarChart3, label: "Relatórios", managerOnly: true },
   { to: "/admin/logs", icon: ScrollText, label: "Atividade" },
-  { to: "/admin/definicoes", icon: Settings, label: "Definições" },
+  { to: "/admin/definicoes", icon: Settings, label: "Definições", managerOnly: true },
   { to: "/admin/utilizadores", icon: Users, label: "Utilizadores", superOnly: true },
 ];
+
+function visibleFor(role) {
+  return NAV.filter((n) => {
+    if (n.superOnly) return role === "super_admin";
+    if (n.managerOnly) return role === "admin" || role === "super_admin";
+    return true;
+  });
+}
 
 export default function AdminLayout() {
   const { user, loading, logout } = useAuth();
@@ -23,7 +43,7 @@ export default function AdminLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    if (!loading && (!user || (user.role !== "admin" && user.role !== "super_admin"))) {
+    if (!loading && (!user || !["staff", "admin", "super_admin"].includes(user.role))) {
       navigate("/login?next=/admin");
     }
   }, [user, loading, navigate]);
@@ -62,7 +82,7 @@ export default function AdminLayout() {
           <button onClick={closeMobile} className="md:hidden text-slate-400 hover:text-white" aria-label="Fechar menu"><X className="w-5 h-5"/></button>
         </div>
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-          {NAV.filter((n) => !n.superOnly || user.role === "super_admin").map(({ to, icon: Icon, label, end }) => (
+          {visibleFor(user.role).map(({ to, icon: Icon, label, end }) => (
             <NavLink
               key={to}
               to={to}

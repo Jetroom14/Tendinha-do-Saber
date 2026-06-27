@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Trash2, Plus, Search } from "lucide-react";
+import { Pencil, Trash2, Plus, Search, Image, RefreshCw, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 const BLANK = { isbn13: "", title: "", author: "", publisher: "", subject: "", year: 2025, price: 0, type: "Manual", status: "Available", stock_qty: 0, synopsis: "", image_url: "", is_lamination_eligible: true };
@@ -18,12 +18,39 @@ export default function AdminBooks() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(BLANK);
+  const [coverStatus, setCoverStatus] = useState(null);
+  const [syncing, setSyncing] = useState(false);
 
   const fetchBooks = async () => {
     const { data } = await api.get(`/books?limit=200${q ? `&q=${encodeURIComponent(q)}` : ""}`);
-    setBooks(data);
+    setBooks(data.items || []);
+  };
+  const fetchCoverStatus = async () => {
+    try { const { data } = await api.get("/admin/books/covers-status"); setCoverStatus(data); } catch { /* ignore */ }
   };
   useEffect(() => { fetchBooks(); /* eslint-disable-next-line */ }, [q]);
+  useEffect(() => { fetchCoverStatus(); }, []);
+
+  // Runs cover enrichment in batches until the backend reports done. Each call
+  // handles up to 50 books; we loop so a 291-book catalog completes in one click.
+  const syncCovers = async () => {
+    setSyncing(true);
+    let safety = 0; // hard cap so a persistent failure can't loop forever
+    try {
+      let done = false;
+      while (!done && safety < 40) {
+        safety += 1;
+        const { data } = await api.post("/admin/books/enrich-covers?limit=50");
+        setCoverStatus((cs) => cs ? { ...cs, missing: data.remaining, with_cover: cs.total - data.remaining } : cs);
+        done = data.done || data.processed === 0;
+      }
+      await fetchCoverStatus();
+      await fetchBooks();
+      toast.success("Procura de capas concluída.");
+    } catch (e) {
+      toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Erro ao procurar capas");
+    } finally { setSyncing(false); }
+  };
 
   const openCreate = () => { setEditing(null); setForm(BLANK); setOpen(true); };
   const openEdit = (b) => { setEditing(b.isbn13); setForm({ ...BLANK, ...b }); setOpen(true); };
@@ -52,6 +79,37 @@ export default function AdminBooks() {
           <h1 className="font-display text-3xl font-medium text-slate-900">Livros</h1>
         </div>
         <Button onClick={openCreate} className="bg-[#5A8F1E] hover:bg-[#3E6E11] text-white" data-testid="add-book-btn"><Plus className="w-4 h-4 mr-2"/>Novo livro</Button>
+      </div>
+
+      {/* Cover sync panel */}
+      <div className="bg-white border border-slate-200 rounded p-4 mb-4 flex flex-col sm:flex-row sm:items-center gap-4" data-testid="cover-sync-panel">
+        <div className="w-10 h-10 rounded bg-[#F5F8EC] grid place-items-center shrink-0">
+          <Image className="w-5 h-5 text-[#5A8F1E]" strokeWidth={1.5}/>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="font-display font-medium text-slate-900 text-sm">Capas dos livros</div>
+          {coverStatus ? (
+            coverStatus.missing > 0 ? (
+              <p className="text-xs text-slate-600 mt-0.5">
+                {coverStatus.with_cover} de {coverStatus.total} livros têm capa · <span className="text-amber-700 font-medium">{coverStatus.missing} sem capa</span>. Procuramos pelo ISBN na editora (se configurada em Definições), Google Books e Open Library.
+              </p>
+            ) : (
+              <p className="text-xs text-emerald-700 mt-0.5 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5"/> Todos os {coverStatus.total} livros têm capa.</p>
+            )
+          ) : (
+            <p className="text-xs text-slate-500 mt-0.5">A verificar estado das capas...</p>
+          )}
+        </div>
+        <Button
+          onClick={syncCovers}
+          disabled={syncing || (coverStatus && coverStatus.missing === 0)}
+          variant="outline"
+          className="border-[#5A8F1E] text-[#5A8F1E] hover:bg-[#5A8F1E] hover:text-white shrink-0"
+          data-testid="cover-sync-btn"
+        >
+          <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? "animate-spin" : ""}`}/>
+          {syncing ? `A procurar... (${coverStatus?.missing ?? ""} restantes)` : "Procurar capas em falta"}
+        </Button>
       </div>
 
       <div className="bg-white border border-slate-200 rounded p-4 mb-4 flex items-center gap-3">
