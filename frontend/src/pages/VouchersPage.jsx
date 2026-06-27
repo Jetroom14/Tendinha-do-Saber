@@ -5,22 +5,42 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Upload, Check } from "lucide-react";
+import { Upload, Check, FileText, X } from "lucide-react";
+
+const MAX_MB = 8;
 
 export default function VouchersPage() {
-  const [form, setForm] = useState({ code: "", pdf_url: "", notes: "" });
+  const [form, setForm] = useState({ code: "", notes: "" });
+  const [file, setFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
 
+  const pickFile = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) { setFile(null); return; }
+    if (f.type !== "application/pdf") { toast.error("O ficheiro tem de ser um PDF."); e.target.value = ""; return; }
+    if (f.size > MAX_MB * 1024 * 1024) { toast.error(`O PDF não pode exceder ${MAX_MB}MB.`); e.target.value = ""; return; }
+    setFile(f);
+  };
+
   const submit = async (e) => {
     e.preventDefault();
-    if (!form.code && !form.pdf_url) { toast.error("Indique um código ou um link para o PDF do voucher"); return; }
+    if (!form.code && !file) { toast.error("Indique um código ou anexe o PDF do voucher"); return; }
     setSubmitting(true);
     try {
-      await api.post("/vouchers", form);
+      if (file) {
+        const fd = new FormData();
+        fd.append("file", file);
+        if (form.code) fd.append("code", form.code);
+        if (form.notes) fd.append("notes", form.notes);
+        await api.post("/vouchers/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      } else {
+        await api.post("/vouchers", { code: form.code, notes: form.notes });
+      }
       setDone(true);
       toast.success("Voucher submetido. Iremos analisar e contactar.");
-      setForm({ code: "", pdf_url: "", notes: "" });
+      setForm({ code: "", notes: "" });
+      setFile(null);
     } catch (err) {
       toast.error(formatApiErrorDetail(err.response?.data?.detail));
     } finally { setSubmitting(false); }
@@ -41,9 +61,23 @@ export default function VouchersPage() {
             <Input value={form.code} onChange={(e)=>setForm({...form, code: e.target.value.toUpperCase()})} placeholder="EX: VC-2025-XXXXX" data-testid="voucher-code-input"/>
           </div>
           <div>
-            <Label className="text-xs uppercase tracking-wider text-[#4A5568] mb-1.5 block">Link do PDF (Google Drive, OneDrive, etc.)</Label>
-            <Input value={form.pdf_url} onChange={(e)=>setForm({...form, pdf_url: e.target.value})} placeholder="https://..." data-testid="voucher-pdf-input"/>
-            <p className="text-xs text-[#4A5568] mt-1">Em alternativa pode enviar o PDF por email para tendinhadosaber@gmail.com</p>
+            <Label className="text-xs uppercase tracking-wider text-[#4A5568] mb-1.5 block">PDF do voucher</Label>
+            {file ? (
+              <div className="flex items-center justify-between gap-2 border border-[#E2E8F0] rounded-md px-3 py-2.5 bg-[#F5F8EC]" data-testid="voucher-file-chip">
+                <span className="flex items-center gap-2 text-sm text-[#1A202C] min-w-0">
+                  <FileText className="w-4 h-4 text-[#5A8F1E] shrink-0" strokeWidth={1.5}/>
+                  <span className="truncate">{file.name}</span>
+                </span>
+                <button type="button" onClick={()=>setFile(null)} className="text-[#4A5568] hover:text-[#C53030] shrink-0" data-testid="voucher-file-remove"><X className="w-4 h-4"/></button>
+              </div>
+            ) : (
+              <label className="flex flex-col items-center justify-center gap-2 border border-dashed border-[#CBD5E0] rounded-md px-4 py-8 cursor-pointer hover:border-[#5A8F1E] hover:bg-[#F5F8EC] transition-colors" data-testid="voucher-file-dropzone">
+                <Upload className="w-5 h-5 text-[#4A5568]" strokeWidth={1.5}/>
+                <span className="text-sm text-[#4A5568]">Clique para anexar o PDF (máx. {MAX_MB}MB)</span>
+                <input type="file" accept="application/pdf" onChange={pickFile} className="hidden" data-testid="voucher-pdf-input"/>
+              </label>
+            )}
+            <p className="text-xs text-[#4A5568] mt-1.5">O ficheiro é guardado de forma privada e segura, acessível apenas pela nossa equipa.</p>
           </div>
           <div>
             <Label className="text-xs uppercase tracking-wider text-[#4A5568] mb-1.5 block">Notas</Label>

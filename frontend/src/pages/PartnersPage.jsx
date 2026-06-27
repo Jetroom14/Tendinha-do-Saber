@@ -4,7 +4,11 @@ import SEO from "@/components/SEO";
 
 export default function PartnersPage() {
   const [partners, setPartners] = useState([]);
-  useEffect(() => { api.get("/partners").then((r) => setPartners(r.data)); }, []);
+  const [content, setContent] = useState(null);
+  useEffect(() => {
+    api.get("/partners").then((r) => setPartners(r.data));
+    api.get("/content").then((r) => setContent(r.data)).catch(() => {});
+  }, []);
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16" data-testid="partners-page">
       <SEO title="Parceiros" path="/parceiros" description="Conheça os parceiros da Tendinha do Saber em Aveiro — clubes, associações e municípios que oferecem benefícios aos seus membros."/>
@@ -26,7 +30,7 @@ export default function PartnersPage() {
       </div>
       <div className="bg-[#F5F8EC] border border-[#E2E8F0] rounded-md p-6 max-w-2xl mx-auto text-center">
         <p className="text-sm text-[#1A202C] leading-relaxed">
-          <strong>É parceiro ou representante de um clube/associação?</strong><br/>
+          <strong>{content?.partners_cta || "Tem interesse em tornar-se parceiro da Tendinha do Saber?"}</strong><br/>
           Contacte-nos em <a href="mailto:tendinhadosaber@gmail.com" className="text-[#5A8F1E] hover:underline">tendinhadosaber@gmail.com</a> para criarmos uma parceria.
         </p>
       </div>

@@ -97,7 +97,11 @@ export function Header() {
 
 export function Footer() {
   const [partners, setPartners] = useState([]);
-  useEffect(() => { api.get("/partners").then((r) => setPartners(r.data)).catch(() => {}); }, []);
+  const [content, setContent] = useState(null);
+  useEffect(() => {
+    api.get("/partners").then((r) => setPartners(r.data)).catch(() => {});
+    api.get("/content").then((r) => setContent(r.data)).catch(() => {});
+  }, []);
   return (
     <footer className="bg-[#0F1F2E] text-[#E2E8F0] mt-24" data-testid="site-footer">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 grid grid-cols-1 md:grid-cols-4 gap-10">
@@ -110,7 +114,7 @@ export function Footer() {
             </div>
           </div>
           <p className="text-sm text-[#CBD5E0] leading-relaxed font-serif italic">
-            "A casa dos manuais escolares — uma livraria local com a precisão das grandes."
+            "{content?.footer_text || "Mais do que uma livraria, um parceiro das famílias na escolha dos manuais escolares."}"
           </p>
         </div>
 
@@ -136,7 +140,10 @@ export function Footer() {
             <li className="flex items-start gap-2"><Mail className="w-4 h-4 mt-0.5 text-[#E07A1F]" strokeWidth={1.5}/> tendinhadosaber@gmail.com</li>
             <li className="flex items-start gap-2"><MapPin className="w-4 h-4 mt-0.5 text-[#E07A1F]" strokeWidth={1.5}/> Aveiro, Portugal</li>
             <li className="flex items-center gap-3 pt-2">
-              <a href="https://instagram.com" target="_blank" rel="noreferrer" className="hover:text-white" data-testid="instagram-link"><Instagram className="w-5 h-5" strokeWidth={1.5}/></a>
+              <a href={content?.instagram_url || "https://instagram.com/tendinhadosaber"} target="_blank" rel="noreferrer" className="hover:text-white flex items-center gap-2" data-testid="instagram-link">
+                <Instagram className="w-5 h-5" strokeWidth={1.5}/>
+                <span className="text-sm">{content?.instagram_handle || "@tendinhadosaber"}</span>
+              </a>
             </li>
           </ul>
         </div>

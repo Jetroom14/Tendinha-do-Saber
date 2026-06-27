@@ -18,14 +18,16 @@ export default function HomePage() {
   const [school, setSchool] = useState("");
   const [featured, setFeatured] = useState([]);
   const [partners, setPartners] = useState([]);
+  const [content, setContent] = useState(null);
   const navigate = useNavigate();
   const { add } = useCart();
 
   useEffect(() => {
     api.get("/grade-levels").then((r) => setGrades(r.data));
     api.get("/municipalities").then((r) => setMunis(r.data));
-    api.get("/books?limit=8").then((r) => setFeatured(r.data));
+    api.get("/books?limit=8").then((r) => setFeatured(r.data.items || []));
     api.get("/partners").then((r) => setPartners(r.data));
+    api.get("/content").then((r) => setContent(r.data)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -62,7 +64,7 @@ export default function HomePage() {
               em Aveiro.
             </h1>
             <p className="text-lg text-white/85 max-w-xl mb-8 leading-relaxed">
-              Encontre todos os livros e cadernos de fichas da sua escola — plastificação opcional, entrega em mão na região de Aveiro.
+              {content?.hero_subtitle || "Encontre todos os livros e cadernos de fichas da sua escola — plastificação opcional, entrega em mão na região de Aveiro."}
             </p>
             <div className="flex flex-wrap gap-3">
               <Link to="/catalogo">
@@ -127,7 +129,7 @@ export default function HomePage() {
             { icon: BookOpen, t: "Manuais & Cadernos", s: "Todas as editoras certificadas" },
             { icon: Truck, t: "Entrega em Mão", s: "Aveiro e arredores" },
             { icon: ShieldCheck, t: "Plastificação", s: "+2€ por livro, à sua escolha" },
-            { icon: Sparkles, t: "5% Parceiros", s: "Códigos das associações" },
+            { icon: Sparkles, t: "Parceiros", s: "Desconto exclusivo das associações" },
           ].map(({ icon: Icon, t, s }, i) => (
             <div key={i} className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-md bg-[#F5F8EC] grid place-items-center shrink-0">
@@ -164,7 +166,7 @@ export default function HomePage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-10">
               <div className="text-[10px] tracking-[0.2em] uppercase text-[#4A5568] font-semibold mb-2">Parceiros locais</div>
-              <h2 className="font-display text-3xl md:text-4xl font-medium text-[#1A202C]">5% de desconto exclusivo</h2>
+              <h2 className="font-display text-3xl md:text-4xl font-medium text-[#1A202C]">{content?.promotions_label || "Desconto exclusivo para parceiros"}</h2>
               <p className="text-[#4A5568] mt-2 max-w-xl mx-auto">Use o código do seu clube ou associação no carrinho — desconto aplicado apenas aos cadernos de fichas.</p>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-5">

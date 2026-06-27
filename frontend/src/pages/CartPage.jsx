@@ -137,7 +137,7 @@ export default function CartPage() {
             <Button onClick={() => navigate("/checkout")} className="w-full mt-5 h-12 bg-[#E07A1F] hover:bg-[#B85F0E] text-white" data-testid="checkout-btn">
               Continuar para pagamento <ArrowRight className="w-4 h-4 ml-2" strokeWidth={1.5}/>
             </Button>
-            <p className="text-xs text-[#4A5568] mt-3 text-center">Os portes são calculados no passo seguinte.</p>
+            <p className="text-xs text-[#4A5568] mt-3 text-center">A entrega em mão (Aveiro) é grátis. Os portes de envio são calculados no passo seguinte.</p>
           </div>
         </aside>
       </div>
