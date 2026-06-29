@@ -8,12 +8,15 @@ import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
 import SEO from "@/components/SEO";
 import { toast } from "sonner";
-import { Search, Filter, X } from "lucide-react";
+import { Search, Filter, X, ChevronLeft, ChevronRight } from "lucide-react";
+
+const PAGE_SIZE = 24;
 
 export default function CatalogPage() {
   const [params, setParams] = useSearchParams();
   const [books, setBooks] = useState([]);
   const [total, setTotal] = useState(0);
+  const [pages, setPages] = useState(1);
   const [subjects, setSubjects] = useState([]);
   const [grades, setGrades] = useState([]);
   const [munis, setMunis] = useState([]);
@@ -27,17 +30,22 @@ export default function CatalogPage() {
   const grade = params.get("grade") || "";
   const mun = params.get("mun") || "";
   const schoolId = params.get("school_id") || "";
+  const page = Math.max(1, parseInt(params.get("page") || "1", 10));
 
   const setParam = (k, v) => {
     const next = new URLSearchParams(params);
     if (v && v !== "all") next.set(k, v); else next.delete(k);
-    if (k === "grade" || k === "mun") {
-      next.delete("school_id");
-    }
-    if (k === "mun") {
-      next.delete("school_id");
-    }
+    if (k === "grade" || k === "mun") next.delete("school_id");
+    // reset to page 1 whenever a filter changes (not when changing page)
+    if (k !== "page") next.delete("page");
     setParams(next);
+  };
+
+  const goToPage = (p) => {
+    const next = new URLSearchParams(params);
+    if (p > 1) next.set("page", String(p)); else next.delete("page");
+    setParams(next);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const fetchBooks = async () => {
@@ -48,10 +56,12 @@ export default function CatalogPage() {
     if (type !== "all") qs.set("type", type);
     if (schoolId) qs.set("school_id", schoolId);
     if (grade) qs.set("grade_level", grade);
-    qs.set("limit", "500");
+    qs.set("limit", String(PAGE_SIZE));
+    qs.set("page", String(page));
     const { data } = await api.get(`/books?${qs.toString()}`);
     setBooks(data.items || []);
-    setTotal(data.total ?? (data.items || []).length);
+    setTotal(data.total ?? 0);
+    setPages(data.pages ?? 1);
     setLoading(false);
   };
 
@@ -158,12 +168,75 @@ export default function CatalogPage() {
         </div>
       ) : (
         <>
-          <div className="text-sm text-[#4A5568] mb-4" data-testid="catalog-count">{books.length} de {total} resultado{total !== 1 ? "s" : ""}</div>
+          <div className="text-sm text-[#4A5568] mb-4 flex items-center justify-between" data-testid="catalog-count">
+            <span>{total} resultado{total !== 1 ? "s" : ""}</span>
+            {pages > 1 && <span className="text-xs">Página {page} de {pages}</span>}
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5" data-testid="catalog-grid">
             {books.map((b) => <BookCard key={b.isbn13} book={b} onAdd={handleAdd}/>)}
           </div>
+
+          {pages > 1 && (
+            <nav className="mt-12 flex items-center justify-center gap-1 flex-wrap" aria-label="Paginação" data-testid="catalog-pagination">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => goToPage(page - 1)}
+                disabled={page <= 1}
+                className="h-9 px-3"
+                data-testid="page-prev"
+              >
+                <ChevronLeft className="w-4 h-4 mr-1" strokeWidth={1.5}/> Anterior
+              </Button>
+
+              {buildPageList(page, pages).map((p, i) =>
+                p === "…" ? (
+                  <span key={`gap-${i}`} className="px-2 text-[#4A5568] text-sm">…</span>
+                ) : (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => goToPage(p)}
+                    aria-current={p === page ? "page" : undefined}
+                    className={`h-9 min-w-9 px-3 rounded-md text-sm transition-colors ${p === page ? "bg-[#5A8F1E] text-white font-medium" : "border border-[#E2E8F0] bg-white text-[#1A202C] hover:bg-[#F5F8EC]"}`}
+                    data-testid={`page-${p}`}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => goToPage(page + 1)}
+                disabled={page >= pages}
+                className="h-9 px-3"
+                data-testid="page-next"
+              >
+                Seguinte <ChevronRight className="w-4 h-4 ml-1" strokeWidth={1.5}/>
+              </Button>
+            </nav>
+          )}
         </>
       )}
     </div>
   );
+}
+
+// Build a compact pagination list (e.g. [1, "…", 4, 5, 6, "…", 15])
+function buildPageList(current, total) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const set = new Set([1, total, current, current - 1, current + 1]);
+  if (current <= 3) [2, 3, 4].forEach((n) => set.add(n));
+  if (current >= total - 2) [total - 1, total - 2, total - 3].forEach((n) => set.add(n));
+  const sorted = [...set].filter((n) => n >= 1 && n <= total).sort((a, b) => a - b);
+  const out = [];
+  for (let i = 0; i < sorted.length; i++) {
+    if (i > 0 && sorted[i] - sorted[i - 1] > 1) out.push("…");
+    out.push(sorted[i]);
+  }
+  return out;
 }
