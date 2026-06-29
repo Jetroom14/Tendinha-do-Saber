@@ -120,7 +120,7 @@ export default function CheckoutPage() {
                   ) : (
                     <p className="text-xs text-[#C53030] mt-1.5 flex items-start gap-1" data-testid="postcode-bad">
                       <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0"/>
-                      <span>Fora do distrito de Aveiro. Contacte-nos diretamente em <a href="mailto:tendinhadosaber@gmail.com" className="underline">tendinhadosaber@gmail.com</a> ou +351 926 384 352.</span>
+                      <span>Fora do distrito de Aveiro. Contacte-nos diretamente em <a href="mailto:tendinhadosaber@gmail.com" className="underline">tendinhadosaber@gmail.com</a> ou +351 961 194 491.</span>
                     </p>
                   )
                 )}
