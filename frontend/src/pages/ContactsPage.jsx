@@ -12,7 +12,7 @@ export default function ContactsPage() {
           <h2 className="font-display text-xl font-medium">Tendinha do Saber</h2>
           <ul className="space-y-3 text-sm">
             <li className="flex items-start gap-3"><MapPin className="w-4 h-4 mt-0.5 text-[#5A8F1E]" strokeWidth={1.5}/> Aveiro, Portugal</li>
-            <li className="flex items-start gap-3"><Phone className="w-4 h-4 mt-0.5 text-[#5A8F1E]" strokeWidth={1.5}/> <a href="tel:+351926384352" className="hover:text-[#5A8F1E]">+351 926 384 352</a></li>
+            <li className="flex items-start gap-3"><Phone className="w-4 h-4 mt-0.5 text-[#5A8F1E]" strokeWidth={1.5}/> <a href="tel:+351961194491" className="hover:text-[#5A8F1E]">+351 961 194 491</a></li>
             <li className="flex items-start gap-3"><Mail className="w-4 h-4 mt-0.5 text-[#5A8F1E]" strokeWidth={1.5}/> <a href="mailto:tendinhadosaber@gmail.com" className="hover:text-[#5A8F1E]">tendinhadosaber@gmail.com</a></li>
             <li className="flex items-start gap-3"><Instagram className="w-4 h-4 mt-0.5 text-[#5A8F1E]" strokeWidth={1.5}/> <a href="https://instagram.com" target="_blank" rel="noreferrer" className="hover:text-[#5A8F1E]">@tendinhadosaber</a></li>
           </ul>

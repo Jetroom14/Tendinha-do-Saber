@@ -51,7 +51,7 @@ export const ORGANIZATION_JSONLD = {
   name: "Tendinha do Saber",
   description: "Livraria especializada em manuais escolares e cadernos de fichas, em Aveiro.",
   url: typeof window !== "undefined" ? window.location.origin : "",
-  telephone: "+351 926 384 352",
+  telephone: "+351 961 194 491",
   email: "tendinhadosaber@gmail.com",
   address: {
     "@type": "PostalAddress",

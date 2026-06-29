@@ -231,6 +231,11 @@ class VoucherSubmitIn(BaseModel):
     code: Optional[str] = None
     pdf_url: Optional[str] = None
     notes: Optional[str] = None
+    name: Optional[str] = None
+    contact: Optional[str] = None
+    manuals: Optional[str] = None
+    wants_workbooks: Optional[bool] = False
+    wants_lamination: Optional[bool] = False
 
 class CartItem(BaseModel):
     isbn13: str
@@ -1417,17 +1422,32 @@ async def _check_voucher_rate_limit(identifier: str):
 
 @api.post("/vouchers")
 async def submit_voucher(payload: VoucherSubmitIn, request: Request, user: Optional[dict] = Depends(get_current_user_optional)):
-    """Legacy/simple path: code only, or (back-compat) an external pdf_url.
-    For a real private PDF upload use POST /vouchers/upload instead."""
+    """Voucher submission via code (no PDF). For PDF use POST /vouchers/upload."""
     identifier = (user["email"] if user else request.client.host) or "anon"
     await _check_voucher_rate_limit(identifier)
+    code_clean = (payload.code or "").upper().strip() or None
+    if code_clean and not re.match(r"^ALN\d{24}$", code_clean):
+        raise HTTPException(400, "O código tem de ter o formato ALN seguido de 24 dígitos.")
+    if not code_clean and not payload.pdf_url:
+        raise HTTPException(400, "Indique um código ALN válido ou anexe o PDF do voucher.")
+    if payload.name is not None and not payload.name.strip():
+        raise HTTPException(400, "Nome é obrigatório.")
+    if payload.contact is not None and not payload.contact.strip():
+        raise HTTPException(400, "Contacto é obrigatório.")
+    if payload.manuals is not None and not payload.manuals.strip():
+        raise HTTPException(400, "Indique os manuais pretendidos.")
     doc = {
         "id": gen_id(),
-        "code": (payload.code or "").upper().strip() or None,
+        "name": (payload.name or "").strip() or None,
+        "contact": (payload.contact or "").strip() or None,
+        "manuals": (payload.manuals or "").strip() or None,
+        "wants_workbooks": bool(payload.wants_workbooks),
+        "wants_lamination": bool(payload.wants_lamination),
+        "code": code_clean,
         "pdf_url": payload.pdf_url,
         "pdf_storage_path": None,
         "notes": payload.notes,
-        "status": "Pending",
+        "status": "Pendente",
         "customer_id": user["id"] if user else None,
         "order_id": None,
         "created_at": iso(now_utc()),
@@ -1442,14 +1462,29 @@ async def upload_voucher(
     file: UploadFile = File(...),
     code: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
+    name: Optional[str] = Form(None),
+    contact: Optional[str] = Form(None),
+    manuals: Optional[str] = Form(None),
+    wants_workbooks: Optional[str] = Form("false"),
+    wants_lamination: Optional[str] = Form("false"),
     user: Optional[dict] = Depends(get_current_user_optional),
 ):
-    """Real, private PDF upload for a MEGA voucher. The file is validated,
+    """Real, private PDF upload for a MEGA voucher. File is validated,
     renamed to a server-generated UUID, and stored OUTSIDE any publicly
-    served directory. It can only be read back via the authenticated
-    GET /admin/vouchers/{id}/pdf endpoint (no public URL ever exists)."""
+    served directory. Readable only via GET /admin/vouchers/{id}/pdf."""
     identifier = (user["email"] if user else request.client.host) or "anon"
     await _check_voucher_rate_limit(identifier)
+
+    if not name or not name.strip():
+        raise HTTPException(400, "Nome é obrigatório.")
+    if not contact or not contact.strip():
+        raise HTTPException(400, "Contacto é obrigatório.")
+    if not manuals or not manuals.strip():
+        raise HTTPException(400, "Indique os manuais pretendidos.")
+
+    code_clean = (code or "").upper().strip() or None
+    if code_clean and not re.match(r"^ALN\d{24}$", code_clean):
+        raise HTTPException(400, "O código tem de ter o formato ALN seguido de 24 dígitos.")
 
     content = await file.read()
     if len(content) > VOUCHER_MAX_BYTES:
@@ -1463,11 +1498,16 @@ async def upload_voucher(
 
     doc = {
         "id": gen_id(),
-        "code": (code or "").upper().strip() or None,
+        "name": name.strip(),
+        "contact": contact.strip(),
+        "manuals": manuals.strip(),
+        "wants_workbooks": str(wants_workbooks).lower() in ("true", "1", "on", "yes"),
+        "wants_lamination": str(wants_lamination).lower() in ("true", "1", "on", "yes"),
+        "code": code_clean,
         "pdf_url": None,
         "pdf_storage_path": stored_name,
         "notes": notes,
-        "status": "Pending",
+        "status": "Pendente",
         "customer_id": user["id"] if user else None,
         "order_id": None,
         "created_at": iso(now_utc()),
