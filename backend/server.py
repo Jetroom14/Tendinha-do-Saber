@@ -1539,7 +1539,7 @@ async def admin_voucher_pdf(vid: str, admin: dict = Depends(require_admin)):
 
 @api.put("/admin/vouchers/{vid}/status")
 async def admin_update_voucher(vid: str, status: str = Form(...), admin: dict = Depends(require_admin)):
-    if status not in ("Pending", "Validated", "Used", "Rejected"):
+    if status not in ("Pending", "Pendente", "Validated", "Used", "Rejected", "Em processamento", "Concluído"):
         raise HTTPException(400, "Estado inválido")
     await db.vouchers.update_one({"id": vid}, {"$set": {"status": status, "updated_at": iso(now_utc())}})
     await log_action(admin["id"], "update_status", "voucher", vid, {"status": status})
@@ -1549,6 +1549,22 @@ async def admin_update_voucher(vid: str, status: str = Form(...), admin: dict = 
         if cust:
             logger.info(f"[MOCKED EMAIL] Voucher {vid} -> {status} to {cust.get('email')}")
     return {"ok": True}
+
+@api.put("/admin/vouchers/{vid}/note")
+async def admin_update_voucher_note(vid: str, note: str = Form(""), admin: dict = Depends(require_admin)):
+    """Update the internal admin note attached to a voucher (e.g. amount due
+    for workbooks/lamination). Stored on the `notes` field of the voucher
+    document. Empty string clears the note."""
+    existing = await db.vouchers.find_one({"id": vid}, {"_id": 0, "id": 1})
+    if not existing:
+        raise HTTPException(404, "Voucher não encontrado")
+    clean = (note or "").strip()
+    await db.vouchers.update_one(
+        {"id": vid},
+        {"$set": {"notes": clean or None, "updated_at": iso(now_utc())}},
+    )
+    await log_action(admin["id"], "update_note", "voucher", vid, {"len": len(clean)})
+    return {"ok": True, "notes": clean or None}
 
 async def _purge_old_voucher_pdfs():
     """RGPD: there is no cron infra in this environment, so this sweep runs

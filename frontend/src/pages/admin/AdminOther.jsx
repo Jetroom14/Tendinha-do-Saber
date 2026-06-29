@@ -2,13 +2,29 @@ import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { FileText, Mail, Phone, User as UserIcon, BookOpen, Layers, Save } from "lucide-react";
 
 const STATUS_COLORS = {
   Pending: "bg-amber-100 text-amber-800",
+  Pendente: "bg-amber-100 text-amber-800",
+  "Em processamento": "bg-sky-100 text-sky-800",
   Validated: "bg-emerald-100 text-emerald-800",
+  "Concluído": "bg-emerald-100 text-emerald-800",
   Used: "bg-blue-100 text-blue-800",
   Rejected: "bg-rose-100 text-rose-800",
+};
+
+const STATUS_LABEL = {
+  Pending: "Pendente",
+  Pendente: "Pendente",
+  "Em processamento": "Em processamento",
+  "Concluído": "Concluído",
+  Validated: "Validado",
+  Used: "Utilizado",
+  Rejected: "Rejeitado",
 };
 
 // Voucher PDFs live in a private bucket; fetch them through the
@@ -25,80 +41,199 @@ async function openVoucherPdf(id) {
   }
 }
 
+function VoucherCard({ v, onUpdated }) {
+  const [note, setNote] = useState(v.notes || "");
+  const [savingNote, setSavingNote] = useState(false);
+  const dirty = (note || "") !== (v.notes || "");
+
+  const saveNote = async () => {
+    setSavingNote(true);
+    try {
+      const fd = new FormData();
+      fd.append("note", note);
+      await api.put(`/admin/vouchers/${v.id}/note`, fd);
+      toast.success("Nota interna guardada");
+      onUpdated?.();
+    } catch {
+      toast.error("Erro ao guardar nota");
+    } finally { setSavingNote(false); }
+  };
+
+  const updateStatus = async (status) => {
+    const fd = new FormData(); fd.append("status", status);
+    try {
+      await api.put(`/admin/vouchers/${v.id}/status`, fd);
+      toast.success(`Estado atualizado para "${STATUS_LABEL[status] || status}"`);
+      onUpdated?.();
+    } catch {
+      toast.error("Erro ao atualizar estado");
+    }
+  };
+
+  const submittedAt = v.created_at
+    ? new Date(v.created_at).toLocaleString("pt-PT", { dateStyle: "short", timeStyle: "short" })
+    : "—";
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-md p-5 space-y-4" data-testid={`voucher-card-${v.id}`}>
+      {/* Cabeçalho: data + estado + alterador */}
+      <div className="flex flex-wrap items-start justify-between gap-3 pb-3 border-b border-slate-100">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-[11px] text-slate-500" data-testid={`voucher-date-${v.id}`}>{submittedAt}</span>
+          <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${STATUS_COLORS[v.status] || "bg-slate-100 text-slate-700"}`} data-testid={`voucher-status-badge-${v.id}`}>
+            {STATUS_LABEL[v.status] || v.status}
+          </span>
+        </div>
+        <Select value={v.status} onValueChange={updateStatus}>
+          <SelectTrigger className="h-8 w-44" data-testid={`voucher-status-${v.id}`}><SelectValue/></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Pendente">Pendente</SelectItem>
+            <SelectItem value="Em processamento">Em processamento</SelectItem>
+            <SelectItem value="Concluído">Concluído</SelectItem>
+            <SelectItem value="Rejected">Rejeitado</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Cliente */}
+      <div className="grid sm:grid-cols-2 gap-3 text-sm">
+        <div className="flex items-start gap-2 min-w-0">
+          <UserIcon className="w-4 h-4 mt-0.5 text-slate-400 shrink-0" strokeWidth={1.5}/>
+          <div className="min-w-0">
+            <div className="text-[10px] uppercase tracking-wider text-slate-500">Nome</div>
+            <div className="text-slate-900 truncate" data-testid={`voucher-name-${v.id}`}>{v.name || "—"}</div>
+          </div>
+        </div>
+        <div className="flex items-start gap-2 min-w-0">
+          {(v.contact || "").includes("@") ? <Mail className="w-4 h-4 mt-0.5 text-slate-400 shrink-0" strokeWidth={1.5}/> : <Phone className="w-4 h-4 mt-0.5 text-slate-400 shrink-0" strokeWidth={1.5}/>}
+          <div className="min-w-0">
+            <div className="text-[10px] uppercase tracking-wider text-slate-500">Contacto</div>
+            <div className="text-slate-900 truncate" data-testid={`voucher-contact-${v.id}`}>{v.contact || "—"}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Código / PDF */}
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Código ALN</div>
+          {v.code ? (
+            <div className="font-mono text-xs bg-slate-50 border border-slate-200 rounded px-2 py-1 inline-block" data-testid={`voucher-code-${v.id}`}>{v.code}</div>
+          ) : (
+            <div className="text-xs text-slate-400">— (não inserido)</div>
+          )}
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">PDF anexo</div>
+          {v.pdf_storage_path ? (
+            <button onClick={() => openVoucherPdf(v.id)} className="inline-flex items-center gap-1 text-[#5A8F1E] hover:underline text-xs" data-testid={`voucher-pdf-${v.id}`}>
+              <FileText className="w-3.5 h-3.5"/> Ver / descarregar PDF
+            </button>
+          ) : v.pdf_url ? (
+            <a href={v.pdf_url} target="_blank" rel="noreferrer" className="text-[#5A8F1E] hover:underline text-xs">Link externo</a>
+          ) : (
+            <div className="text-xs text-slate-400">— (sem PDF)</div>
+          )}
+        </div>
+      </div>
+
+      {/* Manuais pretendidos */}
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1 flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5"/> Manuais pretendidos</div>
+        <div className="text-sm text-slate-800 bg-slate-50 border border-slate-200 rounded p-3 whitespace-pre-wrap" data-testid={`voucher-manuals-${v.id}`}>{v.manuals || "—"}</div>
+      </div>
+
+      {/* Cadernos + Plastificação */}
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div className="border border-slate-200 rounded p-3">
+          <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Cadernos de fichas</div>
+          <div className={`text-sm font-medium ${v.wants_workbooks ? "text-emerald-700" : "text-slate-400"}`} data-testid={`voucher-workbooks-${v.id}`}>
+            {v.wants_workbooks ? "Sim" : "Não"}
+          </div>
+        </div>
+        <div className="border border-slate-200 rounded p-3">
+          <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1 flex items-center gap-1.5"><Layers className="w-3.5 h-3.5"/> Plastificação</div>
+          <div className={`text-sm font-medium ${v.wants_lamination ? "text-emerald-700" : "text-slate-400"}`} data-testid={`voucher-lamination-${v.id}`}>
+            {v.wants_lamination ? "Sim" : "Não"}
+          </div>
+          {v.wants_lamination && v.lamination_details && (
+            <div className="mt-2 text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded p-2 whitespace-pre-wrap" data-testid={`voucher-lamination-details-${v.id}`}>
+              {v.lamination_details}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Nota interna */}
+      <div className="pt-2 border-t border-slate-100">
+        <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1.5">Nota interna (apenas admin)</div>
+        <Textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Ex: Valor a pagar — Cadernos 24,40€ + Plastificação 4€ = 28,40€"
+          rows={2}
+          data-testid={`voucher-note-input-${v.id}`}
+        />
+        <div className="flex justify-end mt-2">
+          <Button size="sm" onClick={saveNote} disabled={!dirty || savingNote} className="bg-[#5A8F1E] hover:bg-[#3E6E11] disabled:bg-slate-300" data-testid={`voucher-note-save-${v.id}`}>
+            <Save className="w-3.5 h-3.5 mr-1.5"/> {savingNote ? "A guardar..." : "Guardar nota"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AdminVouchers() {
   const [vouchers, setVouchers] = useState([]);
   const [filter, setFilter] = useState("all");
+  const [loading, setLoading] = useState(true);
 
   const load = async () => {
-    const qs = filter !== "all" ? `?status=${filter}` : "";
-    const { data } = await api.get(`/admin/vouchers${qs}`);
-    setVouchers(data);
+    setLoading(true);
+    try {
+      const qs = filter !== "all" ? `?status=${encodeURIComponent(filter)}` : "";
+      const { data } = await api.get(`/admin/vouchers${qs}`);
+      // Backend already sorts by created_at desc; ensure on client too in case of legacy docs
+      const sorted = [...data].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+      setVouchers(sorted);
+    } catch {
+      toast.error("Erro ao carregar vouchers");
+    } finally { setLoading(false); }
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [filter]);
-
-  const updateStatus = async (id, status) => {
-    const fd = new FormData(); fd.append("status", status);
-    await api.put(`/admin/vouchers/${id}/status`, fd);
-    toast.success(`Voucher atualizado para ${status}`); load();
-  };
 
   return (
     <div className="p-8" data-testid="admin-vouchers">
       <div className="flex items-center justify-between mb-6">
         <div>
           <div className="text-[10px] tracking-[0.2em] uppercase text-slate-500 font-semibold">Vouchers</div>
-          <h1 className="font-display text-3xl font-medium text-slate-900">Vouchers MEGA</h1>
+          <h1 className="font-display text-3xl font-medium text-slate-900">Vales MEGA</h1>
+          <p className="text-sm text-slate-500 mt-1">Lista de vouchers submetidos pelos clientes, do mais recente para o mais antigo.</p>
         </div>
         <Select value={filter} onValueChange={setFilter}>
-          <SelectTrigger className="w-48" data-testid="voucher-filter"><SelectValue/></SelectTrigger>
+          <SelectTrigger className="w-52" data-testid="voucher-filter"><SelectValue/></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="Pending">Pendentes</SelectItem>
-            <SelectItem value="Validated">Validados</SelectItem>
-            <SelectItem value="Used">Utilizados</SelectItem>
+            <SelectItem value="Pendente">Pendentes</SelectItem>
+            <SelectItem value="Em processamento">Em processamento</SelectItem>
+            <SelectItem value="Concluído">Concluídos</SelectItem>
             <SelectItem value="Rejected">Rejeitados</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="text-[10px] uppercase tracking-wider text-slate-500 bg-slate-50">
-            <tr><th className="text-left p-3">Data</th><th className="text-left p-3">Código</th><th className="text-left p-3">PDF</th><th className="text-left p-3">Notas</th><th className="text-left p-3">Estado</th><th className="text-right p-3">Ações</th></tr>
-          </thead>
-          <tbody>
-            {vouchers.map((v) => (
-              <tr key={v.id} className="border-t border-slate-100" data-testid={`voucher-row-${v.id}`}>
-                <td className="p-3 text-xs">{new Date(v.created_at).toLocaleDateString("pt-PT")}</td>
-                <td className="p-3 font-mono text-xs">{v.code || "—"}</td>
-                <td className="p-3">
-                  {v.pdf_storage_path ? (
-                    <button onClick={() => openVoucherPdf(v.id)} className="text-[#5A8F1E] hover:underline text-xs" data-testid={`voucher-pdf-${v.id}`}>Ver PDF</button>
-                  ) : v.pdf_url ? (
-                    <a href={v.pdf_url} target="_blank" rel="noreferrer" className="text-[#5A8F1E] hover:underline text-xs">Link externo</a>
-                  ) : (
-                    <span className="text-xs text-slate-400">—</span>
-                  )}
-                </td>
-                <td className="p-3 text-xs text-slate-600 max-w-xs truncate">{v.notes || "—"}</td>
-                <td className="p-3"><span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${STATUS_COLORS[v.status]}`}>{v.status}</span></td>
-                <td className="p-3 text-right">
-                  <Select value={v.status} onValueChange={(s) => updateStatus(v.id, s)}>
-                    <SelectTrigger className="h-8 w-32 inline-flex" data-testid={`voucher-status-${v.id}`}><SelectValue/></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Pending">Pendente</SelectItem>
-                      <SelectItem value="Validated">Validar</SelectItem>
-                      <SelectItem value="Used">Usado</SelectItem>
-                      <SelectItem value="Rejected">Rejeitar</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </td>
-              </tr>
-            ))}
-            {vouchers.length === 0 && <tr><td colSpan={6} className="p-10 text-center text-slate-500">Sem vouchers.</td></tr>}
-          </tbody>
-        </table>
-      </div>
+      {loading ? (
+        <div className="bg-white border border-slate-200 rounded p-10 text-center text-sm text-slate-500">A carregar...</div>
+      ) : vouchers.length === 0 ? (
+        <div className="bg-white border border-slate-200 rounded p-10 text-center text-sm text-slate-500" data-testid="vouchers-empty">Sem vouchers.</div>
+      ) : (
+        <div className="space-y-4">
+          {vouchers.map((v) => (
+            <VoucherCard key={v.id} v={v} onUpdated={load}/>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
