@@ -183,6 +183,10 @@ class ResetIn(BaseModel):
     token: str
     password: str = Field(min_length=6)
 
+class ChangePasswordIn(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8)
+
 class BookIn(BaseModel):
     isbn13: str
     title: str
@@ -381,6 +385,17 @@ async def first_login(payload: FirstLoginIn):
     user = await db.users.find_one({"id": rec["user_id"]}, {"_id": 0, "password_hash": 0})
     token = create_access_token(user["id"], user["email"], user["role"])
     return {"token": token, "user": user}
+
+@api.post("/auth/change-password")
+async def change_password(payload: ChangePasswordIn, user: dict = Depends(get_current_user)):
+    stored = await db.users.find_one({"id": user["id"]})
+    if not stored or not verify_password(payload.current_password, stored.get("password_hash", "")):
+        raise HTTPException(400, "A password atual está incorreta")
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"password_hash": hash_password(payload.new_password)}},
+    )
+    return {"message": "Password atualizada com sucesso"}
 
 # ---------- Books ----------
 @api.get("/books")
@@ -658,6 +673,79 @@ async def import_books_commit(payload: ImportCommitIn, admin: dict = Depends(req
     return {"created": created, "updated": updated}
 
 
+@api.post("/admin/schools/import")
+async def import_schools(file: UploadFile = File(...), admin: dict = Depends(require_super_admin)):
+    """Importa escolas e anos a partir de um ficheiro Excel.
+    Espera as colunas Escola, Município e Anos."""
+    content = await file.read()
+    try:
+        df = pd.read_excel(BytesIO(content))
+    except Exception as e:
+        raise HTTPException(400, f"Falha ao ler ficheiro Excel: {e}")
+
+    df.columns = [str(c).strip().lower() for c in df.columns]
+    col_map = {
+        "escola": "school", "school": "school",
+        "município": "municipality", "municipio": "municipality", "municipality": "municipality",
+        "anos": "grades", "grades": "grades",
+    }
+    df.rename(columns={k: v for k, v in col_map.items() if k in df.columns}, inplace=True)
+
+    mun_cache: Dict[str, str] = {}
+    school_cache: Dict[tuple, dict] = {}
+    created_schools = updated_schools = created_munis = anomalies = 0
+    issues = []
+
+    for _, row in df.iterrows():
+        school_name = str(row.get("school", "")).strip()
+        mun_name = str(row.get("municipality", "")).strip()
+        grades = _parse_grade_list(str(row.get("grades", "")).strip())
+        if not school_name or not mun_name or not grades:
+            anomalies += 1
+            issues.append({"school": school_name, "municipality": mun_name, "grades": row.get("grades", ""), "issue": "Escola, Município ou Anos em falta/inválidos"})
+            continue
+
+        mun_key = mun_name.lower()
+        if mun_key not in mun_cache:
+            mun_doc = await db.municipalities.find_one({"name": {"$regex": f"^{re.escape(mun_name)}$", "$options": "i"}})
+            if not mun_doc:
+                mun_doc = {"id": gen_id(), "name": mun_name}
+                await db.municipalities.insert_one(mun_doc)
+                created_munis += 1
+            mun_cache[mun_key] = mun_doc["id"]
+        mun_id = mun_cache[mun_key]
+
+        school_key = (school_name.lower(), mun_id)
+        if school_key not in school_cache:
+            school_doc = await db.schools.find_one({"name": {"$regex": f"^{re.escape(school_name)}$", "$options": "i"}, "municipality_id": mun_id})
+            if school_doc:
+                school_cache[school_key] = school_doc
+        school_doc = school_cache.get(school_key)
+
+        if school_doc:
+            school_doc_grades = school_doc.get("grades_taught") or []
+            if school_doc_grades != grades or school_doc.get("name") != school_name:
+                await db.schools.update_one({"id": school_doc["id"]}, {"$set": {"name": school_name, "grades_taught": grades}})
+                updated_schools += 1
+            school_cache[school_key] = {**school_doc, "name": school_name, "grades_taught": grades}
+        else:
+            school_doc = {"id": gen_id(), "name": school_name, "municipality_id": mun_id, "grades_taught": grades}
+            await db.schools.insert_one(school_doc)
+            created_schools += 1
+            school_cache[school_key] = school_doc
+
+    await log_action(admin["id"], "import", "schools", None, {
+        "created_schools": created_schools, "updated_schools": updated_schools,
+        "created_municipalities": created_munis, "anomalies": anomalies,
+    })
+    return {
+        "created_schools": created_schools,
+        "updated_schools": updated_schools,
+        "created_municipalities": created_munis,
+        "anomalies": anomalies,
+        "issues": issues[:50],
+    }
+
 @api.post("/admin/books/import")
 async def import_books(file: UploadFile = File(...), admin: dict = Depends(require_admin)):
     """Legacy one-shot import kept for backward compatibility. Now also
@@ -851,20 +939,33 @@ async def delete_mun(mid: str, admin: dict = Depends(require_admin)):
     return {"ok": True}
 
 @api.post("/admin/schools")
-async def create_school(payload: SchoolIn, admin: dict = Depends(require_admin)):
+async def create_school(payload: SchoolIn, admin: dict = Depends(require_super_admin)):
     doc = {
         "id": gen_id(),
         "name": payload.name,
         "municipality_id": payload.municipality_id,
-        "grades_taught": payload.grades_taught or _GRADES_ALL,
+        "grades_taught": payload.grades_taught if payload.grades_taught is not None else _GRADES_ALL,
     }
     await db.schools.insert_one(doc)
     await log_action(admin["id"], "create", "school", doc["id"])
     doc.pop("_id", None)
     return doc
 
+@api.put("/admin/schools/{sid}")
+async def update_school(sid: str, payload: SchoolIn, admin: dict = Depends(require_super_admin)):
+    update = {
+        "name": payload.name,
+        "municipality_id": payload.municipality_id,
+        "grades_taught": payload.grades_taught if payload.grades_taught is not None else _GRADES_ALL,
+    }
+    res = await db.schools.update_one({"id": sid}, {"$set": update})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Escola não encontrada")
+    await log_action(admin["id"], "update", "school", sid)
+    return clean_doc(await db.schools.find_one({"id": sid}))
+
 @api.delete("/admin/schools/{sid}")
-async def delete_school(sid: str, admin: dict = Depends(require_admin)):
+async def delete_school(sid: str, admin: dict = Depends(require_super_admin)):
     await db.schools.delete_one({"id": sid})
     await db.school_books.delete_many({"school_id": sid})
     await log_action(admin["id"], "delete", "school", sid)
@@ -937,7 +1038,7 @@ async def import_school_books(file: UploadFile = File(...), admin: dict = Depend
         if school_key not in school_cache:
             school_doc = await db.schools.find_one({"name": {"$regex": f"^{re.escape(school_name)}$", "$options": "i"}, "municipality_id": mun_id})
             if not school_doc:
-                school_doc = {"id": gen_id(), "name": school_name, "municipality_id": mun_id, "grades_taught": _GRADES_ALL}
+                school_doc = {"id": gen_id(), "name": school_name, "municipality_id": mun_id, "grades_taught": []}
                 await db.schools.insert_one(school_doc)
                 created_schools += 1
             school_cache[school_key] = school_doc["id"]
@@ -951,7 +1052,14 @@ async def import_school_books(file: UploadFile = File(...), admin: dict = Depend
             "id": gen_id(), "school_id": school_id, "isbn13": isbn, "grade_level": grade,
             "subject": str(row.get("subject", "")).strip(),
         })
+        await db.schools.update_one({"id": school_id}, {"$addToSet": {"grades_taught": grade}})
         created_links += 1
+
+    # Recalculate grades_taught for any school that may still have stale _GRADES_ALL values.
+    async for stale_school in db.schools.find({"grades_taught": {"$eq": _GRADES_ALL}}, {"id": 1}):
+        school_id = stale_school["id"]
+        distinct_grades = await db.school_books.distinct("grade_level", {"school_id": school_id})
+        await db.schools.update_one({"id": school_id}, {"$set": {"grades_taught": distinct_grades or []}})
 
     await log_action(admin["id"], "import", "school_books", None, {
         "created_links": created_links, "created_schools": created_schools,
@@ -1087,7 +1195,7 @@ async def get_content():
     return {**_CONTENT_DEFAULTS, **{k: v for k, v in doc.items() if v not in (None, "") and k != "id"}}
 
 @api.put("/admin/content")
-async def update_content(payload: ContentIn, admin: dict = Depends(require_manager)):
+async def update_content(payload: ContentIn, admin: dict = Depends(require_super_admin)):
     update = {k: v for k, v in payload.model_dump().items() if v is not None}
     await db.site_content.update_one({"id": "main"}, {"$set": {**update, "id": "main"}}, upsert=True)
     await log_action(admin["id"], "update", "content", "main", update)
@@ -1158,13 +1266,14 @@ async def _compute_cart(items: List[CartItem], promo_code: Optional[str]) -> dic
 async def cart_validate(payload: PromoValidateIn):
     return await _compute_cart(payload.items, payload.promo_code)
 
-# ---------- Postcodes (Aveiro geofencing — concelho, not distrito) ----------
+# ---------- Postcodes (Aveiro geofencing — distrito) ----------
 @api.get("/postcode/check")
 async def check_postcode(code: str):
     code_clean = code.strip().split("-")[0][:4] if code else ""
     settings = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
     aveiro = settings.get("aveiro_postcodes", _AVEIRO_CONCELHO_POSTCODES)
-    return {"hand_delivery_available": code_clean in aveiro, "postcode": code_clean, "valid_zones": aveiro}
+    hand_delivery_available = len(code_clean) == 4 and code_clean[:2] in ("37", "38")
+    return {"hand_delivery_available": hand_delivery_available, "postcode": code_clean, "valid_zones": aveiro}
 
 # ---------- Stock reservation ----------
 async def _reserve_stock(lines: List[dict]) -> List[dict]:
@@ -1205,7 +1314,7 @@ async def create_order(payload: OrderCreateIn):
     if payload.delivery_method == "hand_delivery":
         chk = await check_postcode(payload.postal_code)
         if not chk["hand_delivery_available"]:
-            raise HTTPException(400, "Entrega em mão disponível apenas no concelho de Aveiro para este código postal.")
+            raise HTTPException(400, "Entrega em mão disponível apenas no distrito de Aveiro para este código postal.")
     elif payload.delivery_method == "shipping":
         if not payload.address or not payload.postal_code:
             raise HTTPException(400, "Indique a morada e o código postal para envio.")
@@ -1540,7 +1649,7 @@ async def get_settings(admin: dict = Depends(require_manager)):
     return s
 
 @api.put("/admin/settings")
-async def update_settings(payload: SettingIn, admin: dict = Depends(require_manager)):
+async def update_settings(payload: SettingIn, admin: dict = Depends(require_super_admin)):
     update = {k: v for k, v in payload.model_dump().items() if v is not None}
     await db.settings.update_one({"id": "global"}, {"$set": {**update, "id": "global"}}, upsert=True)
     await log_action(admin["id"], "update", "settings", "global", update)
@@ -1585,6 +1694,39 @@ def _grade_to_label(s: str) -> str:
     s = str(s or "").strip()
     digits = re.search(r"(\d+)", s)
     return f"{digits.group(1)}.º Ano" if digits else s
+
+def _parse_grade_list(s: str) -> List[str]:
+    s = str(s or "").strip()
+    if not s:
+        return []
+    tokens = re.split(r"[;,]", s)
+    parsed: List[str] = []
+    for token in tokens:
+        token = str(token or "").strip()
+        if not token:
+            continue
+        if re.search(r"[-–—]", token):
+            parts = [p.strip() for p in re.split(r"[-–—]", token) if p.strip()]
+            if len(parts) == 2:
+                start = _grade_to_label(parts[0])
+                end = _grade_to_label(parts[1])
+                if start in _GRADES_ALL and end in _GRADES_ALL:
+                    start_idx = _GRADES_ALL.index(start)
+                    end_idx = _GRADES_ALL.index(end)
+                    if start_idx <= end_idx:
+                        parsed.extend(_GRADES_ALL[start_idx:end_idx + 1])
+                    else:
+                        parsed.extend(_GRADES_ALL[end_idx:start_idx + 1])
+                    continue
+        normalized = _grade_to_label(token)
+        if normalized in _GRADES_ALL:
+            parsed.append(normalized)
+    # Preserve order and remove duplicates.
+    unique: List[str] = []
+    for grade in parsed:
+        if grade not in unique:
+            unique.append(grade)
+    return unique
 
 _GRADES_ALL = ["1.º Ano", "2.º Ano", "3.º Ano", "4.º Ano", "5.º Ano", "6.º Ano",
                "7.º Ano", "8.º Ano", "9.º Ano", "10.º Ano", "11.º Ano", "12.º Ano"]

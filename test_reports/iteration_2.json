@@ -1,0 +1,71 @@
+{
+  "summary": "Iteration 2 backend regression + new-feature tests: 53/53 pytest cases PASS (100%) when run sequentially. Coverage: 19 Aveiro concelhos seeded, school cascade by grade (EB1 ↔ Secundária), SEO sitemap.xml + tracking + robots.txt, PUT settings persists SEO IDs (super_admin only), voucher PDF upload (PDF magic-byte check, ~8MB cap, admin-only download via FileResponse, 401 without token), expanded Aveiro postcode geofence (3700/3800 → true, 1000 → false), orders hand_delivery 3700 OK / 1000 blocked, admin enrich-covers, partners with logo_url+promo_code, auth/me, brute-force lockout (now correctly fires at 5 fails → 429). Discovered and patched 4 iteration-1 regressions in tests (see action_items / critical_code_review_comments).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/books",
+        "issue": "Hard cap of limit=200 server-side (line 435 server.py). With 291 seeded books, a client requesting limit=500 silently receives only 200 items. Frontend catalog and external sitemap generators need to paginate (use `page` / `pages` from response). Currently iteration 1's test had to switch to using `total` from the paginated response."
+      },
+      {
+        "endpoint": "POST /api/vouchers/upload (rate limit)",
+        "issue": "8 submissions/hour per identifier is enforced. When pytest-xdist runs vouchers tests in parallel, the limit triggers cross-test and breaks the suite. Tests now run serially OR pre-clear db.voucher_submissions. No fix needed in product code — limit is correct."
+      },
+      {
+        "endpoint": "POST /api/orders (no auth)",
+        "issue": "Still no authentication on order creation; customer_email is trusted from the request body (carried over from iteration 1)."
+      },
+      {
+        "endpoint": "POST /api/orders (no stock decrement)",
+        "issue": "Still no stock_qty decrement on order creation (carried over from iteration 1)."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Catalog browsing >200 books",
+        "issue": "BREAKING CHANGE: /api/books now returns paginated `{items,total,page,page_size,pages}` instead of a flat list (was a list in iteration 1). Frontend code that does `books.map(...)` directly on the response will break. Tester confirmed by reproducing — please audit all frontend fetches of /api/books and switch to `.items`.",
+        "affected_selectors": ["/api/books consumers in CatalogPage / HomePage / Wishlist UI"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_v2_features.py",
+    "/app/backend/tests/conftest.py",
+    "/app/test_reports/pytest/iteration_2.xml"
+  ],
+  "action_items": [
+    "Confirm frontend was updated to consume the new paginated /api/books shape ({items,total,page,...}). If not, the catalog/home/wishlist pages will silently render nothing.",
+    "Document the 200-item server-side cap on /api/books (and expose pagination controls in the UI).",
+    "Consider raising the voucher rate-limit identifier to include user.id when authenticated, so a logged-in admin testing the flow isn’t blocked by a previous IP throttle.",
+    "Add authentication requirement (or HMAC) to POST /api/orders to prevent order spam.",
+    "Add stock_qty decrement when an order moves to 'paid' to avoid overselling."
+  ],
+  "critical_code_review_comments": [
+    "server.py grew to 2024 lines (was 983 in iteration 1). 3× the soft limit. Strongly recommend splitting into routers: auth.py, books.py, schools.py, orders.py, vouchers.py, seo.py, admin.py.",
+    "VOUCHER_MAX_BYTES is 8MB (server.py:45) but the iteration spec mentioned 5MB — keep in sync with the product copy on the UI.",
+    "PUT /api/admin/settings now requires super_admin (server.py:1652). Iteration 1 test used standard admin and broke; the test was updated to use super_token. Confirm the AdminSettings UI hides the form for non-super users (no API-level fallback exists).",
+    "/api/seo/sitemap.xml does not include lastmod per book (uses today’s date for every URL). Acceptable for now, but Google may demote relevance — consider storing books.updated_at and reflecting it.",
+    "robots.txt at /app/frontend/public uses an absolute `Sitemap: /api/seo/sitemap.xml` directive — Google requires a fully qualified URL. Recommend rewriting to `Sitemap: https://<site_url>/api/seo/sitemap.xml` (templated at build time or served dynamically by the backend).",
+    "POST /api/vouchers/upload stores files under ROOT_DIR/private_storage/vouchers without atomic write (open-write-flush). On a crash mid-write the DB row will reference a corrupt PDF. Use tempfile + rename().",
+    "_check_voucher_rate_limit uses request.client.host when unauthenticated — same K8s-ingress quirk as the brute-force bug from iteration 1. Today this is the safe side (over-limit, not under), but worth aligning on a single sourced-IP helper (X-Forwarded-For-aware)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (adapted to paginated /api/books shape; switched settings test to super_token; switched store_pickup to hand_delivery+3800; used raw requests.post for multipart import)",
+    "/app/backend/tests/test_v2_features.py (NEW — 20 cases covering iteration 2 features)"
+  ],
+  "success_rate": {
+    "backend": "100% (53/53) when pytest is run serially. Parallel runs hit the voucher rate limit cross-test (8/hour) and may report 4–6 false negatives in the voucher suite — pre-clear db.voucher_submissions or run with `pytest -o addopts=` to disable xdist for full clean run.",
+    "frontend": "N/A (frontend testing not requested)"
+  },
+  "test_credentials": "Super: jetroortej14@hotmail.com / ChangeMe!2026Super. Admin: tendinhadosaber@gmail.com / ChangeMe!2026Admin. Customer auto-created per session.",
+  "seed_data_creation": "All test data prefixed TEST_ (emails, ISBNs 9999*, voucher codes, municipality/school names). Cleanup runs implicitly via DELETE in CRUD test and finally-blocks in SEO settings test.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run sequentially: `cd /app/backend && python -m pytest tests/ -v -o addopts=` (omits xdist; xdist breaks the voucher rate-limit suite). Before any voucher test, optionally pre-clear: `python -c \"from pymongo import MongoClient; MongoClient('mongodb://localhost:27017')['test_database'].voucher_submissions.delete_many({})\"`. The single biggest finding is the BREAKING CHANGE on /api/books (list → {items, total, ...}); next agent should specifically confirm the React frontend renders the paginated shape correctly. The brute-force lockout that failed in iteration 1 NOW PASSES — main agent fixed the identifier logic.",
+  "rca_of_the_issue": "Iteration 1 → 2 broke several existing tests because /api/books switched from returning `List[Book]` to a paginated dict `{items, total, page, page_size, pages}` (server.py:401-448). The contract change is undocumented and silently truncates any unpaginated consumer at 200 rows (limit cap line 435). All five iteration-1 books tests, the cart tests, two order tests, and the wishlist test crashed with `KeyError: 0` / `TypeError: string indices must be integers` when treating the dict as a list. The test suite was patched with a helper `_books(api, **params)` that handles both shapes. The store_pickup delivery method was removed per requirement #7 ('APENAS entrega em mão'); the iteration-1 test that exercised it was migrated to delivery_method='hand_delivery' + postal_code='3800'. PUT /api/admin/settings was tightened to require super_admin (line 1652); the lamination-price test was repointed to super_token. Finally, the multipart school-books import was failing because the requests.Session in conftest forces `Content-Type: application/json`, which overrode the multipart boundary; the test now uses raw requests.post."
+}

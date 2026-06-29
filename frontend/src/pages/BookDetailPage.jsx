@@ -4,6 +4,8 @@ import api from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
+import SEO, { buildBookJsonLd } from "@/components/SEO";
+import { CoverImage } from "@/components/CoverImage";
 import { toast } from "sonner";
 import { StockBadge } from "@/components/BookCard";
 import { ArrowLeft, Heart, ShoppingBag, Truck, ShieldCheck } from "lucide-react";
@@ -43,18 +45,22 @@ export default function BookDetailPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12" data-testid="book-detail-page">
+      <SEO
+        title={`${book.title} · ${book.subject || ""}`.trim()}
+        path={`/livro/${book.isbn13}`}
+        description={book.synopsis || `${book.title} — Manual escolar de ${book.subject || ""}, editora ${book.publisher || ""}. Compre online com entrega em Aveiro.`}
+        image={book.image_url}
+        type="product"
+        jsonLd={buildBookJsonLd(book)}
+      />
       <Link to="/catalogo" className="inline-flex items-center gap-1.5 text-sm text-[#4A5568] hover:text-[#5A8F1E] mb-8" data-testid="back-to-catalog">
         <ArrowLeft className="w-4 h-4" strokeWidth={1.5}/> Voltar ao catálogo
       </Link>
 
       <div className="grid md:grid-cols-12 gap-12">
         <div className="md:col-span-5">
-          <div className="sticky top-28 bg-[#F5F8EC] rounded-md aspect-[3/4] overflow-hidden border border-[#E2E8F0]">
-            {book.image_url ? (
-              <img src={book.image_url} alt={book.title} className="w-full h-full object-cover" data-testid="book-cover-img"/>
-            ) : (
-              <div className="w-full h-full grid place-items-center font-serif italic text-[#4A5568] text-6xl">{book.title?.[0]}</div>
-            )}
+          <div className="sticky top-28 bg-[#F5F8EC] rounded-md aspect-[3/4] overflow-hidden border border-[#E2E8F0]" data-testid="book-cover-img">
+            <CoverImage book={book} className="w-full h-full object-cover" />
           </div>
         </div>
 
@@ -92,7 +98,7 @@ export default function BookDetailPage() {
               <Truck className="w-5 h-5 text-[#5A8F1E] mt-0.5" strokeWidth={1.5}/>
               <div>
                 <div className="font-display font-medium text-sm">Entrega em Mão</div>
-                <div className="text-xs text-[#4A5568]">Para códigos postais de Aveiro</div>
+                <div className="text-xs text-[#4A5568]">Para códigos postais do distrito de Aveiro</div>
               </div>
             </div>
             {book.is_lamination_eligible && (

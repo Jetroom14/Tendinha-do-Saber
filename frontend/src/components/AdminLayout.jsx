@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard, BookOpen, School2, FileText, ShoppingCart, Handshake,
   Users, Settings, ScrollText, LogOut, Upload, Home, Palette, Menu, X,
-  Tag, UserCircle, Ticket, BarChart3, FileEdit,
+  Tag, UserCircle, Ticket, BarChart3, FileEdit, Key,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -15,17 +15,18 @@ const NAV = [
   { to: "/admin/livros", icon: BookOpen, label: "Livros" },
   { to: "/admin/categorias", icon: Tag, label: "Categorias" },
   { to: "/admin/importar", icon: Upload, label: "Importações" },
-  { to: "/admin/escolas", icon: School2, label: "Escolas" },
+  { to: "/admin/escolas", icon: School2, label: "Escolas", superOnly: true },
   { to: "/admin/encomendas", icon: ShoppingCart, label: "Encomendas" },
   { to: "/admin/clientes", icon: UserCircle, label: "Clientes", managerOnly: true },
   { to: "/admin/vouchers", icon: FileText, label: "Vouchers MEGA" },
   { to: "/admin/codigos", icon: Ticket, label: "Códigos Promo", managerOnly: true },
   { to: "/admin/parceiros", icon: Handshake, label: "Parceiros", managerOnly: true },
-  { to: "/admin/conteudo", icon: FileEdit, label: "Conteúdo", managerOnly: true },
-  { to: "/admin/brand", icon: Palette, label: "Website" },
+  { to: "/admin/conteudo", icon: FileEdit, label: "Conteúdo", superOnly: true },
+  { to: "/admin/brand", icon: Palette, label: "Website", superOnly: true },
   { to: "/admin/relatorios", icon: BarChart3, label: "Relatórios", managerOnly: true },
   { to: "/admin/logs", icon: ScrollText, label: "Atividade" },
-  { to: "/admin/definicoes", icon: Settings, label: "Definições", managerOnly: true },
+  { to: "/admin/definicoes", icon: Settings, label: "Definições", superOnly: true },
+  { to: "/admin/alterar-password", icon: Key, label: "Alterar Password" },
   { to: "/admin/utilizadores", icon: Users, label: "Utilizadores", superOnly: true },
 ];
 
@@ -54,7 +55,7 @@ export default function AdminLayout() {
   const closeMobile = () => setMobileOpen(false);
 
   return (
-    <div className="min-h-screen bg-slate-50 font-body" data-testid="admin-layout">
+    <div className="min-h-screen bg-slate-50 font-body md:flex" data-testid="admin-layout">
       {/* Mobile top bar */}
       <div className="md:hidden fixed top-0 inset-x-0 bg-slate-900 text-white z-40 flex items-center px-4 h-14 shadow-md">
         <button onClick={() => setMobileOpen(true)} aria-label="Abrir menu" className="p-2 -ml-2" data-testid="admin-mobile-menu-btn">
@@ -70,7 +71,7 @@ export default function AdminLayout() {
       {mobileOpen && <div className="md:hidden fixed inset-0 bg-black/50 z-40" onClick={closeMobile} data-testid="admin-mobile-overlay"/>}
 
       {/* Sidebar */}
-      <aside className={`fixed md:sticky top-0 left-0 z-50 md:z-30 w-64 h-screen bg-slate-900 text-slate-100 flex flex-col transition-transform duration-200 ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`} data-testid="admin-sidebar">
+      <aside className={`fixed md:sticky top-0 left-0 z-50 md:z-30 w-64 shrink-0 h-screen bg-slate-900 text-slate-100 flex flex-col transition-transform duration-200 ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`} data-testid="admin-sidebar">
         <div className="p-6 border-b border-slate-800 flex items-center justify-between">
           <Link to="/admin" onClick={closeMobile} className="flex items-center gap-2.5">
             <img src="/logo.svg" alt="Tendinha" className="w-9 h-9 object-contain bg-white rounded p-0.5"/>
@@ -111,10 +112,8 @@ export default function AdminLayout() {
         </div>
       </aside>
 
-      <main className="md:ml-0 pt-14 md:pt-0 md:flex-1 min-w-0 md:pl-0">
-        <div className="md:ml-0">
-          <Outlet />
-        </div>
+      <main className="flex-1 min-w-0 pt-14 md:pt-0">
+        <Outlet />
       </main>
     </div>
   );

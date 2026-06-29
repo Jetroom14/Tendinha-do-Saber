@@ -28,6 +28,7 @@ import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminBooks from "@/pages/admin/AdminBooks";
 import AdminImport from "@/pages/admin/AdminImport";
 import AdminSchools from "@/pages/admin/AdminSchools";
+import AdminChangePassword from "@/pages/admin/AdminChangePassword";
 import { AdminVouchers, AdminOrders, AdminPartners, AdminLogs, AdminSettings, AdminUsers } from "@/pages/admin/AdminOther";
 import { AdminCategories, AdminCustomers, AdminPromoCodes, AdminReports, AdminContent } from "@/pages/admin/AdminExtra";
 import AdminBrand from "@/pages/admin/AdminBrand";
@@ -83,6 +84,7 @@ function App() {
               <Route path="relatorios" element={<AdminReports/>}/>
               <Route path="logs" element={<AdminLogs/>}/>
               <Route path="definicoes" element={<AdminSettings/>}/>
+              <Route path="alterar-password" element={<AdminChangePassword/>}/>
               <Route path="utilizadores" element={<AdminUsers/>}/>
             </Route>
 

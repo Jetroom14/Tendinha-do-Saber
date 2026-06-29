@@ -17,7 +17,12 @@ export default function AdminImport() {
   const [preview, setPreview] = useState(null);   // phase 1 result
   const [committed, setCommitted] = useState(null); // phase 2 result
 
+  const [schoolFile, setSchoolFile] = useState(null);
+  const [schoolLoading, setSchoolLoading] = useState(false);
+  const [schoolResult, setSchoolResult] = useState(null);
+
   const reset = () => { setFile(null); setPreview(null); setCommitted(null); };
+  const resetSchoolImport = () => { setSchoolFile(null); setSchoolResult(null); };
 
   const runPreview = async () => {
     if (!file) { toast.error("Selecione um ficheiro Excel"); return; }
@@ -29,6 +34,19 @@ export default function AdminImport() {
     } catch (e) {
       toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Erro ao analisar o ficheiro");
     } finally { setLoading(false); }
+  };
+
+  const importSchools = async () => {
+    if (!schoolFile) { toast.error("Selecione um ficheiro Excel"); return; }
+    setSchoolLoading(true);
+    try {
+      const fd = new FormData(); fd.append("file", schoolFile);
+      const { data } = await api.post("/admin/schools/import", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      setSchoolResult(data);
+      toast.success(`Importação de escolas concluída: ${data.created_schools} criadas, ${data.updated_schools} atualizadas`);
+    } catch (e) {
+      toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Erro ao importar escolas");
+    } finally { setSchoolLoading(false); }
   };
 
   const confirmImport = async () => {
@@ -68,6 +86,55 @@ export default function AdminImport() {
           </Button>
         </>
       )}
+
+      <div className="mt-12 border-t border-slate-200 pt-8">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <div className="text-[10px] tracking-[0.2em] uppercase text-slate-500 font-semibold">Escolas</div>
+            <h2 className="font-display text-2xl font-medium text-slate-900">Importar Escolas</h2>
+          </div>
+        </div>
+        <div className="bg-white border-2 border-dashed border-slate-300 rounded p-12 text-center mb-6">
+          <Upload className="w-12 h-12 text-slate-400 mx-auto mb-4" strokeWidth={1.5}/>
+          <label className="cursor-pointer">
+            <input type="file" accept=".xlsx,.xls" onChange={(e) => setSchoolFile(e.target.files[0])} className="hidden" data-testid="school-excel-input"/>
+            <span className="text-sm text-slate-700">{schoolFile ? schoolFile.name : "Clique para selecionar um ficheiro .xlsx"}</span>
+          </label>
+          <p className="text-xs text-slate-500 mt-2">Colunas obrigatórias: Escola, Município, Anos</p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Button onClick={importSchools} disabled={!schoolFile || schoolLoading} className="bg-[#5A8F1E] hover:bg-[#3E6E11] text-white" data-testid="import-schools-btn">
+            <Upload className="w-4 h-4 mr-2"/> {schoolLoading ? "A importar..." : "Importar escolas"}
+          </Button>
+          <Button onClick={resetSchoolImport} variant="outline" disabled={schoolLoading} data-testid="import-schools-reset-btn">Limpar</Button>
+        </div>
+        {schoolResult && (
+          <div className="mt-6 grid grid-cols-3 gap-4">
+            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded">
+              <div className="text-2xl font-display font-medium text-emerald-700">{schoolResult.created_schools}</div>
+              <div className="text-xs uppercase tracking-wider text-emerald-600 mt-1">Escolas criadas</div>
+            </div>
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded">
+              <div className="text-2xl font-display font-medium text-blue-700">{schoolResult.updated_schools}</div>
+              <div className="text-xs uppercase tracking-wider text-blue-600 mt-1">Escolas atualizadas</div>
+            </div>
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded">
+              <div className="text-2xl font-display font-medium text-slate-700">{schoolResult.created_municipalities}</div>
+              <div className="text-xs uppercase tracking-wider text-slate-600 mt-1">Municípios criados</div>
+            </div>
+          </div>
+        )}
+        {schoolResult?.issues?.length > 0 && (
+          <div className="mt-6 bg-rose-50 border border-rose-200 rounded p-4 text-sm text-rose-700">
+            <div className="font-medium mb-2">Problemas detectados (até 50):</div>
+            <ul className="list-disc list-inside space-y-1">
+              {schoolResult.issues.map((issue, index) => (
+                <li key={index}>{issue.school || "—"} / {issue.municipality || "—"} / {issue.grades || "—"}: {issue.issue}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
 
       {/* STEP 2 — preview summary + confirm */}
       {preview && (
