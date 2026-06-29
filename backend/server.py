@@ -977,6 +977,37 @@ async def delete_school(sid: str, admin: dict = Depends(require_super_admin)):
     await log_action(admin["id"], "delete", "school", sid)
     return {"ok": True}
 
+@api.delete("/admin/schools")
+async def delete_all_schools(
+    confirmation: str = Form(...),
+    admin: dict = Depends(require_manager),
+):
+    """DANGER: wipes every document from `schools` AND removes the orphan
+    `school_books` links that would otherwise dangle. Restricted to
+    admin/super_admin. Requires exact confirmation phrase 'APAGAR TODAS'.
+    Counts before/after are returned so the UI can show what happened."""
+    if (confirmation or "").strip() != "APAGAR TODAS":
+        raise HTTPException(400, "Confirmação inválida. Escreva exatamente 'APAGAR TODAS' para confirmar.")
+    schools_before = await db.schools.count_documents({})
+    links_before = await db.school_books.count_documents({})
+    s_res = await db.schools.delete_many({})
+    l_res = await db.school_books.delete_many({})
+    await log_action(
+        admin["id"], "bulk_delete", "schools", "ALL",
+        {"schools_deleted": s_res.deleted_count, "links_deleted": l_res.deleted_count},
+    )
+    logger.warning(
+        f"[ADMIN BULK WIPE] {admin.get('email')} apagou {s_res.deleted_count} escolas "
+        f"e {l_res.deleted_count} ligações school_books."
+    )
+    return {
+        "ok": True,
+        "schools_before": schools_before,
+        "schools_deleted": s_res.deleted_count,
+        "school_books_before": links_before,
+        "school_books_deleted": l_res.deleted_count,
+    }
+
 @api.post("/admin/school-books")
 async def link_school_book(payload: SchoolBookIn, admin: dict = Depends(require_admin)):
     payload_isbn = strip_isbn(payload.isbn13)

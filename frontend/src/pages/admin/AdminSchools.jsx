@@ -5,8 +5,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Plus, Trash2, Link as LinkIcon, Pencil } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Plus, Trash2, Link as LinkIcon, Pencil, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AdminSchools() {
@@ -19,6 +19,10 @@ export default function AdminSchools() {
   const [editingSchoolId, setEditingSchoolId] = useState("");
   const [schoolForm, setSchoolForm] = useState({ name: "", municipality_id: "", grades_taught: [] });
   const [grades, setGrades] = useState([]);
+  const [wipeOpen, setWipeOpen] = useState(false);
+  const [wipePhrase, setWipePhrase] = useState("");
+  const [wipeFinalConfirm, setWipeFinalConfirm] = useState(false);
+  const [wiping, setWiping] = useState(false);
 
   const load = async () => {
     const m = await api.get("/municipalities"); setMunis(m.data);
@@ -90,6 +94,30 @@ export default function AdminSchools() {
     } catch (e) { toast.error(e.response?.data?.detail || "Erro"); }
   };
 
+  const openWipeDialog = () => {
+    setWipePhrase("");
+    setWipeFinalConfirm(false);
+    setWipeOpen(true);
+  };
+
+  const wipeAllSchools = async () => {
+    if (wipePhrase.trim() !== "APAGAR TODAS" || !wipeFinalConfirm) return;
+    setWiping(true);
+    try {
+      const fd = new FormData();
+      fd.append("confirmation", "APAGAR TODAS");
+      const { data } = await api.delete("/admin/schools", { data: fd, headers: { "Content-Type": "multipart/form-data" } });
+      toast.success(`${data.schools_deleted} escolas e ${data.school_books_deleted} ligações apagadas.`);
+      setWipeOpen(false);
+      setWipePhrase("");
+      setWipeFinalConfirm(false);
+      setSelectedMun("");
+      load();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Erro ao apagar escolas");
+    } finally { setWiping(false); }
+  };
+
   return (
     <div className="p-8" data-testid="admin-schools">
       <div className="flex items-center justify-between mb-6">
@@ -97,7 +125,12 @@ export default function AdminSchools() {
           <div className="text-[10px] tracking-[0.2em] uppercase text-slate-500 font-semibold">Escolas</div>
           <h1 className="font-display text-3xl font-medium text-slate-900">Concelhos & Escolas</h1>
         </div>
-        <Button onClick={() => setLinkOpen(true)} variant="outline" data-testid="link-school-book-btn"><LinkIcon className="w-4 h-4 mr-2"/>Associar livro</Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={openWipeDialog} variant="outline" className="border-rose-300 text-rose-700 hover:bg-rose-50 hover:text-rose-800" data-testid="wipe-all-schools-btn">
+            <Trash2 className="w-4 h-4 mr-2"/>Apagar todas as escolas
+          </Button>
+          <Button onClick={() => setLinkOpen(true)} variant="outline" data-testid="link-school-book-btn"><LinkIcon className="w-4 h-4 mr-2"/>Associar livro</Button>
+        </div>
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
@@ -201,6 +234,72 @@ export default function AdminSchools() {
             <Button variant="outline" onClick={() => setSchoolDialogOpen(false)}>Cancelar</Button>
             <Button onClick={saveSchool} className="bg-[#5A8F1E] hover:bg-[#3E6E11] text-white" data-testid="save-school-btn">
               {editingSchoolId ? "Atualizar" : "Criar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Apagar TODAS as escolas (confirmação dupla) */}
+      <Dialog open={wipeOpen} onOpenChange={(o) => { setWipeOpen(o); if (!o) { setWipePhrase(""); setWipeFinalConfirm(false); } }}>
+        <DialogContent data-testid="wipe-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-700">
+              <AlertTriangle className="w-5 h-5"/> Apagar todas as escolas
+            </DialogTitle>
+            <DialogDescription className="text-slate-600 pt-2">
+              Esta ação é <strong>irreversível</strong>. Vai eliminar <strong>todas as escolas</strong> e também todas as <strong>ligações livro ↔ escola</strong> existentes.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="mt-2 space-y-4">
+            <div className="bg-rose-50 border border-rose-200 rounded p-3 text-sm text-rose-900 space-y-1">
+              <div className="font-semibold">O que vai ser apagado:</div>
+              <ul className="list-disc list-inside text-xs space-y-0.5">
+                <li>Todas as escolas (coleção <code className="bg-rose-100 px-1 rounded">schools</code>)</li>
+                <li>Todas as ligações livro↔escola (coleção <code className="bg-rose-100 px-1 rounded">school_books</code>)</li>
+              </ul>
+              <div className="font-semibold pt-2">O que <em>NÃO</em> será tocado:</div>
+              <ul className="list-disc list-inside text-xs space-y-0.5">
+                <li>Concelhos, livros, encomendas, vouchers, clientes, parceiros, definições</li>
+              </ul>
+            </div>
+
+            <div>
+              <Label htmlFor="wipe-phrase" className="text-xs uppercase tracking-wider text-slate-500 mb-1.5 block">
+                Para confirmar, escreva exatamente: <code className="bg-slate-100 px-1 rounded font-mono">APAGAR TODAS</code>
+              </Label>
+              <Input
+                id="wipe-phrase"
+                value={wipePhrase}
+                onChange={(e) => setWipePhrase(e.target.value)}
+                placeholder="APAGAR TODAS"
+                className={`font-mono ${wipePhrase && wipePhrase.trim() !== "APAGAR TODAS" ? "border-rose-400" : ""}`}
+                autoComplete="off"
+                data-testid="wipe-phrase-input"
+              />
+            </div>
+
+            <label className="flex items-start gap-2 cursor-pointer">
+              <Checkbox
+                checked={wipeFinalConfirm}
+                onCheckedChange={(v) => setWipeFinalConfirm(!!v)}
+                data-testid="wipe-final-confirm"
+              />
+              <span className="text-sm text-slate-700">
+                Compreendo que esta ação é <strong>irreversível</strong> e que vou ter de reimportar o Excel para repor as escolas.
+              </span>
+            </label>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWipeOpen(false)} disabled={wiping} data-testid="wipe-cancel-btn">Cancelar</Button>
+            <Button
+              onClick={wipeAllSchools}
+              disabled={wipePhrase.trim() !== "APAGAR TODAS" || !wipeFinalConfirm || wiping}
+              className="bg-rose-600 hover:bg-rose-700 text-white disabled:bg-slate-300"
+              data-testid="wipe-confirm-btn"
+            >
+              <Trash2 className="w-4 h-4 mr-2"/>{wiping ? "A apagar..." : "Apagar TODAS as escolas"}
             </Button>
           </DialogFooter>
         </DialogContent>
