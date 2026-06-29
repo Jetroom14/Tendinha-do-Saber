@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="Iliabum Clube">
+  <rect width="240" height="240" rx="20" fill="#5A8F1E"/>
+  <path d="M 60 90 L 120 50 L 180 90 L 180 150 L 120 190 L 60 150 Z" fill="none" stroke="#FFFFFF" stroke-width="3"/>
+  <text x="120" y="115" text-anchor="middle" font-family="Outfit, sans-serif" font-weight="700" font-size="22" fill="#FFFFFF" letter-spacing="0.08em">ILIABUM</text>
+  <text x="120" y="145" text-anchor="middle" font-family="Outfit, sans-serif" font-weight="500" font-size="14" fill="#FFFFFF" letter-spacing="0.20em" opacity="0.85">CLUBE</text>
+  <circle cx="120" cy="170" r="3" fill="#FFFFFF"/>
+</svg>

@@ -63,7 +63,7 @@ export function VoucherGuidePage() {
         {[
           { n: "1", icon: Upload, t: "Submeta o voucher", s: "Insira o código manualmente ou envie um link para o PDF. Demora 30 segundos." },
           { n: "2", icon: Sparkles, t: "Validamos em 24h", s: "A nossa equipa confirma o voucher e atribui o desconto. Receberá um email de confirmação." },
-          { n: "3", icon: BookOpen, t: "Receba os manuais", s: "Escolha entrega em mão (Aveiro) ou levantamento na loja. Plastificação opcional." },
+          { n: "3", icon: BookOpen, t: "Receba os manuais", s: "Receba os seus manuais em mão, na morada combinada. Plastificação opcional." },
         ].map((s, i) => (
           <div key={i} className="bg-white border border-[#E2E8F0] rounded-md p-7" data-testid={`voucher-step-${s.n}`}>
             <div className="text-6xl font-serif italic text-[#5A8F1E]/15 leading-none mb-2">{s.n}</div>

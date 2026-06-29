@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { BookCard } from "@/components/BookCard";
 import { useCart } from "@/contexts/CartContext";
 import SEO, { ORGANIZATION_JSONLD } from "@/components/SEO";
+import PartnerLogo from "@/components/PartnerLogo";
 import { ArrowRight, GraduationCap, MapPin, School, BookOpen, ShieldCheck, Truck, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
@@ -172,7 +173,7 @@ export default function HomePage() {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
               {partners.map((p) => (
                 <div key={p.id} className="bg-white rounded-md p-6 border border-[#E2E8F0] flex flex-col items-center text-center" data-testid={`partner-${p.id}`}>
-                  {p.logo_url && <img src={p.logo_url} alt={p.name} className="w-16 h-16 rounded-md object-cover mb-3" loading="lazy"/>}
+                  {p.logo_url && <PartnerLogo partner={p} className="w-16 h-16 rounded-md object-cover mb-3"/>}
                   <div className="font-display font-medium text-[#1A202C]">{p.name}</div>
                   <div className="text-xs text-[#4A5568] mt-1">{p.description}</div>
                 </div>

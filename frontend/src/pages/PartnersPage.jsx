@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import SEO from "@/components/SEO";
+import PartnerLogo from "@/components/PartnerLogo";
 
 export default function PartnersPage() {
   const [partners, setPartners] = useState([]);
@@ -21,11 +22,7 @@ export default function PartnersPage() {
         {partners.map((p) => (
           <div key={p.id} className="bg-white border border-[#E2E8F0] rounded-md overflow-hidden hover:border-[#5A8F1E] transition-colors h-full flex flex-col" data-testid={`partner-card-${p.id}`}>
             <div className="h-40 bg-[#F5F8EC] flex items-center justify-center p-6">
-              {p.logo_url ? (
-                <img src={p.logo_url} alt={p.name} className="max-h-24 max-w-[80%] object-contain" loading="lazy"/>
-              ) : (
-                <div className="text-sm text-[#94A3B8] text-center">{p.name}</div>
-              )}
+              <PartnerLogo partner={p} className="max-h-24 max-w-[80%] object-contain"/>
             </div>
             <div className="p-6 flex-1 flex flex-col">
               <h3 className="font-display text-xl font-medium text-[#1A202C] mb-1">{p.name}</h3>

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
+import PartnerLogo from "@/components/PartnerLogo";
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -165,7 +166,7 @@ export function Footer() {
             <div className="flex flex-wrap items-center justify-center gap-6">
               {partners.map((p) => (
                 <Link key={p.id} to="/parceiros" className="flex items-center gap-2 opacity-80 hover:opacity-100 transition-opacity" data-testid={`footer-partner-${p.id}`}>
-                  {p.logo_url && <img src={p.logo_url} alt={p.name} className="w-10 h-10 rounded object-cover bg-white/10" loading="lazy"/>}
+                  <PartnerLogo partner={p} className="w-10 h-10 rounded object-cover bg-white/10"/>
                   <span className="text-xs text-[#CBD5E0] hidden sm:inline">{p.name}</span>
                 </Link>
               ))}

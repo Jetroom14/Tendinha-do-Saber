@@ -13,6 +13,7 @@ import { Search, Filter, X } from "lucide-react";
 export default function CatalogPage() {
   const [params, setParams] = useSearchParams();
   const [books, setBooks] = useState([]);
+  const [total, setTotal] = useState(0);
   const [subjects, setSubjects] = useState([]);
   const [grades, setGrades] = useState([]);
   const [munis, setMunis] = useState([]);
@@ -47,9 +48,10 @@ export default function CatalogPage() {
     if (type !== "all") qs.set("type", type);
     if (schoolId) qs.set("school_id", schoolId);
     if (grade) qs.set("grade_level", grade);
-    qs.set("limit", "100");
+    qs.set("limit", "500");
     const { data } = await api.get(`/books?${qs.toString()}`);
     setBooks(data.items || []);
+    setTotal(data.total ?? (data.items || []).length);
     setLoading(false);
   };
 
@@ -63,7 +65,7 @@ export default function CatalogPage() {
     if (mun) {
       const qs = new URLSearchParams({ municipality_id: mun });
       if (grade) qs.set("grade", grade);
-      api.get(`/schools?${qs.toString()}`).then((r) => setSchools(r.data));
+      api.get(`/schools?${qs.toString()}`).then((r) => setSchools(Array.isArray(r.data) ? r.data : []));
     } else setSchools([]);
   }, [mun, grade]);
 
@@ -156,7 +158,7 @@ export default function CatalogPage() {
         </div>
       ) : (
         <>
-          <div className="text-sm text-[#4A5568] mb-4" data-testid="catalog-count">{books.length} resultado{books.length !== 1 ? "s" : ""}</div>
+          <div className="text-sm text-[#4A5568] mb-4" data-testid="catalog-count">{books.length} de {total} resultado{total !== 1 ? "s" : ""}</div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5" data-testid="catalog-grid">
             {books.map((b) => <BookCard key={b.isbn13} book={b} onAdd={handleAdd}/>)}
           </div>

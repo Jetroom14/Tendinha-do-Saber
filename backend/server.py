@@ -432,7 +432,7 @@ async def list_books(
         isbns = await db.school_books.distinct("isbn13", sb_filter)
         filt["isbn13"] = {"$in": isbns}
 
-    limit = max(1, min(limit, 200))
+    limit = max(1, min(limit, 500))
     if page is not None:
         skip = max(0, (page - 1)) * limit
 
