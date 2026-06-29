@@ -285,9 +285,21 @@ export function AdminSettings() {
         ? s.aveiro_postcodes.split(",").map((x) => x.trim()).filter(Boolean)
         : s.aveiro_postcodes,
       publisher_cover_template: s.publisher_cover_template || "",
+      google_analytics_id: s.google_analytics_id || "",
+      google_ads_id: s.google_ads_id || "",
+      facebook_pixel_id: s.facebook_pixel_id || "",
+      google_site_verification: s.google_site_verification || "",
+      site_url: s.site_url || "",
     };
     const { data } = await api.put("/admin/settings", payload);
     setS(data); toast.success("Definições atualizadas");
+  };
+
+  const enrichCovers = async () => {
+    try {
+      const { data } = await api.post("/admin/books/enrich-covers?limit=200");
+      toast.success(`Capas atualizadas: ${data.updated} livros`);
+    } catch { toast.error("Erro ao enriquecer capas"); }
   };
 
   if (!s) return <div className="p-8 text-slate-500">A carregar...</div>;
@@ -321,6 +333,42 @@ export function AdminSettings() {
           </p>
         </div>
         <button onClick={save} className="bg-[#5A8F1E] hover:bg-[#3E6E11] text-white rounded px-5 py-2 text-sm" data-testid="settings-save-btn">Guardar definições</button>
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded p-6 space-y-5 mt-6">
+        <h2 className="font-display text-lg font-medium text-slate-900">SEO & Tracking</h2>
+        <div>
+          <label className="text-xs uppercase tracking-wider text-slate-500">URL do site (para sitemap.xml)</label>
+          <input value={s.site_url || ""} onChange={(e)=>setS({...s, site_url: e.target.value})} placeholder="https://tendinhadosaber.pt" className="w-full mt-1 px-3 py-2 border border-slate-300 rounded font-mono text-sm" data-testid="settings-site-url"/>
+        </div>
+        <div>
+          <label className="text-xs uppercase tracking-wider text-slate-500">Google Analytics 4 (Measurement ID)</label>
+          <input value={s.google_analytics_id || ""} onChange={(e)=>setS({...s, google_analytics_id: e.target.value})} placeholder="G-XXXXXXXXXX" className="w-full mt-1 px-3 py-2 border border-slate-300 rounded font-mono text-sm" data-testid="settings-ga"/>
+        </div>
+        <div>
+          <label className="text-xs uppercase tracking-wider text-slate-500">Google Ads (Conversion ID)</label>
+          <input value={s.google_ads_id || ""} onChange={(e)=>setS({...s, google_ads_id: e.target.value})} placeholder="AW-XXXXXXXXX" className="w-full mt-1 px-3 py-2 border border-slate-300 rounded font-mono text-sm" data-testid="settings-ads"/>
+        </div>
+        <div>
+          <label className="text-xs uppercase tracking-wider text-slate-500">Facebook Pixel ID</label>
+          <input value={s.facebook_pixel_id || ""} onChange={(e)=>setS({...s, facebook_pixel_id: e.target.value})} placeholder="123456789012345" className="w-full mt-1 px-3 py-2 border border-slate-300 rounded font-mono text-sm" data-testid="settings-fb"/>
+        </div>
+        <div>
+          <label className="text-xs uppercase tracking-wider text-slate-500">Google Search Console (código de verificação)</label>
+          <input value={s.google_site_verification || ""} onChange={(e)=>setS({...s, google_site_verification: e.target.value})} placeholder="ABC123..." className="w-full mt-1 px-3 py-2 border border-slate-300 rounded font-mono text-sm" data-testid="settings-gsc"/>
+          <p className="text-xs text-slate-500 mt-1">No Search Console, escolha "Tag HTML" e cole apenas o valor do <code>content</code>.</p>
+        </div>
+        <div className="bg-slate-50 rounded p-3 text-xs text-slate-600 space-y-1">
+          <div>📄 Sitemap: <a href="/api/seo/sitemap.xml" target="_blank" rel="noreferrer" className="text-[#5A8F1E] hover:underline">/api/seo/sitemap.xml</a></div>
+          <div>🤖 Robots: <a href="/robots.txt" target="_blank" rel="noreferrer" className="text-[#5A8F1E] hover:underline">/robots.txt</a></div>
+        </div>
+        <button onClick={save} className="bg-[#5A8F1E] hover:bg-[#3E6E11] text-white rounded px-5 py-2 text-sm" data-testid="settings-save-seo-btn">Guardar SEO</button>
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded p-6 space-y-3 mt-6">
+        <h2 className="font-display text-lg font-medium text-slate-900">Manutenção</h2>
+        <p className="text-sm text-slate-600">Procura automaticamente capas de livros em falta no Google Books (por ISBN, depois por título+autor).</p>
+        <button onClick={enrichCovers} className="bg-slate-900 hover:bg-black text-white rounded px-5 py-2 text-sm" data-testid="enrich-covers-btn">🖼️ Enriquecer capas em falta</button>
       </div>
     </div>
   );

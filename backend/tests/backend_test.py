@@ -4,9 +4,22 @@ wishlist, admin dashboard/users/logs/settings.
 """
 import time
 import uuid
+from io import BytesIO
+
+import pandas as pd
 import requests
 import pytest
 from conftest import BASE_URL, auth_headers, SUPER_EMAIL, SUPER_PASSWORD, ADMIN_EMAIL, ADMIN_PASSWORD
+
+
+def _books(api, **params):
+    """Wrap /api/books to handle both legacy list response and new paginated dict."""
+    qs = "&".join(f"{k}={v}" for k, v in params.items())
+    data = api.get(f"{BASE_URL}/api/books?{qs}").json()
+    if isinstance(data, dict) and "items" in data:
+        return data["items"]
+    return data
+
 
 
 # ============================ AUTH ============================
@@ -69,44 +82,33 @@ class TestAuth:
 # ============================ BOOKS / CATALOG ============================
 class TestBooks:
     def test_list_books_seed_count(self, api):
-        # Loop with high limit
-        r = api.get(f"{BASE_URL}/api/books?limit=500")
-        assert r.status_code == 200
-        books = r.json()
-        assert isinstance(books, list)
-        assert len(books) >= 280, f"Expected ~291 seeded books, got {len(books)}"
-        # Validate ISBN length
+        # /api/books page_size is server-capped at 200. Use `total` from paginated response.
+        data = api.get(f"{BASE_URL}/api/books?limit=200").json()
+        assert isinstance(data, dict) and "items" in data
+        assert data["total"] >= 280, f"Expected ~291 seeded books, got total={data['total']}"
+        books = data["items"]
         for b in books[:30]:
             assert len(b["isbn13"]) == 13, f"Bad ISBN: {b['isbn13']}"
             assert b["type"] in ("Manual", "Workbook")
 
     def test_books_filter_by_type_workbook(self, api):
-        r = api.get(f"{BASE_URL}/api/books?type=Workbook&limit=200")
-        assert r.status_code == 200
-        for b in r.json():
+        for b in _books(api, type="Workbook", limit=200):
             assert b["type"] == "Workbook"
 
     def test_books_filter_by_type_manual(self, api):
-        r = api.get(f"{BASE_URL}/api/books?type=Manual&limit=200")
-        assert r.status_code == 200
-        for b in r.json():
+        for b in _books(api, type="Manual", limit=200):
             assert b["type"] == "Manual"
 
     def test_books_search_q(self, api):
-        # Pick a random book and search by title fragment
-        r0 = api.get(f"{BASE_URL}/api/books?limit=1").json()
-        sample_title = r0[0]["title"].split()[0]
-        r = api.get(f"{BASE_URL}/api/books?q={sample_title}")
-        assert r.status_code == 200
-        assert len(r.json()) > 0
+        first = _books(api, limit=1)
+        sample_title = first[0]["title"].split()[0]
+        assert len(_books(api, q=sample_title)) > 0
 
     def test_books_filter_by_subject(self, api):
         subjects = api.get(f"{BASE_URL}/api/books/subjects").json()
         assert isinstance(subjects, list) and len(subjects) > 0
         sub = [s for s in subjects if s][0]
-        r = api.get(f"{BASE_URL}/api/books?subject={sub}&limit=50")
-        assert r.status_code == 200
-        for b in r.json():
+        for b in _books(api, subject=sub, limit=50):
             assert b["subject"] == sub
 
     def test_books_filter_school_grade(self, api):
@@ -116,10 +118,9 @@ class TestBooks:
         sid = schools[0]["id"]
         # Pick a grade
         grades = api.get(f"{BASE_URL}/api/grade-levels").json()
-        # find a grade that has associations
         for g in grades:
-            r = api.get(f"{BASE_URL}/api/books?school_id={sid}&grade_level={g}")
-            if r.status_code == 200 and len(r.json()) > 0:
+            items = _books(api, school_id=sid, grade_level=g)
+            if len(items) > 0:
                 return
         pytest.fail("No books found for any school+grade combination")
 
@@ -150,6 +151,54 @@ class TestGeography:
         grades = r.json()
         assert len(grades) == 12
 
+    def test_import_school_books_updates_school_grades(self, api, admin_token, super_token):
+        mun_name = f"TEST Mun {uuid.uuid4().hex[:6]}"
+        r = api.post(f"{BASE_URL}/api/admin/municipalities", headers=auth_headers(admin_token), json={"name": mun_name})
+        assert r.status_code == 200, r.text
+        mun_id = r.json()["id"]
+
+        school_a = f"TEST School A {uuid.uuid4().hex[:6]}"
+        r = api.post(f"{BASE_URL}/api/admin/schools", headers=auth_headers(super_token), json={"name": school_a, "municipality_id": mun_id})
+        assert r.status_code == 200, r.text
+        assert set(r.json()["grades_taught"]) == set(["1.º Ano", "2.º Ano", "3.º Ano", "4.º Ano", "5.º Ano", "6.º Ano", "7.º Ano", "8.º Ano", "9.º Ano", "10.º Ano", "11.º Ano", "12.º Ano"])
+
+        school_b = f"TEST School B {uuid.uuid4().hex[:6]}"
+        rows = [
+            {"ISBN": "9781234567897", "Município": mun_name, "Escola": school_a, "Disciplina": "Português", "Ano": "9.º Ano"},
+            {"ISBN": "9781234567898", "Município": mun_name, "Escola": school_b, "Disciplina": "Matemática", "Ano": "8.º Ano"},
+        ]
+        df = pd.DataFrame(rows)
+        buffer = BytesIO()
+        try:
+            with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+                df.to_excel(writer, index=False)
+        except ImportError:
+            pytest.skip("openpyxl is required to generate Excel files for this test")
+        buffer.seek(0)
+
+        files = {"file": ("school_import.xlsx", buffer, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+        # Use raw requests.post (not the api session) — the session injects Content-Type: application/json
+        # which corrupts the multipart boundary and makes FastAPI think file is missing.
+        r = requests.post(
+            f"{BASE_URL}/api/admin/school-books/import",
+            headers=auth_headers(admin_token),
+            files=files,
+            timeout=60,
+        )
+        assert r.status_code == 200, r.text
+        result = r.json()
+        assert result["created_schools"] == 1
+        assert result["created_links"] == 2
+        assert result["anomalies"] == 0
+
+        r = api.get(f"{BASE_URL}/api/schools?municipality_id={mun_id}")
+        assert r.status_code == 200, r.text
+        schools = {s["name"]: s for s in r.json()}
+        assert school_a in schools
+        assert school_b in schools
+        assert set(schools[school_a]["grades_taught"]) == {"9.º Ano"}
+        assert set(schools[school_b]["grades_taught"]) == {"8.º Ano"}
+
 
 # ============================ PARTNERS ============================
 class TestPartners:
@@ -167,8 +216,8 @@ class TestPartners:
 class TestCart:
     def test_cart_discount_only_on_workbooks(self, api):
         # Get one Manual and one Workbook
-        manuals = api.get(f"{BASE_URL}/api/books?type=Manual&limit=1").json()
-        workbooks = api.get(f"{BASE_URL}/api/books?type=Workbook&limit=1").json()
+        manuals = _books(api, type="Manual", limit=1)
+        workbooks = _books(api, type="Workbook", limit=1)
         assert manuals and workbooks
         m = manuals[0]
         w = workbooks[0]
@@ -198,7 +247,7 @@ class TestCart:
         assert abs(d["total"] - expected_total) < 0.05
 
     def test_cart_lamination_adds_to_manual(self, api):
-        manuals = api.get(f"{BASE_URL}/api/books?type=Manual&limit=5").json()
+        manuals = _books(api, type="Manual", limit=5)
         # find lamination-eligible manual
         m = next((b for b in manuals if b.get("is_lamination_eligible", True)), manuals[0])
         payload = {"items": [{"isbn13": m["isbn13"], "qty": 1, "lamination": True}]}
@@ -227,16 +276,16 @@ class TestPostcode:
 # ============================ ORDERS ============================
 class TestOrders:
     def test_create_order_and_fetch(self, api):
-        books = api.get(f"{BASE_URL}/api/books?limit=2").json()
+        books = _books(api, limit=2)
         payload = {
             "items": [{"isbn13": books[0]["isbn13"], "qty": 1, "lamination": False}],
             "promo_code": None,
             "customer_name": "TEST Buyer",
             "customer_email": "test_buyer@example.com",
             "customer_phone": "910000000",
-            "delivery_method": "store_pickup",
-            "address": "",
-            "postal_code": "",
+            "delivery_method": "hand_delivery",
+            "address": "Rua Teste 1",
+            "postal_code": "3800",
             "notes": "TEST order",
         }
         r = api.post(f"{BASE_URL}/api/orders", json=payload)
@@ -251,7 +300,7 @@ class TestOrders:
         assert r2.json()["order_no"] == o["order_no"]
 
     def test_create_order_hand_delivery_outside_aveiro(self, api):
-        books = api.get(f"{BASE_URL}/api/books?limit=1").json()
+        books = _books(api, limit=1)
         payload = {
             "items": [{"isbn13": books[0]["isbn13"], "qty": 1, "lamination": False}],
             "customer_name": "TEST", "customer_email": "t@t.pt", "customer_phone": "910",
@@ -364,8 +413,9 @@ class TestAdminPanel:
         # Logs should exist from previous admin book CRUD test
         # (best-effort; don't fail if test order changes)
 
-    def test_settings_lamination_price_persists(self, api, admin_token):
-        h = auth_headers(admin_token)
+    def test_settings_lamination_price_persists(self, api, super_token):
+        # NOTE: PUT /api/admin/settings is now restricted to super_admin only (iteration 2 change).
+        h = auth_headers(super_token)
         h["Content-Type"] = "application/json"
         # Set to 3.00
         r = requests.put(f"{BASE_URL}/api/admin/settings", json={"lamination_price": 3.00}, headers=h)
@@ -373,7 +423,7 @@ class TestAdminPanel:
         assert r.json()["lamination_price"] == 3.00
 
         # Cart should reflect new price
-        manuals = api.get(f"{BASE_URL}/api/books?type=Manual&limit=5").json()
+        manuals = _books(api, type="Manual", limit=5)
         m = next((b for b in manuals if b.get("is_lamination_eligible", True)), manuals[0])
         r = api.post(f"{BASE_URL}/api/cart/validate", json={
             "items": [{"isbn13": m["isbn13"], "qty": 1, "lamination": True}]
@@ -390,7 +440,7 @@ class TestAdminPanel:
 class TestWishlist:
     def test_wishlist_crud(self, api, customer):
         h = auth_headers(customer["token"])
-        books = api.get(f"{BASE_URL}/api/books?limit=1").json()
+        books = _books(api, limit=1)
         isbn = books[0]["isbn13"]
         # Add
         r = requests.post(f"{BASE_URL}/api/wishlist", json={"isbn13": isbn},

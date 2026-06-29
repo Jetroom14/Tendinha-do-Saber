@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Plus, Trash2, Link as LinkIcon } from "lucide-react";
+import { Plus, Trash2, Link as LinkIcon, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AdminSchools() {
@@ -14,6 +15,9 @@ export default function AdminSchools() {
   const [selectedMun, setSelectedMun] = useState("");
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkForm, setLinkForm] = useState({ school_id: "", isbn13: "", grade_level: "" });
+  const [schoolDialogOpen, setSchoolDialogOpen] = useState(false);
+  const [editingSchoolId, setEditingSchoolId] = useState("");
+  const [schoolForm, setSchoolForm] = useState({ name: "", municipality_id: "", grades_taught: [] });
   const [grades, setGrades] = useState([]);
 
   const load = async () => {
@@ -22,6 +26,17 @@ export default function AdminSchools() {
   };
 
   useEffect(() => { load(); api.get("/grade-levels").then((r) => setGrades(r.data)); /* eslint-disable-next-line */ }, [selectedMun]);
+
+  const resetSchoolForm = (school = null) => {
+    if (school) {
+      setEditingSchoolId(school.id);
+      setSchoolForm({ name: school.name, municipality_id: school.municipality_id, grades_taught: school.grades_taught || [] });
+    } else {
+      setEditingSchoolId("");
+      setSchoolForm({ name: "", municipality_id: selectedMun, grades_taught: [] });
+    }
+    setSchoolDialogOpen(true);
+  };
 
   const addMun = async () => {
     const name = prompt("Nome do concelho:");
@@ -32,12 +47,36 @@ export default function AdminSchools() {
     if (!confirm("Eliminar concelho e respetivas escolas?")) return;
     await api.delete(`/admin/municipalities/${id}`); toast.success("Eliminado"); load();
   };
-  const addSchool = async () => {
+  const openNewSchoolDialog = () => {
     if (!selectedMun) { toast.error("Selecione primeiro um concelho"); return; }
-    const name = prompt("Nome da escola:");
-    if (!name) return;
-    await api.post("/admin/schools", { name, municipality_id: selectedMun });
-    toast.success("Escola criada"); load();
+    resetSchoolForm();
+  };
+  const editSchool = (school) => resetSchoolForm(school);
+  const saveSchool = async () => {
+    if (!schoolForm.name.trim()) { toast.error("Nome da escola é obrigatório"); return; }
+    if (!schoolForm.municipality_id) { toast.error("Município inválido"); return; }
+    if (schoolForm.grades_taught.length === 0) { toast.error("Selecione pelo menos um ano"); return; }
+    try {
+      if (editingSchoolId) {
+        await api.put(`/admin/schools/${editingSchoolId}`, {
+          name: schoolForm.name.trim(),
+          municipality_id: schoolForm.municipality_id,
+          grades_taught: schoolForm.grades_taught,
+        });
+        toast.success("Escola atualizada");
+      } else {
+        await api.post("/admin/schools", {
+          name: schoolForm.name.trim(),
+          municipality_id: schoolForm.municipality_id,
+          grades_taught: schoolForm.grades_taught,
+        });
+        toast.success("Escola criada");
+      }
+      setSchoolDialogOpen(false);
+      load();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Erro");
+    }
   };
   const delSchool = async (id) => {
     if (!confirm("Eliminar escola?")) return;
@@ -80,13 +119,19 @@ export default function AdminSchools() {
         <div className="bg-white border border-slate-200 rounded p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-display text-lg font-medium">Escolas {selectedMun && <span className="text-xs text-slate-500">· {munis.find(m=>m.id===selectedMun)?.name}</span>}</h2>
-            <Button size="sm" onClick={addSchool} className="bg-[#5A8F1E] hover:bg-[#3E6E11] text-white" data-testid="add-school-btn"><Plus className="w-3.5 h-3.5 mr-1"/>Nova</Button>
+            <Button size="sm" onClick={openNewSchoolDialog} className="bg-[#5A8F1E] hover:bg-[#3E6E11] text-white" data-testid="add-school-btn"><Plus className="w-3.5 h-3.5 mr-1"/>Nova</Button>
           </div>
           <div className="space-y-1 max-h-96 overflow-y-auto">
             {schools.map((s) => (
               <div key={s.id} className="flex items-center justify-between px-3 py-2 rounded hover:bg-slate-50">
-                <span className="text-sm">{s.name}</span>
-                <button onClick={() => delSchool(s.id)} className="text-slate-400 hover:text-rose-600"><Trash2 className="w-3.5 h-3.5"/></button>
+                <div>
+                  <div className="text-sm font-medium">{s.name}</div>
+                  {s.grades_taught?.length > 0 && <div className="text-xs text-slate-500">{s.grades_taught.join(", ")}</div>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => editSchool(s)} className="p-1.5 rounded hover:bg-slate-200" data-testid={`edit-school-${s.id}`}><Pencil className="w-3.5 h-3.5"/></button>
+                  <button onClick={() => delSchool(s.id)} className="text-slate-400 hover:text-rose-600"><Trash2 className="w-3.5 h-3.5"/></button>
+                </div>
               </div>
             ))}
             {schools.length === 0 && <p className="text-sm text-slate-500 px-3 py-2">Nenhuma escola.</p>}
@@ -115,6 +160,48 @@ export default function AdminSchools() {
           <DialogFooter>
             <Button variant="outline" onClick={()=>setLinkOpen(false)}>Cancelar</Button>
             <Button onClick={submitLink} className="bg-[#5A8F1E] hover:bg-[#3E6E11] text-white">Associar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={schoolDialogOpen} onOpenChange={setSchoolDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingSchoolId ? "Editar escola" : "Nova escola"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div>
+              <Label>Nome da escola</Label>
+              <Input value={schoolForm.name} onChange={(e) => setSchoolForm({ ...schoolForm, name: e.target.value })} data-testid="school-name-input" />
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <Label>Anos que a escola ensina</Label>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <button type="button" onClick={() => setSchoolForm({ ...schoolForm, grades_taught: ["1.º Ano", "2.º Ano", "3.º Ano", "4.º Ano"] })} className="rounded bg-slate-100 px-2 py-1 hover:bg-slate-200">1.º Ciclo</button>
+                  <button type="button" onClick={() => setSchoolForm({ ...schoolForm, grades_taught: ["5.º Ano", "6.º Ano", "7.º Ano", "8.º Ano", "9.º Ano"] })} className="rounded bg-slate-100 px-2 py-1 hover:bg-slate-200">2.º/3.º Ciclo</button>
+                  <button type="button" onClick={() => setSchoolForm({ ...schoolForm, grades_taught: ["10.º Ano", "11.º Ano", "12.º Ano"] })} className="rounded bg-slate-100 px-2 py-1 hover:bg-slate-200">Secundário</button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {grades.map((grade) => (
+                  <label key={grade} className="flex items-center gap-2 text-sm rounded border border-slate-200 p-2 hover:bg-slate-50">
+                    <Checkbox checked={schoolForm.grades_taught.includes(grade)} onCheckedChange={(checked) => {
+                      const selected = new Set(schoolForm.grades_taught);
+                      if (checked) selected.add(grade); else selected.delete(grade);
+                      setSchoolForm({ ...schoolForm, grades_taught: Array.from(selected).sort((a, b) => grades.indexOf(a) - grades.indexOf(b)) });
+                    }} />
+                    <span>{grade}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSchoolDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={saveSchool} className="bg-[#5A8F1E] hover:bg-[#3E6E11] text-white" data-testid="save-school-btn">
+              {editingSchoolId ? "Atualizar" : "Criar"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -5,6 +5,7 @@ import api from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Heart, User } from "lucide-react";
 import { toast } from "sonner";
+import ChangePasswordForm from "@/components/ChangePasswordForm";
 
 export default function AccountPage() {
   const { user, logout } = useAuth();
@@ -82,6 +83,15 @@ export default function AccountPage() {
               ))}
             </div>
           )}
+
+          <div className="mt-10 bg-white border border-[#E2E8F0] rounded-md p-8">
+            <div className="flex items-center gap-2 mb-4">
+              <Heart className="w-5 h-5 text-[#5A8F1E]" strokeWidth={1.5}/>
+              <h2 className="font-display text-xl font-medium">Alterar Password</h2>
+            </div>
+            <p className="mb-6 text-sm text-[#4A5568]">Atualize a sua password atualizando a password antiga para uma nova password de pelo menos 8 caracteres.</p>
+            <ChangePasswordForm />
+          </div>
         </section>
       </div>
     </div>

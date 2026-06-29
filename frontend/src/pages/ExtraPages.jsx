@@ -12,12 +12,12 @@ export function AboutPage() {
       <div className="text-[10px] tracking-[0.2em] uppercase text-[#4A5568] font-semibold mb-2">Sobre nós</div>
       <h1 className="font-display text-4xl md:text-5xl font-medium mb-6">A Tendinha do Saber</h1>
       <p className="font-serif italic text-xl text-[#1A202C] mb-10 leading-relaxed">
-        “Uma livraria de bairro com o catálogo de uma grande superfície — e o cuidado de quem conhece cada família pelo nome.”
+        "O catálogo completo de manuais de uma grande livraria, com o cuidado de quem conhece cada família pelo nome."
       </p>
       <div className="prose max-w-none space-y-5 text-[#1A202C] leading-relaxed">
         <p>Há mais de uma década que a Tendinha do Saber acompanha as famílias de Aveiro e arredores no início de cada ano letivo. Cresceu com a confiança dos pais, professores e alunos — e hoje continua dedicada à mesma missão: <strong>tornar simples a vida escolar das famílias</strong>.</p>
         <p>Trabalhamos diretamente com as principais editoras nacionais para garantir manuais e cadernos de fichas oficiais, ao preço de capa, com o serviço opcional de plastificação que dá outra vida aos livros — para que durem o ano inteiro e ainda sirvam o(a) irmã(o) seguinte.</p>
-        <p>Acreditamos numa loja local, próxima e digital. Por isso construímos este espaço online, onde pode encontrar a lista completa da sua escola em poucos cliques, submeter o seu voucher MEGA, e escolher entre entrega em mão (Aveiro) ou levantamento na loja.</p>
+        <p>Acreditamos numa loja local, próxima e digital. Por isso construímos este espaço online, onde pode encontrar a lista completa da sua escola em poucos cliques, submeter o seu voucher MEGA, e escolher entre entrega em mão (Aveiro) ou envio por transportadora.</p>
       </div>
     </div>
   );
@@ -28,11 +28,11 @@ export function FaqPage() {
     { q: "Como faço para encomendar os livros da escola do meu filho?", a: "Use o seletor da página inicial: escolha o ano, o concelho e a escola. Mostramos imediatamente a lista oficial e pode adicionar tudo ao carrinho. Em alternativa, pesquise por título ou ISBN." },
     { q: "Os preços são iguais aos das outras livrarias?", a: "Sim. Praticamos o Preço de Venda ao Público (PVP) recomendado pelas editoras. A diferença está no serviço de proximidade e na plastificação." },
     { q: "Quanto custa a plastificação?", a: "2€ por livro. É opcional e escolhe por cada livro no carrinho. Apenas se aplica a manuais (cadernos de fichas não são plastificados)." },
-    { q: "Tenho um código de parceiro. Onde o aplico?", a: "Na página do carrinho existe um campo para o código promocional. Os códigos de parceiros aplicam 5% de desconto apenas aos cadernos de fichas." },
-    { q: "Vocês entregam em casa?", a: "Sim, em mão e gratuitamente, dentro do concelho de Aveiro. Para outras localidades, escolha levantamento na loja." },
+    { q: "Tenho um código de parceiro. Onde o aplico?", a: "Na página do carrinho existe um campo para inserir o código promocional. Basta introduzi-lo para que o desconto seja aplicado automaticamente à sua encomenda." },
+    { q: "Vocês entregam em casa?", a: "Sim. Fazemos entrega em mão, gratuitamente, em todo o distrito de Aveiro. Para combinar a entrega, entre em contacto connosco após a encomenda." },
     { q: "Como funciona o voucher MEGA?", a: "Pode submeter o voucher (código ou PDF) na página dedicada. A nossa equipa valida em 24h úteis e o desconto é aplicado à sua próxima encomenda. Veja o passo-a-passo na página Como funciona o voucher MEGA." },
     { q: "E se o livro estiver indicado como 'Disponível por encomenda'?", a: "Significa que não temos stock imediato, mas pode comprar. Pediremos ao fornecedor e contactamo-lo quando estiver pronto. O prazo depende do fornecedor." },
-    { q: "Posso pagar com MB Way?", a: "Sim. Aceitamos MB Way, Multibanco e transferência bancária via Ifthenpay. A fatura-recibo é emitida automaticamente após o pagamento." },
+    { q: "Posso pagar com MB Way?", a: "Sim. Após a sua encomenda, entraremos em contacto para combinar o pagamento por MB Way ou transferência bancária. A fatura é enviada após a confirmação do pagamento." },
   ];
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16" data-testid="faq-page">

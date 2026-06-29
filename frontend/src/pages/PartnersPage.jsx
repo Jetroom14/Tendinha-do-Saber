@@ -19,9 +19,15 @@ export default function PartnersPage() {
       </p>
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
         {partners.map((p) => (
-          <div key={p.id} className="bg-white border border-[#E2E8F0] rounded-md overflow-hidden hover:border-[#5A8F1E] transition-colors" data-testid={`partner-card-${p.id}`}>
-            {p.logo_url && <div className="aspect-[16/9] bg-[#F5F8EC] grid place-items-center p-6"><img src={p.logo_url} alt={p.name} className="max-h-full object-contain" loading="lazy"/></div>}
-            <div className="p-6">
+          <div key={p.id} className="bg-white border border-[#E2E8F0] rounded-md overflow-hidden hover:border-[#5A8F1E] transition-colors h-full flex flex-col" data-testid={`partner-card-${p.id}`}>
+            <div className="h-40 bg-[#F5F8EC] flex items-center justify-center p-6">
+              {p.logo_url ? (
+                <img src={p.logo_url} alt={p.name} className="max-h-24 max-w-[80%] object-contain" loading="lazy"/>
+              ) : (
+                <div className="text-sm text-[#94A3B8] text-center">{p.name}</div>
+              )}
+            </div>
+            <div className="p-6 flex-1 flex flex-col">
               <h3 className="font-display text-xl font-medium text-[#1A202C] mb-1">{p.name}</h3>
               <p className="text-sm text-[#4A5568]">{p.description}</p>
             </div>
