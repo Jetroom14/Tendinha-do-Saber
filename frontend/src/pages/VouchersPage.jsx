@@ -19,6 +19,7 @@ export default function VouchersPage() {
     manuals: "",
     wants_workbooks: false,
     wants_lamination: false,
+    lamination_details: "",
   });
   const [file, setFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -58,6 +59,9 @@ export default function VouchersPage() {
         if (code) fd.append("code", code);
         fd.append("wants_workbooks", String(form.wants_workbooks));
         fd.append("wants_lamination", String(form.wants_lamination));
+        if (form.wants_lamination && form.lamination_details.trim()) {
+          fd.append("lamination_details", form.lamination_details.trim());
+        }
         await api.post("/vouchers/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
       } else {
         await api.post("/vouchers", {
@@ -67,11 +71,12 @@ export default function VouchersPage() {
           code,
           wants_workbooks: form.wants_workbooks,
           wants_lamination: form.wants_lamination,
+          lamination_details: form.wants_lamination ? form.lamination_details.trim() : null,
         });
       }
       setDone(true);
       toast.success("Voucher submetido. Vamos analisar e entraremos em contacto.");
-      setForm({ name: "", contact: "", code: "", manuals: "", wants_workbooks: false, wants_lamination: false });
+      setForm({ name: "", contact: "", code: "", manuals: "", wants_workbooks: false, wants_lamination: false, lamination_details: "" });
       setFile(null);
     } catch (err) {
       toast.error(formatApiErrorDetail(err.response?.data?.detail));
@@ -172,12 +177,25 @@ export default function VouchersPage() {
               </span>
             </label>
             <label className="flex items-start gap-3 cursor-pointer">
-              <Checkbox checked={form.wants_lamination} onCheckedChange={(v) => setForm({...form, wants_lamination: !!v})} data-testid="voucher-want-lamination"/>
+              <Checkbox checked={form.wants_lamination} onCheckedChange={(v) => setForm({...form, wants_lamination: !!v, lamination_details: v ? form.lamination_details : ""})} data-testid="voucher-want-lamination"/>
               <span className="text-sm leading-snug">
                 <span className="font-medium text-[#1A202C]">Quero plastificação dos manuais</span>
                 <span className="block text-xs text-[#4A5568]">+2€ por manual. Cadernos de fichas não são plastificados.</span>
               </span>
             </label>
+            {form.wants_lamination && (
+              <div className="pl-7" data-testid="voucher-lamination-details-wrap">
+                <Label className="text-xs uppercase tracking-wider text-[#4A5568] mb-1.5 block">Em quais manuais quer plastificação?</Label>
+                <Textarea
+                  value={form.lamination_details}
+                  onChange={(e)=>setForm({...form, lamination_details: e.target.value})}
+                  placeholder="Ex: Manual de Português 5.º ano, Manual de Matemática 5.º ano"
+                  rows={3}
+                  data-testid="voucher-lamination-details-input"
+                />
+                <p className="text-[11px] text-[#4A5568] mt-1.5">Indique apenas os manuais que pretende plastificar (pode escolher só alguns).</p>
+              </div>
+            )}
           </div>
 
           {/* Aviso credencial */}
