@@ -236,6 +236,7 @@ class VoucherSubmitIn(BaseModel):
     manuals: Optional[str] = None
     wants_workbooks: Optional[bool] = False
     wants_lamination: Optional[bool] = False
+    lamination_details: Optional[str] = None
 
 class CartItem(BaseModel):
     isbn13: str
@@ -1443,6 +1444,7 @@ async def submit_voucher(payload: VoucherSubmitIn, request: Request, user: Optio
         "manuals": (payload.manuals or "").strip() or None,
         "wants_workbooks": bool(payload.wants_workbooks),
         "wants_lamination": bool(payload.wants_lamination),
+        "lamination_details": (payload.lamination_details or "").strip() if payload.wants_lamination else None,
         "code": code_clean,
         "pdf_url": payload.pdf_url,
         "pdf_storage_path": None,
@@ -1467,6 +1469,7 @@ async def upload_voucher(
     manuals: Optional[str] = Form(None),
     wants_workbooks: Optional[str] = Form("false"),
     wants_lamination: Optional[str] = Form("false"),
+    lamination_details: Optional[str] = Form(None),
     user: Optional[dict] = Depends(get_current_user_optional),
 ):
     """Real, private PDF upload for a MEGA voucher. File is validated,
@@ -1503,6 +1506,7 @@ async def upload_voucher(
         "manuals": manuals.strip(),
         "wants_workbooks": str(wants_workbooks).lower() in ("true", "1", "on", "yes"),
         "wants_lamination": str(wants_lamination).lower() in ("true", "1", "on", "yes"),
+        "lamination_details": (lamination_details or "").strip() if str(wants_lamination).lower() in ("true", "1", "on", "yes") else None,
         "code": code_clean,
         "pdf_url": None,
         "pdf_storage_path": stored_name,
