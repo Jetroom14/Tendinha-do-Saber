@@ -49,7 +49,7 @@ export default function CatalogPage() {
     if (grade) qs.set("grade_level", grade);
     qs.set("limit", "100");
     const { data } = await api.get(`/books?${qs.toString()}`);
-    setBooks(data);
+    setBooks(data.items || []);
     setLoading(false);
   };
 
