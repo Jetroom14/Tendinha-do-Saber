@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="Academia Vista Alegre">
+  <rect width="240" height="240" rx="20" fill="#1B4965"/>
+  <circle cx="120" cy="100" r="32" fill="none" stroke="#F0E0B6" stroke-width="2.5"/>
+  <path d="M 95 100 Q 120 60 145 100 Q 120 140 95 100 Z" fill="#F0E0B6"/>
+  <text x="120" y="170" text-anchor="middle" font-family="Outfit, sans-serif" font-weight="700" font-size="24" fill="#FFFFFF" letter-spacing="0.05em">VISTA</text>
+  <text x="120" y="200" text-anchor="middle" font-family="Outfit, sans-serif" font-weight="700" font-size="24" fill="#F0E0B6" letter-spacing="0.05em">ALEGRE</text>
+  <text x="120" y="220" text-anchor="middle" font-family="Outfit, sans-serif" font-weight="500" font-size="9" fill="#FFFFFF" letter-spacing="0.25em" opacity="0.85">ACADEMIA</text>
+</svg>
