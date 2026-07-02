@@ -3,9 +3,10 @@ import api from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { FileText, Mail, Phone, User as UserIcon, BookOpen, Layers, Save } from "lucide-react";
+import { FileText, Mail, Phone, User as UserIcon, BookOpen, Layers, Save, Archive, Download } from "lucide-react";
 
 const STATUS_COLORS = {
   Pending: "bg-amber-100 text-amber-800",
@@ -187,21 +188,57 @@ function VoucherCard({ v, onUpdated }) {
 export function AdminVouchers() {
   const [vouchers, setVouchers] = useState([]);
   const [filter, setFilter] = useState("all");
+  const [archiveView, setArchiveView] = useState("active");
+  const [selected, setSelected] = useState(new Set());
   const [loading, setLoading] = useState(true);
+  const [archiving, setArchiving] = useState(false);
 
   const load = async () => {
     setLoading(true);
     try {
-      const qs = filter !== "all" ? `?status=${encodeURIComponent(filter)}` : "";
-      const { data } = await api.get(`/admin/vouchers${qs}`);
-      // Backend already sorts by created_at desc; ensure on client too in case of legacy docs
+      const qs = new URLSearchParams();
+      if (filter !== "all") qs.append("status", filter);
+      qs.append("archived", archiveView === "archived" ? "true" : "false");
+      const { data } = await api.get(`/admin/vouchers?${qs}`);
       const sorted = [...data].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
       setVouchers(sorted);
+      setSelected(new Set());
     } catch {
       toast.error("Erro ao carregar vouchers");
     } finally { setLoading(false); }
   };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [filter]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [filter, archiveView]);
+
+  const toggleSelect = (id) => {
+    const newSel = new Set(selected);
+    if (newSel.has(id)) newSel.delete(id);
+    else newSel.add(id);
+    setSelected(newSel);
+  };
+
+  const archiveSelected = async () => {
+    if (selected.size === 0) return;
+    setArchiving(true);
+    try {
+      await api.post("/admin/vouchers/archive", { ids: Array.from(selected) });
+      toast.success(`${selected.size} voucher(s) arquivado(s)`);
+      load();
+    } catch {
+      toast.error("Erro ao arquivar vouchers");
+    } finally { setArchiving(false); }
+  };
+
+  const unarchiveSelected = async () => {
+    if (selected.size === 0) return;
+    setArchiving(true);
+    try {
+      await api.post("/admin/vouchers/unarchive", { ids: Array.from(selected) });
+      toast.success(`${selected.size} voucher(s) restaurado(s)`);
+      load();
+    } catch {
+      toast.error("Erro ao restaurar vouchers");
+    } finally { setArchiving(false); }
+  };
 
   return (
     <div className="p-8" data-testid="admin-vouchers">
@@ -211,26 +248,58 @@ export function AdminVouchers() {
           <h1 className="font-display text-3xl font-medium text-slate-900">Vales MEGA</h1>
           <p className="text-sm text-slate-500 mt-1">Lista de vouchers submetidos pelos clientes, do mais recente para o mais antigo.</p>
         </div>
-        <Select value={filter} onValueChange={setFilter}>
-          <SelectTrigger className="w-52" data-testid="voucher-filter"><SelectValue/></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="Pendente">Pendentes</SelectItem>
-            <SelectItem value="Em processamento">Em processamento</SelectItem>
-            <SelectItem value="Concluído">Concluídos</SelectItem>
-            <SelectItem value="Rejected">Rejeitados</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex gap-3">
+          <Select value={archiveView} onValueChange={setArchiveView} data-testid="voucher-archive-filter">
+            <SelectTrigger className="w-40"><SelectValue/></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">Ativos</SelectItem>
+              <SelectItem value="archived">Arquivados</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filter} onValueChange={setFilter}>
+            <SelectTrigger className="w-52" data-testid="voucher-filter"><SelectValue/></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="Pendente">Pendentes</SelectItem>
+              <SelectItem value="Em processamento">Em processamento</SelectItem>
+              <SelectItem value="Concluído">Concluídos</SelectItem>
+              <SelectItem value="Rejected">Rejeitados</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
+
+      {selected.size > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-6 flex items-center justify-between">
+          <span className="text-sm text-blue-700">{selected.size} selecionado(s)</span>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={archiveView === "active" ? archiveSelected : unarchiveSelected} disabled={archiving || selected.size === 0} className="bg-[#5A8F1E] hover:bg-[#3E6E11]" data-testid="voucher-archive-btn">
+              <Archive className="w-3.5 h-3.5 mr-1.5"/> {archiveView === "active" ? "Arquivar" : "Restaurar"}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="bg-white border border-slate-200 rounded p-10 text-center text-sm text-slate-500">A carregar...</div>
       ) : vouchers.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded p-10 text-center text-sm text-slate-500" data-testid="vouchers-empty">Sem vouchers.</div>
+        <div className="bg-white border border-slate-200 rounded p-10 text-center text-sm text-slate-500" data-testid="vouchers-empty">Sem vouchers {archiveView === "archived" ? "arquivados" : ""}.</div>
       ) : (
         <div className="space-y-4">
+          <div className="flex items-center gap-3 px-3 py-2 bg-slate-50 border border-slate-200 rounded">
+            <Checkbox checked={selected.size === vouchers.length && vouchers.length > 0} onCheckedChange={() => {
+              if (selected.size === vouchers.length) setSelected(new Set());
+              else setSelected(new Set(vouchers.map(v => v.id)));
+            }} data-testid="voucher-select-all" />
+            <span className="text-sm text-slate-600">{selected.size === vouchers.length && vouchers.length > 0 ? "Desselecionar todos" : "Selecionar todos"}</span>
+          </div>
           {vouchers.map((v) => (
-            <VoucherCard key={v.id} v={v} onUpdated={load}/>
+            <div key={v.id} className="flex gap-3 items-start">
+              <Checkbox checked={selected.has(v.id)} onCheckedChange={() => toggleSelect(v.id)} className="mt-5" data-testid={`voucher-select-${v.id}`} />
+              <div className="flex-1">
+                <VoucherCard v={v} onUpdated={load}/>
+              </div>
+            </div>
           ))}
         </div>
       )}
@@ -241,18 +310,110 @@ export function AdminVouchers() {
 export function AdminOrders() {
   const [orders, setOrders] = useState([]);
   const [filter, setFilter] = useState("all");
+  const [archiveView, setArchiveView] = useState("active");
+  const [selected, setSelected] = useState(new Set());
+  const [loading, setLoading] = useState(true);
+  const [archiving, setArchiving] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const load = async () => {
-    const qs = filter !== "all" ? `?status=${filter}` : "";
-    const { data } = await api.get(`/admin/orders${qs}`);
-    setOrders(data);
+    setLoading(true);
+    try {
+      const qs = new URLSearchParams();
+      if (filter !== "all") qs.append("status", filter);
+      qs.append("archived", archiveView === "archived" ? "true" : "false");
+      const { data } = await api.get(`/admin/orders?${qs}`);
+      setOrders(data);
+      setSelected(new Set());
+    } catch {
+      toast.error("Erro ao carregar encomendas");
+    } finally { setLoading(false); }
   };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [filter]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [filter, archiveView]);
 
   const updateStatus = async (orderNo, status) => {
     const fd = new FormData(); fd.append("status", status);
-    await api.put(`/admin/orders/${orderNo}/status`, fd);
-    toast.success(`Encomenda ${orderNo} atualizada`); load();
+    try {
+      await api.put(`/admin/orders/${orderNo}/status`, fd);
+      toast.success(`Encomenda ${orderNo} atualizada`);
+      load();
+    } catch {
+      toast.error("Erro ao atualizar encomenda");
+    }
+  };
+
+  const toggleSelect = (orderNo) => {
+    const newSel = new Set(selected);
+    if (newSel.has(orderNo)) newSel.delete(orderNo);
+    else newSel.add(orderNo);
+    setSelected(newSel);
+  };
+
+  const archiveSelected = async () => {
+    if (selected.size === 0) return;
+    setArchiving(true);
+    try {
+      await api.post("/admin/orders/archive", { ids: Array.from(selected) });
+      toast.success(`${selected.size} encomenda(s) arquivada(s)`);
+      load();
+    } catch {
+      toast.error("Erro ao arquivar encomendas");
+    } finally { setArchiving(false); }
+  };
+
+  const unarchiveSelected = async () => {
+    if (selected.size === 0) return;
+    setArchiving(true);
+    try {
+      await api.post("/admin/orders/unarchive", { ids: Array.from(selected) });
+      toast.success(`${selected.size} encomenda(s) restaurada(s)`);
+      load();
+    } catch {
+      toast.error("Erro ao restaurar encomendas");
+    } finally { setArchiving(false); }
+  };
+
+  const exportToExcel = async () => {
+    if (selected.size === 0) {
+      toast.error("Seleciona encomendas para descarregar");
+      return;
+    }
+    setExporting(true);
+    try {
+      const selectedOrders = orders.filter(o => selected.has(o.order_no));
+      const headers = ["Encomenda #", "Data", "Cliente", "Email", "Telefone", "Entrega", "Manuais", "Cadernos", "Desconto", "Plastificação", "Envio", "Total", "Estado", "Pagamento"];
+      const rows = selectedOrders.map(o => [
+        o.order_no,
+        new Date(o.created_at).toLocaleDateString("pt-PT"),
+        o.customer?.name || "",
+        o.customer?.email || "",
+        o.customer?.phone || "",
+        o.delivery?.method === "hand_delivery" ? "Em mão" : "Envio",
+        (o.totals?.manuals || 0).toFixed(2),
+        (o.totals?.workbooks || 0).toFixed(2),
+        (o.totals?.discount || 0).toFixed(2),
+        (o.totals?.lamination || 0).toFixed(2),
+        (o.totals?.shipping || 0).toFixed(2),
+        (o.totals?.total || 0).toFixed(2),
+        o.status,
+        o.payment_status || "—",
+      ]);
+
+      // Create CSV with UTF-8 BOM for proper Excel encoding
+      const csvContent = [headers, ...rows]
+        .map(row => row.map(cell => `"${(cell || "").toString().replace(/"/g, '""')}"`).join(","))
+        .join("\n");
+      const bom = "\uFEFF";
+      const blob = new Blob([bom + csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `encomendas_${new Date().toISOString().split("T")[0]}.csv`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+      toast.success("Ficheiro descarregado");
+    } catch (e) {
+      toast.error("Erro ao exportar");
+    } finally { setExporting(false); }
   };
 
   return (
@@ -262,52 +423,84 @@ export function AdminOrders() {
           <div className="text-[10px] tracking-[0.2em] uppercase text-slate-500 font-semibold">Encomendas</div>
           <h1 className="font-display text-3xl font-medium text-slate-900">Gestão de Encomendas</h1>
         </div>
-        <Select value={filter} onValueChange={setFilter}>
-          <SelectTrigger className="w-48"><SelectValue/></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas</SelectItem>
-            <SelectItem value="pending_payment">Aguarda Pagamento</SelectItem>
-            <SelectItem value="paid">Paga</SelectItem>
-            <SelectItem value="preparing">Em Preparação</SelectItem>
-            <SelectItem value="ready">Pronta</SelectItem>
-            <SelectItem value="delivered">Entregue</SelectItem>
-            <SelectItem value="cancelled">Cancelada</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex gap-3">
+          <Select value={archiveView} onValueChange={setArchiveView} data-testid="order-archive-filter">
+            <SelectTrigger className="w-40"><SelectValue/></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">Ativas</SelectItem>
+              <SelectItem value="archived">Arquivadas</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filter} onValueChange={setFilter}>
+            <SelectTrigger className="w-48"><SelectValue/></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              <SelectItem value="pending_payment">Aguarda Pagamento</SelectItem>
+              <SelectItem value="paid">Paga</SelectItem>
+              <SelectItem value="preparing">Em Preparação</SelectItem>
+              <SelectItem value="ready">Pronta</SelectItem>
+              <SelectItem value="delivered">Entregue</SelectItem>
+              <SelectItem value="cancelled">Cancelada</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="text-[10px] uppercase tracking-wider text-slate-500 bg-slate-50">
-            <tr><th className="text-left p-3">Nº</th><th className="text-left p-3">Data</th><th className="text-left p-3">Cliente</th><th className="text-left p-3">Entrega</th><th className="text-right p-3">Total</th><th className="text-right p-3">Estado</th></tr>
-          </thead>
-          <tbody>
-            {orders.map((o) => (
-              <tr key={o.order_no} className="border-t border-slate-100" data-testid={`order-row-${o.order_no}`}>
-                <td className="p-3 font-mono text-xs">{o.order_no}</td>
-                <td className="p-3 text-xs">{new Date(o.created_at).toLocaleDateString("pt-PT")}</td>
-                <td className="p-3">{o.customer?.name}<div className="text-xs text-slate-500">{o.customer?.email}</div></td>
-                <td className="p-3 text-xs">{o.delivery?.method === "hand_delivery" ? "Em mão" : o.delivery?.method === "shipping" ? "Envio" : "—"}</td>
-                <td className="p-3 text-right font-mono">{o.totals?.total?.toFixed(2)}€</td>
-                <td className="p-3 text-right">
-                  <Select value={o.status} onValueChange={(s) => updateStatus(o.order_no, s)}>
-                    <SelectTrigger className="h-8 w-40 inline-flex" data-testid={`order-status-${o.order_no}`}><SelectValue/></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending_payment">Aguarda Pagamento</SelectItem>
-                      <SelectItem value="paid">Paga</SelectItem>
-                      <SelectItem value="preparing">Em Preparação</SelectItem>
-                      <SelectItem value="ready">Pronta</SelectItem>
-                      <SelectItem value="delivered">Entregue</SelectItem>
-                      <SelectItem value="cancelled">Cancelada</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </td>
-              </tr>
-            ))}
-            {orders.length === 0 && <tr><td colSpan={6} className="p-10 text-center text-slate-500">Sem encomendas.</td></tr>}
-          </tbody>
-        </table>
-      </div>
+      {selected.size > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-6 flex items-center justify-between">
+          <span className="text-sm text-blue-700">{selected.size} selecionada(s)</span>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={archiveView === "active" ? archiveSelected : unarchiveSelected} disabled={archiving || selected.size === 0} className="bg-[#5A8F1E] hover:bg-[#3E6E11]" data-testid="order-archive-btn">
+              <Archive className="w-3.5 h-3.5 mr-1.5"/> {archiveView === "active" ? "Arquivar" : "Restaurar"}
+            </Button>
+            <Button size="sm" onClick={exportToExcel} disabled={exporting || selected.size === 0} className="bg-[#5A8F1E] hover:bg-[#3E6E11]" data-testid="order-export-btn">
+              <Download className="w-3.5 h-3.5 mr-1.5"/> {exporting ? "A exportar..." : "Descarregar"}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="bg-white border border-slate-200 rounded p-10 text-center text-sm text-slate-500">A carregar...</div>
+      ) : (
+        <div className="bg-white border border-slate-200 rounded overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-[10px] uppercase tracking-wider text-slate-500 bg-slate-50">
+              <tr><th className="text-center p-3 w-8"><Checkbox checked={selected.size === orders.length && orders.length > 0} onCheckedChange={() => {
+                if (selected.size === orders.length) setSelected(new Set());
+                else setSelected(new Set(orders.map(o => o.order_no)));
+              }} data-testid="order-select-all" /></th><th className="text-left p-3">Nº</th><th className="text-left p-3">Data</th><th className="text-left p-3">Cliente</th><th className="text-left p-3">Entrega</th><th className="text-right p-3">Total</th><th className="text-right p-3">Estado</th></tr>
+            </thead>
+            <tbody>
+              {orders.length === 0 ? (
+                <tr><td colSpan={7} className="p-10 text-center text-slate-500">Sem encomendas {archiveView === "archived" ? "arquivadas" : ""}.</td></tr>
+              ) : orders.map((o) => (
+                <tr key={o.order_no} className="border-t border-slate-100" data-testid={`order-row-${o.order_no}`}>
+                  <td className="p-3 text-center"><Checkbox checked={selected.has(o.order_no)} onCheckedChange={() => toggleSelect(o.order_no)} data-testid={`order-select-${o.order_no}`} /></td>
+                  <td className="p-3 font-mono text-xs">{o.order_no}</td>
+                  <td className="p-3 text-xs">{new Date(o.created_at).toLocaleDateString("pt-PT")}</td>
+                  <td className="p-3">{o.customer?.name}<div className="text-xs text-slate-500">{o.customer?.email}</div></td>
+                  <td className="p-3 text-xs">{o.delivery?.method === "hand_delivery" ? "Em mão" : o.delivery?.method === "shipping" ? "Envio" : "—"}</td>
+                  <td className="p-3 text-right font-mono">{o.totals?.total?.toFixed(2)}€</td>
+                  <td className="p-3 text-right">
+                    <Select value={o.status} onValueChange={(s) => updateStatus(o.order_no, s)}>
+                      <SelectTrigger className="h-8 w-40 inline-flex" data-testid={`order-status-${o.order_no}`}><SelectValue/></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending_payment">Aguarda Pagamento</SelectItem>
+                        <SelectItem value="paid">Paga</SelectItem>
+                        <SelectItem value="preparing">Em Preparação</SelectItem>
+                        <SelectItem value="ready">Pronta</SelectItem>
+                        <SelectItem value="delivered">Entregue</SelectItem>
+                        <SelectItem value="cancelled">Cancelada</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

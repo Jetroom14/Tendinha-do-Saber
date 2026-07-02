@@ -235,6 +235,7 @@ class VoucherSubmitIn(BaseModel):
     contact: Optional[str] = None
     manuals: Optional[str] = None
     wants_workbooks: Optional[bool] = False
+    workbook_details: Optional[str] = None
     wants_lamination: Optional[bool] = False
     lamination_details: Optional[str] = None
 
@@ -1420,8 +1421,14 @@ async def get_order(order_no: str):
     return o
 
 @api.get("/admin/orders")
-async def admin_list_orders(admin: dict = Depends(require_admin), status: Optional[str] = None):
-    filt = {"status": status} if status else {}
+async def admin_list_orders(admin: dict = Depends(require_admin), status: Optional[str] = None, archived: str = "false"):
+    filt = {}
+    if archived.lower() in ("true", "1", "yes"):
+        filt["archived"] = True
+    else:
+        filt["archived"] = {"$ne": True}
+    if status:
+        filt["status"] = status
     return await db.orders.find(filt, {"_id": 0}).sort("created_at", -1).to_list(500)
 
 @api.put("/admin/orders/{order_no}/status")
@@ -1440,6 +1447,27 @@ async def admin_update_order(order_no: str, status: str = Form(...), admin: dict
         logger.info(f"[MOCKED INVOICEXPRESS] Fatura-Recibo gerada para {order_no}")
         await db.orders.update_one({"order_no": order_no}, {"$set": {"invoice_status": "issued", "payment_status": "paid"}})
     return {"ok": True}
+
+class ArchiveIn(BaseModel):
+    ids: List[str]
+
+@api.post("/admin/orders/archive")
+async def admin_archive_orders(payload: ArchiveIn, admin: dict = Depends(require_admin)):
+    """Archive multiple orders by order_no."""
+    if not payload.ids:
+        return {"archived": 0}
+    result = await db.orders.update_many({"order_no": {"$in": payload.ids}}, {"$set": {"archived": True, "updated_at": iso(now_utc())}})
+    await log_action(admin["id"], "archive", "orders", None, {"count": result.modified_count})
+    return {"archived": result.modified_count}
+
+@api.post("/admin/orders/unarchive")
+async def admin_unarchive_orders(payload: ArchiveIn, admin: dict = Depends(require_admin)):
+    """Unarchive multiple orders by order_no."""
+    if not payload.ids:
+        return {"unarchived": 0}
+    result = await db.orders.update_many({"order_no": {"$in": payload.ids}}, {"$set": {"archived": False, "updated_at": iso(now_utc())}})
+    await log_action(admin["id"], "unarchive", "orders", None, {"count": result.modified_count})
+    return {"unarchived": result.modified_count}
 
 # ---------- Vouchers ----------
 async def _check_voucher_rate_limit(identifier: str):
@@ -1474,6 +1502,7 @@ async def submit_voucher(payload: VoucherSubmitIn, request: Request, user: Optio
         "contact": (payload.contact or "").strip() or None,
         "manuals": (payload.manuals or "").strip() or None,
         "wants_workbooks": bool(payload.wants_workbooks),
+        "workbook_details": (payload.workbook_details or "").strip() if payload.wants_workbooks else None,
         "wants_lamination": bool(payload.wants_lamination),
         "lamination_details": (payload.lamination_details or "").strip() if payload.wants_lamination else None,
         "code": code_clean,
@@ -1499,6 +1528,7 @@ async def upload_voucher(
     contact: Optional[str] = Form(None),
     manuals: Optional[str] = Form(None),
     wants_workbooks: Optional[str] = Form("false"),
+    workbook_details: Optional[str] = Form(None),
     wants_lamination: Optional[str] = Form("false"),
     lamination_details: Optional[str] = Form(None),
     user: Optional[dict] = Depends(get_current_user_optional),
@@ -1536,6 +1566,7 @@ async def upload_voucher(
         "contact": contact.strip(),
         "manuals": manuals.strip(),
         "wants_workbooks": str(wants_workbooks).lower() in ("true", "1", "on", "yes"),
+        "workbook_details": (workbook_details or "").strip() if str(wants_workbooks).lower() in ("true", "1", "on", "yes") else None,
         "wants_lamination": str(wants_lamination).lower() in ("true", "1", "on", "yes"),
         "lamination_details": (lamination_details or "").strip() if str(wants_lamination).lower() in ("true", "1", "on", "yes") else None,
         "code": code_clean,
@@ -1552,8 +1583,14 @@ async def upload_voucher(
     return doc
 
 @api.get("/admin/vouchers")
-async def admin_vouchers(admin: dict = Depends(require_admin), status: Optional[str] = None):
-    filt = {"status": status} if status else {}
+async def admin_vouchers(admin: dict = Depends(require_admin), status: Optional[str] = None, archived: str = "false"):
+    filt = {}
+    if archived.lower() in ("true", "1", "yes"):
+        filt["archived"] = True
+    else:
+        filt["archived"] = {"$ne": True}
+    if status:
+        filt["status"] = status
     return await db.vouchers.find(filt, {"_id": 0}).sort("created_at", -1).to_list(500)
 
 @api.get("/admin/vouchers/{vid}/pdf")
@@ -1597,6 +1634,24 @@ async def admin_update_voucher_note(vid: str, note: str = Form(""), admin: dict 
     await log_action(admin["id"], "update_note", "voucher", vid, {"len": len(clean)})
     return {"ok": True, "notes": clean or None}
 
+@api.post("/admin/vouchers/archive")
+async def admin_archive_vouchers(payload: ArchiveIn, admin: dict = Depends(require_admin)):
+    """Archive multiple vouchers by id."""
+    if not payload.ids:
+        return {"archived": 0}
+    result = await db.vouchers.update_many({"id": {"$in": payload.ids}}, {"$set": {"archived": True, "updated_at": iso(now_utc())}})
+    await log_action(admin["id"], "archive", "vouchers", None, {"count": result.modified_count})
+    return {"archived": result.modified_count}
+
+@api.post("/admin/vouchers/unarchive")
+async def admin_unarchive_vouchers(payload: ArchiveIn, admin: dict = Depends(require_admin)):
+    """Unarchive multiple vouchers by id."""
+    if not payload.ids:
+        return {"unarchived": 0}
+    result = await db.vouchers.update_many({"id": {"$in": payload.ids}}, {"$set": {"archived": False, "updated_at": iso(now_utc())}})
+    await log_action(admin["id"], "unarchive", "vouchers", None, {"count": result.modified_count})
+    return {"unarchived": result.modified_count}
+
 async def _purge_old_voucher_pdfs():
     """RGPD: there is no cron infra in this environment, so this sweep runs
     once per backend startup instead of daily. For a long-running production
@@ -1637,10 +1692,10 @@ async def remove_wishlist(isbn13: str, user: dict = Depends(get_current_user)):
 async def admin_dashboard(admin: dict = Depends(require_admin)):
     total_books = await db.books.count_documents({})
     total_schools = await db.schools.count_documents({})
-    total_orders = await db.orders.count_documents({})
-    pending_vouchers = await db.vouchers.count_documents({"status": "Pending"})
+    total_orders = await db.orders.count_documents({"archived": {"$ne": True}})
+    pending_vouchers = await db.vouchers.count_documents({"status": "Pending", "archived": {"$ne": True}})
     anomalies = await db.books.count_documents({"$or": [{"price": 0}, {"price": {"$lte": 0}}]})
-    recent_orders = await db.orders.find({}, {"_id": 0}).sort("created_at", -1).limit(5).to_list(5)
+    recent_orders = await db.orders.find({"archived": {"$ne": True}}, {"_id": 0}).sort("created_at", -1).limit(5).to_list(5)
     return {
         "total_books": total_books,
         "total_schools": total_schools,
