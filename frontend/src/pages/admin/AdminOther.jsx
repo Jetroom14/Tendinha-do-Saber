@@ -603,6 +603,7 @@ export function AdminLogs() {
 
 export function AdminSettings() {
   const [s, setS] = useState(null);
+  const [lastCoverRun, setLastCoverRun] = useState(null);
   useEffect(() => { api.get("/admin/settings").then((r) => setS(r.data)); }, []);
 
   const save = async () => {
@@ -626,7 +627,12 @@ export function AdminSettings() {
   const enrichCovers = async () => {
     try {
       const { data } = await api.post("/admin/books/enrich-covers?limit=200");
-      toast.success(`Capas atualizadas: ${data.updated} livros`);
+      setLastCoverRun(data);
+      if (data.updated > 0) {
+        toast.success(`${data.updated} capa(s) atualizadas em ${data.processed} tentativas. Restam ${data.remaining}.`);
+      } else {
+        toast.warning(`0 capas atualizadas em ${data.processed} tentativas. Veja o diagnóstico abaixo para perceber porquê.`);
+      }
     } catch { toast.error("Erro ao enriquecer capas"); }
   };
 
@@ -694,9 +700,87 @@ export function AdminSettings() {
       </div>
 
       <div className="bg-white border border-slate-200 rounded p-6 space-y-3 mt-6">
-        <h2 className="font-display text-lg font-medium text-slate-900">Manutenção</h2>
-        <p className="text-sm text-slate-600">Procura automaticamente capas de livros em falta no Google Books (por ISBN, depois por título+autor).</p>
-        <button onClick={enrichCovers} className="bg-slate-900 hover:bg-black text-white rounded px-5 py-2 text-sm" data-testid="enrich-covers-btn">🖼️ Enriquecer capas em falta</button>
+        <h2 className="font-display text-lg font-medium text-slate-900">Manutenção — Capas dos livros</h2>
+        <p className="text-sm text-slate-600">Procura capas em falta em 4 fontes por ordem: <strong>modelo da editora</strong> (se configurado) → <strong>Google Books por ISBN</strong> → <strong>Google Books por título+autor</strong> → <strong>Open Library</strong>.</p>
+        <button onClick={enrichCovers} className="bg-slate-900 hover:bg-black text-white rounded px-5 py-2 text-sm" data-testid="enrich-covers-btn">Procurar capas em falta</button>
+
+        {lastCoverRun && (
+          <div className="mt-4 space-y-3" data-testid="cover-diagnostics">
+            <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Diagnóstico da última execução</div>
+            <div className="grid grid-cols-3 gap-2 text-sm">
+              <div className="bg-emerald-50 border border-emerald-200 rounded p-2">
+                <div className="text-[10px] uppercase text-emerald-700">Atualizadas</div>
+                <div className="text-lg font-medium text-emerald-800">{lastCoverRun.updated}</div>
+              </div>
+              <div className="bg-slate-50 border border-slate-200 rounded p-2">
+                <div className="text-[10px] uppercase text-slate-500">Processadas</div>
+                <div className="text-lg font-medium text-slate-800">{lastCoverRun.processed}</div>
+              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded p-2">
+                <div className="text-[10px] uppercase text-amber-700">Restantes sem capa</div>
+                <div className="text-lg font-medium text-amber-800">{lastCoverRun.remaining}</div>
+              </div>
+            </div>
+
+            <div className="text-xs text-slate-600 space-y-1">
+              <div className="flex items-center gap-2">
+                <span className={`inline-block w-2 h-2 rounded-full ${lastCoverRun.api_key_configured ? "bg-emerald-500" : "bg-amber-500"}`}></span>
+                <span>Google Books API Key: <strong>{lastCoverRun.api_key_configured ? "configurada" : "NÃO configurada (limitado ~1000/dia partilhados com outros clientes)"}</strong></span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`inline-block w-2 h-2 rounded-full ${lastCoverRun.publisher_template_configured ? "bg-emerald-500" : "bg-slate-400"}`}></span>
+                <span>Modelo da editora: <strong>{lastCoverRun.publisher_template_configured ? "configurado" : "vazio"}</strong></span>
+              </div>
+            </div>
+
+            {lastCoverRun.diagnostics && Object.keys(lastCoverRun.diagnostics).length > 0 && (
+              <div className="border border-slate-200 rounded overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead className="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500">
+                    <tr>
+                      <th className="text-left p-2">Fonte</th>
+                      <th className="text-right p-2">Encontradas</th>
+                      <th className="text-right p-2">Não indexado</th>
+                      <th className="text-right p-2">Bloqueado (429)</th>
+                      <th className="text-right p-2">Erro</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(lastCoverRun.diagnostics).map(([source, counts]) => (
+                      <tr key={source} className="border-t border-slate-100">
+                        <td className="p-2 font-mono">{source}</td>
+                        <td className="p-2 text-right text-emerald-700 font-medium">{counts.success || 0}</td>
+                        <td className="p-2 text-right text-slate-500">{counts.not_found || 0}</td>
+                        <td className="p-2 text-right text-rose-600">{counts.blocked || 0}</td>
+                        <td className="p-2 text-right text-amber-600">{counts.error || 0}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {lastCoverRun.updated === 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded p-3 text-xs text-amber-900">
+                <div className="font-semibold mb-1">Porque é que deu 0 capas?</div>
+                <ul className="list-disc list-inside space-y-0.5">
+                  {(lastCoverRun.diagnostics?.google_isbn?.blocked > 0) && (
+                    <li>Google Books devolveu <strong>429 (quota)</strong>. Verifique a chave <code>GOOGLE_BOOKS_API_KEY</code> no <code>.env</code>.</li>
+                  )}
+                  {(lastCoverRun.diagnostics?.google_isbn?.not_found > 0 || lastCoverRun.diagnostics?.google_title?.not_found > 0) && (
+                    <li>Google Books não indexa manuais escolares portugueses (a maioria devolve <strong>0 resultados</strong>). Solução: configure o campo <em>“Modelo de URL das capas da editora”</em> acima.</li>
+                  )}
+                  {!lastCoverRun.publisher_template_configured && (
+                    <li>O <strong>Modelo de URL da editora</strong> não está preenchido — esta é a via mais fiável para manuais PT.</li>
+                  )}
+                  {(lastCoverRun.diagnostics?.openlibrary?.not_found > 0) && (
+                    <li>Open Library não tem manuais escolares portugueses indexados.</li>
+                  )}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

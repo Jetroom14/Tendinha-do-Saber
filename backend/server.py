@@ -799,72 +799,131 @@ async def import_books(file: UploadFile = File(...), admin: dict = Depends(requi
     return {"created": created, "updated": updated, "anomalies": anomalies, "issues": issues[:50]}
 
 # Enrich missing book covers via Google Books API
-async def _resolve_cover_url(client_http, book: dict, publisher_template: Optional[str] = None) -> Optional[str]:
+# Google Books own-quota key (avoids the shared-IP 429s). Set in backend/.env.
+GOOGLE_BOOKS_API_KEY = os.environ.get("GOOGLE_BOOKS_API_KEY", "").strip()
+
+
+def _gb_url(query: str) -> str:
+    """Google Books API URL builder. `country=PT` is REQUIRED (without it the
+    API returns 403 'unknownLocation' because it can't derive the caller's
+    location from a data-center IP). The `key=` parameter is appended when a
+    dedicated key is configured, moving us off the shared free-tier quota."""
+    url = f"https://www.googleapis.com/books/v1/volumes?{query}&country=PT"
+    if GOOGLE_BOOKS_API_KEY:
+        url += f"&key={GOOGLE_BOOKS_API_KEY}"
+    return url
+
+
+async def _resolve_cover_url(
+    client_http,
+    book: dict,
+    publisher_template: Optional[str] = None,
+    diag: Optional[dict] = None,
+) -> Optional[str]:
     """Tries several public sources, in order of reliability, and returns the
-    first WORKING cover URL (or None):
-      0. Publisher template (configurable, e.g. Porto Editora / WOOK) — if set
-      1. Google Books by ISBN
-      2. Google Books by title + author
+    first WORKING cover URL (or None). Records per-source outcomes into
+    `diag` (dict keyed by source name → {success,not_found,blocked,error}) so
+    the admin UI can show WHY a run produced few/no covers.
+
+    Sources tried:
+      0. Publisher URL template (configured in Settings) — TRUSTED, no server
+         validation because outbound cloud IPs are usually blocked by publisher
+         CDNs (Cloudflare). The browser fetches these directly and the
+         front-end already has a placeholder fallback if the image 404s.
+      1. Google Books by ISBN (with own API key + country=PT)
+      2. Google Books by title (+ author when available)
       3. Open Library by ISBN
-    A URL only counts if the image actually exists (HTTP 200 + image/* + real
-    size), so we never store a dead link that would just fall back to the
-    themed placeholder. This means a publisher template can be left configured
-    permanently: while a manual's cover doesn't exist yet it's simply skipped,
-    and the day the publisher publishes it, the next run picks it up."""
-    isbn = book.get("isbn13", "")
-    title = book.get("title", "")
-    author = book.get("author", "")
+    """
+    isbn = book.get("isbn13", "") or ""
+    title = (book.get("title", "") or "").strip()
+    author = (book.get("author", "") or "").strip()
+
+    def note(source: str, outcome: str):
+        if diag is None:
+            return
+        d = diag.setdefault(source, {"success": 0, "not_found": 0, "blocked": 0, "error": 0})
+        d[outcome] = d.get(outcome, 0) + 1
 
     async def _image_ok(url: str) -> bool:
         try:
             r = await client_http.get(url, follow_redirects=True)
             ctype = r.headers.get("content-type", "")
-            # Some CDNs return a 1x1 "not found" pixel; require a real-sized image.
             return r.status_code == 200 and ctype.startswith("image") and len(r.content) > 1500
         except Exception:
             return False
 
-    # 0. Publisher cover template (configured in Settings). Tried first because,
-    #    for this catalog (mostly Porto Editora group), it's the most accurate
-    #    source once the manual is on sale.
+    # 0. Publisher cover template — TRUSTED (see docstring).
     if publisher_template and "{isbn}" in publisher_template:
         pub_url = publisher_template.replace("{isbn}", isbn)
-        if await _image_ok(pub_url):
-            return pub_url
+        note("publisher_template", "success")
+        return pub_url
 
-    # 1. Google Books by ISBN (best coverage for PT trade + many schoolbooks)
+    # 1. Google Books by ISBN
     try:
-        r = await client_http.get(f"https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}&country=PT")
-        data = r.json()
-        if data.get("totalItems", 0) > 0:
-            links = (data["items"][0].get("volumeInfo", {}).get("imageLinks") or {})
-            u = links.get("thumbnail") or links.get("smallThumbnail")
-            if u:
-                return u.replace("http://", "https://").replace("&edge=curl", "")
-    except Exception:
-        pass
-
-    # 2. Google Books by title + author (catches editions indexed without ISBN)
-    if title:
-        try:
-            q = f'intitle:"{title}"'
-            if author:
-                q += f'+inauthor:"{author}"'
-            r = await client_http.get(f"https://www.googleapis.com/books/v1/volumes?q={q}&maxResults=1&country=PT")
+        r = await client_http.get(_gb_url(f"q=isbn:{isbn}"))
+        if r.status_code == 429:
+            note("google_isbn", "blocked")
+            logger.warning(f"[covers] Google Books quota (429) for ISBN {isbn}. Set GOOGLE_BOOKS_API_KEY.")
+        elif r.status_code >= 400:
+            note("google_isbn", "error")
+            logger.warning(f"[covers] Google Books HTTP {r.status_code} for ISBN {isbn}: {r.text[:200]}")
+        else:
             data = r.json()
             if data.get("totalItems", 0) > 0:
                 links = (data["items"][0].get("volumeInfo", {}).get("imageLinks") or {})
                 u = links.get("thumbnail") or links.get("smallThumbnail")
                 if u:
+                    note("google_isbn", "success")
                     return u.replace("http://", "https://").replace("&edge=curl", "")
-        except Exception:
-            pass
+                note("google_isbn", "not_found")
+            else:
+                note("google_isbn", "not_found")
+    except Exception as e:
+        note("google_isbn", "error")
+        logger.warning(f"[covers] Google Books ISBN exception for {isbn}: {type(e).__name__}: {e}")
 
-    # 3. Open Library by ISBN — ?default=false makes it 404 instead of returning
-    #    a blank placeholder, so _image_ok correctly rejects misses.
+    # 2. Google Books by title (+ author when present)
+    if title:
+        try:
+            q = f'intitle:"{title}"'
+            if author:
+                q += f'+inauthor:"{author}"'
+            r = await client_http.get(_gb_url(f"q={q}&maxResults=1"))
+            if r.status_code == 429:
+                note("google_title", "blocked")
+            elif r.status_code >= 400:
+                note("google_title", "error")
+                logger.warning(f"[covers] Google Books title HTTP {r.status_code} for ISBN {isbn}: {r.text[:200]}")
+            else:
+                data = r.json()
+                if data.get("totalItems", 0) > 0:
+                    links = (data["items"][0].get("volumeInfo", {}).get("imageLinks") or {})
+                    u = links.get("thumbnail") or links.get("smallThumbnail")
+                    if u:
+                        note("google_title", "success")
+                        return u.replace("http://", "https://").replace("&edge=curl", "")
+                    note("google_title", "not_found")
+                else:
+                    note("google_title", "not_found")
+        except Exception as e:
+            note("google_title", "error")
+            logger.warning(f"[covers] Google Books title exception for {isbn}: {type(e).__name__}: {e}")
+
+    # 3. Open Library by ISBN
     ol_url = f"https://covers.openlibrary.org/b/isbn/{isbn}-L.jpg?default=false"
-    if await _image_ok(ol_url):
-        return ol_url
+    try:
+        r = await client_http.get(ol_url, follow_redirects=True)
+        ctype = r.headers.get("content-type", "")
+        if r.status_code == 200 and ctype.startswith("image") and len(r.content) > 1500:
+            note("openlibrary", "success")
+            return ol_url
+        elif r.status_code == 404:
+            note("openlibrary", "not_found")
+        else:
+            note("openlibrary", "error")
+    except Exception as e:
+        note("openlibrary", "error")
+        logger.warning(f"[covers] Open Library exception for {isbn}: {type(e).__name__}: {e}")
 
     return None
 
@@ -883,13 +942,18 @@ async def covers_status(admin: dict = Depends(require_admin)):
 async def enrich_covers(admin: dict = Depends(require_admin), limit: int = 50):
     """Fills in missing book covers from public sources (see _resolve_cover_url).
     Processes up to `limit` books per call so a large catalog can be done in
-    batches without timing out. Returns how many were updated and how many
-    still have no cover, so the front end can keep calling until done."""
+    batches without timing out. Returns:
+      - updated / processed / remaining / done
+      - diagnostics: per-source counters (success, not_found, blocked, error)
+        + api_key_configured flag + publisher_template flag, so the admin can
+        see WHY the run produced few or no covers.
+    """
     import httpx
     updated = 0
     processed = 0
     settings = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
     publisher_template = settings.get("publisher_cover_template") or None
+    diagnostics: dict = {}
     cursor = db.books.find(
         {"$or": [{"image_url": ""}, {"image_url": None}, {"image_url": {"$regex": "openlibrary"}}]},
         {"_id": 0},
@@ -898,17 +962,28 @@ async def enrich_covers(admin: dict = Depends(require_admin), limit: int = 50):
         async for b in cursor:
             processed += 1
             try:
-                url = await _resolve_cover_url(client_http, b, publisher_template)
+                url = await _resolve_cover_url(client_http, b, publisher_template, diag=diagnostics)
                 if url:
                     await db.books.update_one({"isbn13": b["isbn13"]}, {"$set": {"image_url": url}})
                     updated += 1
-            except Exception:
+            except Exception as e:
+                logger.warning(f"[covers] Unexpected exception for {b.get('isbn13')}: {type(e).__name__}: {e}")
+                diagnostics.setdefault("_unhandled", {"count": 0})
+                diagnostics["_unhandled"]["count"] += 1
                 continue
     remaining = await db.books.count_documents(
         {"$or": [{"image_url": ""}, {"image_url": None}, {"image_url": {"$regex": "openlibrary"}}]}
     )
-    await log_action(admin["id"], "enrich", "covers", None, {"updated": updated, "processed": processed})
-    return {"updated": updated, "processed": processed, "remaining": remaining, "done": remaining == 0}
+    await log_action(admin["id"], "enrich", "covers", None, {"updated": updated, "processed": processed, "diag": diagnostics})
+    return {
+        "updated": updated,
+        "processed": processed,
+        "remaining": remaining,
+        "done": remaining == 0,
+        "diagnostics": diagnostics,
+        "api_key_configured": bool(GOOGLE_BOOKS_API_KEY),
+        "publisher_template_configured": bool(publisher_template and "{isbn}" in (publisher_template or "")),
+    }
 
 # ---------- Municipalities / Schools ----------
 @api.get("/municipalities")
