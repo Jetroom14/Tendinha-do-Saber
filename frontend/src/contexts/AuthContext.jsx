@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import api, { formatApiErrorDetail } from "@/lib/api";
+import { getAuthToken, setAuthToken, removeAuthToken } from "@/lib/storage";
 
 const AuthCtx = createContext(null);
 
@@ -8,7 +9,7 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    const token = localStorage.getItem("ts_token");
+    const token = getAuthToken();
     if (!token) {
       setUser(null);
       setLoading(false);
@@ -18,7 +19,7 @@ export function AuthProvider({ children }) {
       const { data } = await api.get("/auth/me");
       setUser(data);
     } catch {
-      localStorage.removeItem("ts_token");
+      removeAuthToken();
       setUser(null);
     } finally {
       setLoading(false);
@@ -27,10 +28,10 @@ export function AuthProvider({ children }) {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  const login = async (email, password) => {
+  const login = async (email, password, keepSession = false) => {
     try {
       const { data } = await api.post("/auth/login", { email, password });
-      localStorage.setItem("ts_token", data.token);
+      setAuthToken(data.token, keepSession);
       setUser(data.user);
       return { ok: true, user: data.user };
     } catch (e) {
@@ -41,7 +42,7 @@ export function AuthProvider({ children }) {
   const register = async (name, email, password) => {
     try {
       const { data } = await api.post("/auth/register", { name, email, password });
-      localStorage.setItem("ts_token", data.token);
+      setAuthToken(data.token, true);
       setUser(data.user);
       return { ok: true, user: data.user };
     } catch (e) {
@@ -50,7 +51,7 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
-    localStorage.removeItem("ts_token");
+    removeAuthToken();
     setUser(null);
   };
 

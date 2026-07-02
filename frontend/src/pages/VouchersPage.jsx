@@ -18,6 +18,7 @@ export default function VouchersPage() {
     code: "",
     manuals: "",
     wants_workbooks: false,
+    workbook_details: "",
     wants_lamination: false,
     lamination_details: "",
   });
@@ -59,6 +60,9 @@ export default function VouchersPage() {
         if (code) fd.append("code", code);
         fd.append("wants_workbooks", String(form.wants_workbooks));
         fd.append("wants_lamination", String(form.wants_lamination));
+        if (form.wants_workbooks && form.workbook_details.trim()) {
+          fd.append("workbook_details", form.workbook_details.trim());
+        }
         if (form.wants_lamination && form.lamination_details.trim()) {
           fd.append("lamination_details", form.lamination_details.trim());
         }
@@ -70,13 +74,14 @@ export default function VouchersPage() {
           manuals: form.manuals,
           code,
           wants_workbooks: form.wants_workbooks,
+          workbook_details: form.wants_workbooks ? form.workbook_details.trim() : null,
           wants_lamination: form.wants_lamination,
           lamination_details: form.wants_lamination ? form.lamination_details.trim() : null,
         });
       }
       setDone(true);
       toast.success("Voucher submetido. Vamos analisar e entraremos em contacto.");
-      setForm({ name: "", contact: "", code: "", manuals: "", wants_workbooks: false, wants_lamination: false, lamination_details: "" });
+      setForm({ name: "", contact: "", code: "", manuals: "", wants_workbooks: false, workbook_details: "", wants_lamination: false, lamination_details: "" });
       setFile(null);
     } catch (err) {
       toast.error(formatApiErrorDetail(err.response?.data?.detail));
@@ -170,12 +175,25 @@ export default function VouchersPage() {
           {/* Checkboxes */}
           <div className="space-y-3 pt-2">
             <label className="flex items-start gap-3 cursor-pointer">
-              <Checkbox checked={form.wants_workbooks} onCheckedChange={(v) => setForm({...form, wants_workbooks: !!v})} data-testid="voucher-want-workbooks"/>
+              <Checkbox checked={form.wants_workbooks} onCheckedChange={(v) => setForm({...form, wants_workbooks: !!v, workbook_details: v ? form.workbook_details : ""})} data-testid="voucher-want-workbooks"/>
               <span className="text-sm leading-snug">
-                <span className="font-medium text-[#1A202C]">Quero cadernos de fichas</span>
+                <span className="font-medium text-[#1A202C]">Quero cadernos de fichas/atividades</span>
                 <span className="block text-xs text-[#4A5568]">Incluir os cadernos de atividades correspondentes aos manuais.</span>
               </span>
             </label>
+            {form.wants_workbooks && (
+              <div className="pl-7" data-testid="voucher-workbook-details-wrap">
+                <Label className="text-xs uppercase tracking-wider text-[#4A5568] mb-1.5 block">Quais cadernos de atividades/fichas quer?</Label>
+                <Textarea
+                  value={form.workbook_details}
+                  onChange={(e)=>setForm({...form, workbook_details: e.target.value})}
+                  placeholder="Ex: Cadernos de Português 5.º ano + Matemática 5.º ano"
+                  rows={3}
+                  data-testid="voucher-workbook-details-input"
+                />
+                <p className="text-[11px] text-[#4A5568] mt-1.5">Descreva quais cadernos de atividades ou fichas pretende incluir.</p>
+              </div>
+            )}
             <label className="flex items-start gap-3 cursor-pointer">
               <Checkbox checked={form.wants_lamination} onCheckedChange={(v) => setForm({...form, wants_lamination: !!v, lamination_details: v ? form.lamination_details : ""})} data-testid="voucher-want-lamination"/>
               <span className="text-sm leading-snug">

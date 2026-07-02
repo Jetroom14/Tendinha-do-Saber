@@ -1,12 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { getRememberedEmail, setRememberedEmail, removeRememberedEmail } from "@/lib/storage";
 
 export function LoginPage() {
+  const [rememberEmail, setRememberEmail] = useState(false);
+  const [keepSignedIn, setKeepSignedIn] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -19,9 +23,11 @@ export function LoginPage() {
   const submit = async (e) => {
     e.preventDefault();
     setLoading(true); setErr("");
-    const res = await login(email, password);
+    const res = await login(email, password, keepSignedIn);
     setLoading(false);
     if (res.ok) {
+      if (rememberEmail) setRememberedEmail(email);
+      else removeRememberedEmail();
       toast.success("Bem-vindo!");
       if (res.user?.role === "admin" || res.user?.role === "super_admin") navigate("/admin");
       else navigate(next);
@@ -29,6 +35,14 @@ export function LoginPage() {
       setErr(res.error);
     }
   };
+
+  useEffect(() => {
+    const saved = getRememberedEmail();
+    if (saved) {
+      setEmail(saved);
+      setRememberEmail(true);
+    }
+  }, []);
 
   return (
     <div className="min-h-[70vh] grid place-items-center px-4 py-12" data-testid="login-page">
@@ -40,9 +54,17 @@ export function LoginPage() {
             <Label className="text-xs uppercase tracking-wider text-[#4A5568] mb-1.5 block">Email</Label>
             <Input type="email" required value={email} onChange={(e)=>setEmail(e.target.value)} data-testid="login-email"/>
           </div>
+          <div className="flex items-start gap-3">
+            <Checkbox checked={rememberEmail} onCheckedChange={(v) => setRememberEmail(!!v)} data-testid="remember-email-checkbox" />
+            <Label className="text-sm text-[#1A202C] cursor-pointer">Lembrar o meu email</Label>
+          </div>
           <div>
             <Label className="text-xs uppercase tracking-wider text-[#4A5568] mb-1.5 block">Palavra-passe</Label>
             <Input type="password" required value={password} onChange={(e)=>setPassword(e.target.value)} data-testid="login-password"/>
+          </div>
+          <div className="flex items-start gap-3">
+            <Checkbox checked={keepSignedIn} onCheckedChange={(v) => setKeepSignedIn(!!v)} data-testid="keep-signed-in-checkbox" />
+            <Label className="text-sm text-[#1A202C] cursor-pointer">Manter sessão iniciada</Label>
           </div>
           {err && <p className="text-sm text-[#C53030]" data-testid="login-error">{err}</p>}
           <Button type="submit" disabled={loading} className="w-full bg-[#5A8F1E] hover:bg-[#3E6E11] h-11" data-testid="login-submit">

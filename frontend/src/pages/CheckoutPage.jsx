@@ -103,7 +103,7 @@ export default function CheckoutPage() {
               <Truck className="w-5 h-5 text-[#5A8F1E] mt-0.5 shrink-0" strokeWidth={1.5}/>
               <div>
                 <h2 className="font-display font-medium text-[#1A202C]">Entrega em mão · Distrito de Aveiro</h2>
-                <p className="text-sm text-[#4A5568] mt-1">O Francisco entrega-lhe os manuais pessoalmente, sem custos adicionais.</p>
+                <p className="text-sm text-[#4A5568] mt-1">A Tendinha do Saber entrega-lhe os manuais pessoalmente, sem custos adicionais.</p>
               </div>
             </div>
             <div className="space-y-4">
