@@ -80,6 +80,68 @@ def create_access_token(user_id: str, email: str, role: str) -> str:
 def strip_isbn(s: str) -> str:
     return re.sub(r"[^0-9Xx]", "", s or "")
 
+
+# ---- Book identifier helpers (Bloco A) ----
+# A book is identified by (in priority order): isbn13 (13 digits) OR slug OR
+# pe_code (Porto Editora internal code, for books without ISBN). All three
+# fields are unique when present (partial indexes in ensure_indexes()).
+_SLUG_STRIP_RE = re.compile(r"[^a-z0-9]+")
+
+
+def _slugify(text: str) -> str:
+    """Deterministic ASCII slug from a title. Handles Portuguese accents,
+    removes symbols, collapses whitespace to hyphens. Returns empty string
+    if the input has no usable characters."""
+    if not text:
+        return ""
+    import unicodedata
+    # Strip diacritics: "Matemática" -> "Matematica"
+    ascii_text = unicodedata.normalize("NFKD", str(text)).encode("ascii", "ignore").decode("ascii")
+    ascii_text = ascii_text.lower().strip()
+    # Replace anything non-alphanumeric with a hyphen, then collapse hyphens
+    slug = _SLUG_STRIP_RE.sub("-", ascii_text).strip("-")
+    return slug[:80]  # cap length to keep URLs sane
+
+
+async def _ensure_unique_slug(base: str, exclude_id: Optional[str] = None) -> str:
+    """Given a base slug, returns a slug guaranteed to be unique in the books
+    collection. Adds -2, -3, ... suffix on collision. `exclude_id` lets a
+    book keep its own slug during an update without triggering a suffix."""
+    if not base:
+        # Plan B: caller must supply a synthetic fallback (typically book UUID).
+        return ""
+    candidate = base
+    n = 1
+    while True:
+        filt = {"slug": candidate}
+        if exclude_id:
+            filt["id"] = {"$ne": exclude_id}
+        collision = await db.books.find_one(filt, {"_id": 0, "id": 1})
+        if not collision:
+            return candidate
+        n += 1
+        candidate = f"{base}-{n}"
+
+
+def _book_key_filter(key: str) -> dict:
+    """Builds a MongoDB filter that resolves a URL/API key to a single book.
+    The key may be: (a) a 13-digit ISBN, (b) a slug, or (c) a PE code. We do
+    NOT strip_isbn() the key blindly, because slugs contain hyphens/letters
+    that would be destroyed. Instead we try each field verbatim, and also
+    try the digits-only form for the isbn13 field so hyphenated ISBNs still
+    resolve."""
+    key = (key or "").strip()
+    isbn_clean = strip_isbn(key)
+    ors = [{"slug": key}, {"pe_code": key}]
+    if isbn_clean:
+        ors.append({"isbn13": isbn_clean})
+    return {"$or": ors}
+
+
+async def _find_book_by_key(key: str) -> Optional[dict]:
+    return await db.books.find_one(_book_key_filter(key), {"_id": 0})
+
+
 def gen_id() -> str:
     return str(uuid.uuid4())
 
@@ -188,7 +250,10 @@ class ChangePasswordIn(BaseModel):
     new_password: str = Field(min_length=8)
 
 class BookIn(BaseModel):
-    isbn13: str
+    isbn13: Optional[str] = ""           # Bloco A: agora opcional (pode ser vazio se pe_code presente)
+    pe_code: Optional[str] = None        # Bloco A: código interno Porto Editora (livros sem ISBN)
+    slug: Optional[str] = None           # Bloco A: URL slug (gerado auto). SÓ visível internamente.
+    related_book_id: Optional[str] = None  # Bloco A: futura ligação manual↔caderno (deixado vazio agora)
     title: str
     author: Optional[str] = ""
     publisher: Optional[str] = ""
@@ -458,42 +523,95 @@ async def list_books(
 async def list_subjects():
     return await db.books.distinct("subject")
 
-@api.get("/books/{isbn13}")
-async def get_book(isbn13: str):
-    book = await db.books.find_one({"isbn13": strip_isbn(isbn13)}, {"_id": 0})
+@api.get("/books/{key}")
+async def get_book(key: str):
+    """Bloco A: `key` pode ser ISBN-13, slug ou código PE."""
+    book = await _find_book_by_key(key)
     if not book:
         raise HTTPException(404, "Livro não encontrado")
     return book
 
 @api.post("/admin/books")
 async def create_book(payload: BookIn, admin: dict = Depends(require_admin)):
-    payload.isbn13 = strip_isbn(payload.isbn13)
-    if await db.books.find_one({"isbn13": payload.isbn13}):
+    isbn = strip_isbn(payload.isbn13 or "")
+    pe_code = (payload.pe_code or "").strip() or None
+    if not isbn and not pe_code:
+        raise HTTPException(400, "Indique um ISBN OU um Código PE (pelo menos um é obrigatório).")
+    if isbn and len(isbn) != 13:
+        raise HTTPException(400, "ISBN inválido — deve ter 13 dígitos.")
+    if isbn and await db.books.find_one({"isbn13": isbn}):
         raise HTTPException(400, "ISBN já existe")
+    if pe_code and await db.books.find_one({"pe_code": pe_code}):
+        raise HTTPException(400, "Código PE já existe")
+
     doc = payload.model_dump()
+    doc["isbn13"] = isbn or ""
+    doc["pe_code"] = pe_code
     doc["id"] = gen_id()
+    # Slug: se admin forneceu um explícito, respeita-o; senão gera do título.
+    # Plan B: se título vazio ou slug vazio, usa o UUID como slug para não partir.
+    provided_slug = _slugify(payload.slug or "")
+    base = provided_slug or _slugify(payload.title) or doc["id"]
+    doc["slug"] = await _ensure_unique_slug(base, exclude_id=doc["id"])
     doc["created_at"] = iso(now_utc())
     await db.books.insert_one(doc)
-    await log_action(admin["id"], "create", "book", doc["id"], {"isbn": doc["isbn13"]})
+    await log_action(admin["id"], "create", "book", doc["id"], {"isbn": doc["isbn13"], "pe_code": pe_code, "slug": doc["slug"]})
     doc.pop("_id", None)
     return doc
 
-@api.put("/admin/books/{isbn13}")
-async def update_book(isbn13: str, payload: BookIn, admin: dict = Depends(require_admin)):
-    update = payload.model_dump()
-    update["isbn13"] = strip_isbn(update["isbn13"])
-    res = await db.books.update_one({"isbn13": strip_isbn(isbn13)}, {"$set": update})
-    if res.matched_count == 0:
+@api.put("/admin/books/{key}")
+async def update_book(key: str, payload: BookIn, admin: dict = Depends(require_admin)):
+    """Bloco A: `key` pode ser ISBN-13, slug ou código PE."""
+    existing = await _find_book_by_key(key)
+    if not existing:
         raise HTTPException(404, "Livro não encontrado")
-    await log_action(admin["id"], "update", "book", isbn13)
+
+    update = payload.model_dump()
+    new_isbn = strip_isbn(update.get("isbn13") or "")
+    new_pe = (update.get("pe_code") or "").strip() or None
+    if not new_isbn and not new_pe:
+        raise HTTPException(400, "Indique um ISBN OU um Código PE (pelo menos um é obrigatório).")
+    if new_isbn and len(new_isbn) != 13:
+        raise HTTPException(400, "ISBN inválido — deve ter 13 dígitos.")
+    # Impedir colisões noutros livros (mas permitir manter o próprio)
+    if new_isbn:
+        clash = await db.books.find_one({"isbn13": new_isbn, "id": {"$ne": existing["id"]}}, {"_id": 0, "id": 1})
+        if clash:
+            raise HTTPException(400, "ISBN já pertence a outro livro")
+    if new_pe:
+        clash = await db.books.find_one({"pe_code": new_pe, "id": {"$ne": existing["id"]}}, {"_id": 0, "id": 1})
+        if clash:
+            raise HTTPException(400, "Código PE já pertence a outro livro")
+
+    update["isbn13"] = new_isbn or ""
+    update["pe_code"] = new_pe
+
+    # Slug: se admin escreveu um slug diferente, respeita; senão mantém o atual;
+    # se atualmente vazio, gera-o agora a partir do título.
+    incoming_slug = _slugify(update.get("slug") or "")
+    current_slug = existing.get("slug") or ""
+    if incoming_slug and incoming_slug != current_slug:
+        update["slug"] = await _ensure_unique_slug(incoming_slug, exclude_id=existing["id"])
+    elif not current_slug:
+        base = _slugify(update.get("title") or existing.get("title") or "") or existing["id"]
+        update["slug"] = await _ensure_unique_slug(base, exclude_id=existing["id"])
+    else:
+        update["slug"] = current_slug
+
+    await db.books.update_one({"id": existing["id"]}, {"$set": update})
+    await log_action(admin["id"], "update", "book", existing["id"])
     return {"ok": True}
 
-@api.delete("/admin/books/{isbn13}")
-async def delete_book(isbn13: str, admin: dict = Depends(require_admin)):
-    res = await db.books.delete_one({"isbn13": strip_isbn(isbn13)})
+@api.delete("/admin/books/{key}")
+async def delete_book(key: str, admin: dict = Depends(require_admin)):
+    """Bloco A: `key` pode ser ISBN-13, slug ou código PE."""
+    existing = await _find_book_by_key(key)
+    if not existing:
+        raise HTTPException(404, "Livro não encontrado")
+    res = await db.books.delete_one({"id": existing["id"]})
     if res.deleted_count == 0:
         raise HTTPException(404, "Livro não encontrado")
-    await log_action(admin["id"], "delete", "book", isbn13)
+    await log_action(admin["id"], "delete", "book", existing["id"], {"isbn": existing.get("isbn13"), "pe_code": existing.get("pe_code")})
     return {"ok": True}
 
 # ---------- Excel Import ----------
@@ -513,6 +631,11 @@ def _normalize_import_df(content: bytes):
         "isbn": "isbn13", "artigo": "type", "pvp": "price",
         "preço": "price", "preco": "price",
         "autor": "author", "autor(es)": "author", "autores": "author",
+        # Bloco A: Código Porto Editora (para livros sem ISBN)
+        "código pe": "pe_code", "codigo pe": "pe_code",
+        "código porto editora": "pe_code", "codigo porto editora": "pe_code",
+        "codigo_pe": "pe_code", "código_pe": "pe_code",
+        "cod pe": "pe_code", "cod. pe": "pe_code",
     }
     df.rename(columns={k: v for k, v in col_map.items() if k in df.columns}, inplace=True)
     return df
@@ -521,19 +644,51 @@ def _normalize_import_df(content: bytes):
 def _classify_import_rows(df) -> List[dict]:
     """Validates and classifies every row WITHOUT touching the database.
     Each returned record has an 'action' of 'new' | 'update' | 'error' and,
-    for valid rows, a normalized 'data' dict ready to be persisted."""
+    for valid rows, a normalized 'data' dict ready to be persisted.
+
+    Bloco A: aceita linhas SEM ISBN se tiverem Código PE + Título + Preço.
+    Rejeita linhas sem NENHUM identificador (nem ISBN nem Código PE)."""
+
+    def _clean_cell(v) -> str:
+        """Pandas devolve NaN/None em células vazias e converte para 'nan' quando
+        forçado a str. Este helper trata NaN/None como vazio, e remove um '.0'
+        residual de códigos numéricos que o pandas leu como float (perdendo,
+        infelizmente, zeros à esquerda — cabe ao utilizador formatar a coluna
+        como Texto no Excel se quiser preservá-los)."""
+        if v is None:
+            return ""
+        try:
+            # pd.isna funciona para NaN, NaT e None
+            import pandas as _pd
+            if _pd.isna(v):
+                return ""
+        except Exception:
+            pass
+        s = str(v).strip()
+        if s.lower() in ("nan", "none", "nat"):
+            return ""
+        if s.endswith(".0") and s[:-2].isdigit():
+            s = s[:-2]
+        return s
+
     rows: List[dict] = []
     for idx, row in df.iterrows():
         line_no = int(idx) + 2  # +2: header row + 1-based for humans
-        isbn = strip_isbn(str(row.get("isbn13", "")))
-        title = str(row.get("title", "")).strip()
+        isbn = strip_isbn(_clean_cell(row.get("isbn13", "")))
+        pe_code = _clean_cell(row.get("pe_code", ""))
+        title = _clean_cell(row.get("title", ""))
         try:
-            price = float(row.get("price", 0) or 0)
+            price_raw = row.get("price", 0)
+            price = float(price_raw) if price_raw not in (None, "") else 0.0
         except Exception:
             price = 0.0
 
         problems = []
-        if len(isbn) != 13:
+        # Bloco A: ISBN OU Código PE (não os dois obrigatórios)
+        has_isbn = len(isbn) == 13
+        if not has_isbn and not pe_code:
+            problems.append("é preciso ISBN (13 dígitos) OU Código PE")
+        elif isbn and not has_isbn:
             problems.append("ISBN inválido (deve ter 13 dígitos)")
         if price <= 0:
             problems.append("preço em falta ou ≤ 0")
@@ -542,28 +697,41 @@ def _classify_import_rows(df) -> List[dict]:
 
         if problems:
             rows.append({
-                "line": line_no, "isbn": isbn, "title": title,
-                "action": "error", "issue": "; ".join(problems),
+                "line": line_no,
+                "isbn": isbn,
+                "pe_code": pe_code,
+                "title": title,
+                "action": "error",
+                "issue": "; ".join(problems),
             })
             continue
 
-        item_type = "Workbook" if ("caderno" in str(row.get("type", "")).lower()
-                                   or "workbook" in str(row.get("type", "")).lower()) else "Manual"
+        # Bloco A: detecta cadernos por coluna "artigo/tipo" OU por título
+        artigo_field = _clean_cell(row.get("type", "")).lower()
+        title_lower = title.lower()
+        is_workbook = (
+            "caderno" in artigo_field or "workbook" in artigo_field
+            or "fichas" in artigo_field or "caderno" in title_lower
+        )
+        item_type = "Workbook" if is_workbook else "Manual"
+
         rows.append({
             "line": line_no,
             "isbn": isbn,
+            "pe_code": pe_code,
             "title": title,
             "action": "pending",  # resolved to new/update during preview against DB
             "data": {
-                "isbn13": isbn,
+                "isbn13": isbn if has_isbn else "",
+                "pe_code": pe_code or None,
                 "title": title,
-                "author": str(row.get("author", "") or ""),
-                "publisher": str(row.get("publisher", "") or ""),
-                "subject": str(row.get("subject", "") or ""),
+                "author": _clean_cell(row.get("author", "")),
+                "publisher": _clean_cell(row.get("publisher", "")),
+                "subject": _clean_cell(row.get("subject", "")),
                 "price": round(price, 2),
                 "type": item_type,
-                "cycle": str(row.get("cycle", "") or ""),
-                "grade_level": str(row.get("grade_level", "") or ""),
+                "cycle": _clean_cell(row.get("cycle", "")),
+                "grade_level": _clean_cell(row.get("grade_level", "")),
             },
         })
     return rows
@@ -583,7 +751,13 @@ async def import_books_preview(file: UploadFile = File(...), admin: dict = Depen
     for r in classified:
         if r["action"] == "error":
             continue
-        existing = await db.books.find_one({"isbn13": r["data"]["isbn13"]}, {"_id": 0, "isbn13": 1})
+        # Bloco A: procura por ISBN OU por Código PE
+        d = r["data"]
+        existing = None
+        if d.get("isbn13"):
+            existing = await db.books.find_one({"isbn13": d["isbn13"]}, {"_id": 0, "id": 1})
+        if not existing and d.get("pe_code"):
+            existing = await db.books.find_one({"pe_code": d["pe_code"]}, {"_id": 0, "id": 1})
         r["action"] = "update" if existing else "new"
         if existing:
             update_count += 1
@@ -633,32 +807,52 @@ async def import_books_commit(payload: ImportCommitIn, admin: dict = Depends(req
 
     created = updated = 0
     for data in rows:
-        isbn = strip_isbn(str(data.get("isbn13", "")))
+        isbn = strip_isbn(str(data.get("isbn13", "") or ""))
+        pe_code = (data.get("pe_code") or "").strip() or None
         try:
             price = float(data.get("price", 0) or 0)
         except Exception:
             price = 0.0
-        if len(isbn) != 13 or price <= 0:
+        # Bloco A: aceita rows com ISBN válido OU com Código PE
+        has_isbn = len(isbn) == 13
+        if (not has_isbn and not pe_code) or price <= 0:
             continue  # defensive: invalid rows never persist
-        existing = await db.books.find_one({"isbn13": isbn})
+
+        # Localizar existente por ISBN OU por Código PE
+        existing = None
+        if has_isbn:
+            existing = await db.books.find_one({"isbn13": isbn})
+        if not existing and pe_code:
+            existing = await db.books.find_one({"pe_code": pe_code})
+
         if existing:
-            await db.books.update_one(
-                {"isbn13": isbn},
-                {"$set": {
-                    "price": round(price, 2),
-                    "type": data.get("type", "Manual"),
-                    "title": data.get("title") or existing.get("title", ""),
-                    "publisher": data.get("publisher", existing.get("publisher", "")),
-                    "author": data.get("author", existing.get("author", "")),
-                    "subject": data.get("subject", existing.get("subject", "")),
-                    "updated_at": iso(now_utc()),
-                }},
-            )
+            update_set = {
+                "price": round(price, 2),
+                "type": data.get("type", "Manual"),
+                "title": data.get("title") or existing.get("title", ""),
+                "publisher": data.get("publisher", existing.get("publisher", "")),
+                "author": data.get("author", existing.get("author", "")),
+                "subject": data.get("subject", existing.get("subject", "")),
+                "updated_at": iso(now_utc()),
+            }
+            # Se a linha traz ISBN e o existente não tinha, adiciona
+            if has_isbn and not existing.get("isbn13"):
+                update_set["isbn13"] = isbn
+            # Se a linha traz pe_code e o existente não tinha, adiciona
+            if pe_code and not existing.get("pe_code"):
+                update_set["pe_code"] = pe_code
+            await db.books.update_one({"id": existing["id"]}, {"$set": update_set})
             updated += 1
         else:
+            new_id = gen_id()
+            base_slug = _slugify(data.get("title") or "") or new_id
+            slug = await _ensure_unique_slug(base_slug, exclude_id=new_id)
             doc = {
-                "id": gen_id(),
-                "isbn13": isbn,
+                "id": new_id,
+                "isbn13": isbn if has_isbn else "",
+                "pe_code": pe_code,
+                "slug": slug,
+                "related_book_id": None,
                 "title": data.get("title", ""),
                 "author": data.get("author", ""),
                 "publisher": data.get("publisher", ""),
@@ -1333,7 +1527,8 @@ async def _compute_cart(items: List[CartItem], promo_code: Optional[str]) -> dic
     lamination_total = 0.0
 
     for it in items:
-        book = await db.books.find_one({"isbn13": strip_isbn(it.isbn13)}, {"_id": 0})
+        # Bloco A: aceita isbn13, slug ou pe_code como identificador do item
+        book = await _find_book_by_key(it.isbn13)
         if not book:
             continue
         line_price = float(book["price"]) * it.qty
@@ -1879,7 +2074,39 @@ async def update_settings(payload: SettingIn, admin: dict = Depends(require_supe
 # ---------- Seeding ----------
 async def ensure_indexes():
     await db.users.create_index("email", unique=True)
-    await db.books.create_index("isbn13", unique=True)
+    # Bloco A: livros podem ter ISBN OU Código PE (mutuamente exclusivos, ou ambos).
+    # Migração segura do índice antigo "isbn13_1 unique" para um partial-unique
+    # (só único quando isbn13 é não-vazio, permitindo múltiplos livros sem ISBN).
+    try:
+        existing = await db.books.index_information()
+        # Se o índice antigo existe (unique estrito, sem partialFilter), removê-lo
+        old = existing.get("isbn13_1")
+        if old is not None and old.get("unique") and "partialFilterExpression" not in old:
+            await db.books.drop_index("isbn13_1")
+    except Exception as e:
+        logger.warning(f"[indexes] Não foi possível inspecionar/limpar índice isbn13_1: {e}")
+    # Partial-unique: só livros com isbn13 não-vazio são forçados a ser únicos.
+    # Livros sem ISBN (só código PE) podem coexistir com isbn13="".
+    await db.books.create_index(
+        "isbn13",
+        unique=True,
+        partialFilterExpression={"isbn13": {"$type": "string", "$gt": ""}},
+        name="isbn13_unique_when_present",
+    )
+    # pe_code único quando presente
+    await db.books.create_index(
+        "pe_code",
+        unique=True,
+        partialFilterExpression={"pe_code": {"$type": "string", "$gt": ""}},
+        name="pe_code_unique_when_present",
+    )
+    # slug único quando presente (para URLs SEO-friendly)
+    await db.books.create_index(
+        "slug",
+        unique=True,
+        partialFilterExpression={"slug": {"$type": "string", "$gt": ""}},
+        name="slug_unique_when_present",
+    )
     await db.school_books.create_index([("school_id", 1), ("isbn13", 1), ("grade_level", 1)])
     await db.login_attempts.create_index("identifier")
     await db.password_reset_tokens.create_index("expires_at")
