@@ -10,7 +10,11 @@ import { Badge } from "@/components/ui/badge";
 import { Pencil, Trash2, Plus, Search, Image, RefreshCw, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
-const BLANK = { isbn13: "", title: "", author: "", publisher: "", subject: "", year: 2025, price: 0, type: "Manual", status: "Available", stock_qty: 0, synopsis: "", image_url: "", is_lamination_eligible: true };
+const BLANK = { isbn13: "", pe_code: "", slug: "", related_book_id: "", title: "", author: "", publisher: "", subject: "", year: 2025, price: 0, type: "Manual", status: "Available", stock_qty: 0, synopsis: "", image_url: "", is_lamination_eligible: true };
+
+// Bloco A: retorna a chave a usar em URLs de admin (edit/delete). Para livros
+// com ISBN, é o ISBN. Para livros sem ISBN, é o slug (ou pe_code como fallback).
+const bookKey = (b) => b.isbn13 || b.slug || b.pe_code || b.id;
 
 export default function AdminBooks() {
   const [books, setBooks] = useState([]);
@@ -53,21 +57,25 @@ export default function AdminBooks() {
   };
 
   const openCreate = () => { setEditing(null); setForm(BLANK); setOpen(true); };
-  const openEdit = (b) => { setEditing(b.isbn13); setForm({ ...BLANK, ...b }); setOpen(true); };
+  const openEdit = (b) => { setEditing(bookKey(b)); setForm({ ...BLANK, ...b, pe_code: b.pe_code || "", slug: b.slug || "", related_book_id: b.related_book_id || "" }); setOpen(true); };
 
   const save = async () => {
     try {
       const payload = { ...form, price: parseFloat(form.price) || 0, stock_qty: parseInt(form.stock_qty) || 0, year: parseInt(form.year) || null };
-      if (editing) await api.put(`/admin/books/${editing}`, payload);
+      // Bloco A: garantir que campos vazios são enviados como null/vazio corretos
+      payload.pe_code = (form.pe_code || "").trim() || null;
+      payload.related_book_id = (form.related_book_id || "").trim() || null;
+      payload.slug = (form.slug || "").trim() || null;
+      if (editing) await api.put(`/admin/books/${encodeURIComponent(editing)}`, payload);
       else await api.post("/admin/books", payload);
       toast.success(editing ? "Livro atualizado" : "Livro criado");
       setOpen(false); fetchBooks();
     } catch (e) { toast.error(formatApiErrorDetail(e.response?.data?.detail)); }
   };
 
-  const remove = async (isbn) => {
+  const remove = async (b) => {
     if (!confirm("Eliminar este livro?")) return;
-    await api.delete(`/admin/books/${isbn}`);
+    await api.delete(`/admin/books/${encodeURIComponent(bookKey(b))}`);
     toast.success("Livro eliminado"); fetchBooks();
   };
 
@@ -121,7 +129,7 @@ export default function AdminBooks() {
         <table className="w-full text-sm">
           <thead className="text-[10px] uppercase tracking-wider text-slate-500 bg-slate-50">
             <tr>
-              <th className="text-left p-3">ISBN</th>
+              <th className="text-left p-3">ISBN / Cód. PE</th>
               <th className="text-left p-3">Título</th>
               <th className="text-left p-3">Disciplina</th>
               <th className="text-left p-3">Tipo</th>
@@ -133,8 +141,15 @@ export default function AdminBooks() {
           </thead>
           <tbody>
             {books.map((b) => (
-              <tr key={b.isbn13} className="border-t border-slate-100 hover:bg-slate-50" data-testid={`book-row-${b.isbn13}`}>
-                <td className="p-3 font-mono text-xs">{b.isbn13}</td>
+              <tr key={b.id || bookKey(b)} className="border-t border-slate-100 hover:bg-slate-50" data-testid={`book-row-${bookKey(b)}`}>
+                <td className="p-3 font-mono text-xs">
+                  {b.isbn13 ? b.isbn13 : (
+                    <span className="inline-flex items-center gap-1">
+                      <span className="text-slate-400">—</span>
+                      {b.pe_code && <span className="text-[10px] uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200 rounded px-1.5 py-0.5">PE {b.pe_code}</span>}
+                    </span>
+                  )}
+                </td>
                 <td className="p-3 max-w-md truncate">{b.title}</td>
                 <td className="p-3 text-slate-600">{b.subject}</td>
                 <td className="p-3"><Badge variant="outline" className="text-xs">{b.type === "Workbook" ? "Caderno" : "Manual"}</Badge></td>
@@ -146,8 +161,8 @@ export default function AdminBooks() {
                   {b.status === "Unavailable" && <span className="text-rose-700">● Indisponível</span>}
                 </td>
                 <td className="p-3 flex gap-1">
-                  <button onClick={()=>openEdit(b)} className="p-1.5 rounded hover:bg-slate-200" data-testid={`edit-book-${b.isbn13}`}><Pencil className="w-3.5 h-3.5"/></button>
-                  <button onClick={()=>remove(b.isbn13)} className="p-1.5 rounded hover:bg-rose-100 text-rose-700" data-testid={`delete-book-${b.isbn13}`}><Trash2 className="w-3.5 h-3.5"/></button>
+                  <button onClick={()=>openEdit(b)} className="p-1.5 rounded hover:bg-slate-200" data-testid={`edit-book-${bookKey(b)}`}><Pencil className="w-3.5 h-3.5"/></button>
+                  <button onClick={()=>remove(b)} className="p-1.5 rounded hover:bg-rose-100 text-rose-700" data-testid={`delete-book-${bookKey(b)}`}><Trash2 className="w-3.5 h-3.5"/></button>
                 </td>
               </tr>
             ))}
@@ -161,7 +176,9 @@ export default function AdminBooks() {
           <DialogHeader><DialogTitle>{editing ? "Editar livro" : "Novo livro"}</DialogTitle></DialogHeader>
           <div className="grid grid-cols-2 gap-3 mt-2">
             <div className="col-span-2"><Label>Título *</Label><Input value={form.title} onChange={(e)=>setForm({...form, title: e.target.value})} data-testid="book-form-title"/></div>
-            <div><Label>ISBN-13 *</Label><Input value={form.isbn13} onChange={(e)=>setForm({...form, isbn13: e.target.value})} disabled={!!editing} data-testid="book-form-isbn"/></div>
+            <div><Label>ISBN-13 <span className="text-slate-400 text-xs">(opcional se tiver Código PE)</span></Label><Input value={form.isbn13} onChange={(e)=>setForm({...form, isbn13: e.target.value})} disabled={!!editing} placeholder="13 dígitos" data-testid="book-form-isbn"/></div>
+            <div><Label>Código PE <span className="text-slate-400 text-xs">(Porto Editora, se sem ISBN)</span></Label><Input value={form.pe_code} onChange={(e)=>setForm({...form, pe_code: e.target.value})} placeholder="ex: 05000072" data-testid="book-form-pe-code"/></div>
+            <div className="col-span-2 -mt-1 text-[11px] text-slate-500">Um livro precisa de <strong>ISBN OU Código PE</strong>. O Código PE é interno e nunca aparece ao cliente.</div>
             <div><Label>Disciplina</Label><Input value={form.subject} onChange={(e)=>setForm({...form, subject: e.target.value})}/></div>
             <div><Label>Autor</Label><Input value={form.author} onChange={(e)=>setForm({...form, author: e.target.value})}/></div>
             <div><Label>Editora</Label><Input value={form.publisher} onChange={(e)=>setForm({...form, publisher: e.target.value})}/></div>
@@ -183,6 +200,8 @@ export default function AdminBooks() {
                 </SelectContent>
               </Select>
             </div>
+            <div><Label>Slug URL <span className="text-slate-400 text-xs">(auto)</span></Label><Input value={form.slug} onChange={(e)=>setForm({...form, slug: e.target.value})} placeholder="ex: matematica-a-11-modulo-3" className="font-mono text-xs" data-testid="book-form-slug"/></div>
+            <div><Label>Livro relacionado (ID) <span className="text-slate-400 text-xs">(caderno↔manual, opcional)</span></Label><Input value={form.related_book_id} onChange={(e)=>setForm({...form, related_book_id: e.target.value})} placeholder="ISBN, slug ou ID do livro relacionado" className="font-mono text-xs" data-testid="book-form-related"/></div>
             <div className="col-span-2"><Label>URL da imagem</Label><Input value={form.image_url} onChange={(e)=>setForm({...form, image_url: e.target.value})}/></div>
             <div className="col-span-2"><Label>Sinopse</Label><Textarea value={form.synopsis} onChange={(e)=>setForm({...form, synopsis: e.target.value})}/></div>
           </div>
