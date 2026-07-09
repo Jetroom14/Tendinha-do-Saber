@@ -320,6 +320,7 @@ class OrderCreateIn(BaseModel):
     customer_email: EmailStr
     customer_phone: str
     delivery_method: str  # hand_delivery | shipping
+    delivery_concelho: Optional[str] = None  # Bloco B: concelho de Aveiro escolhido
     address: Optional[str] = ""
     postal_code: Optional[str] = ""
     notes: Optional[str] = ""
@@ -328,6 +329,8 @@ class SettingIn(BaseModel):
     lamination_price: Optional[float] = None
     aveiro_postcodes: Optional[List[str]] = None
     shipping_flat_rate: Optional[float] = None
+    shipping_rates: Optional[Dict[str, float]] = None  # Bloco B: {concelho: preço}
+    ctt_enabled: Optional[bool] = None                 # Bloco B: CTT preparado (default off)
     google_analytics_id: Optional[str] = None
     google_ads_id: Optional[str] = None
     facebook_pixel_id: Optional[str] = None
@@ -1581,7 +1584,15 @@ async def check_postcode(code: str):
     settings = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
     aveiro = settings.get("aveiro_postcodes", _AVEIRO_CONCELHO_POSTCODES)
     hand_delivery_available = len(code_clean) == 4 and code_clean[:2] in ("37", "38")
-    return {"hand_delivery_available": hand_delivery_available, "postcode": code_clean, "valid_zones": aveiro}
+    # Bloco B: indica se o CP pertence ao DISTRITO de Aveiro (mais permissivo do
+    # que "concelho de Aveiro"). O checkout usa isto para AVISAR sem bloquear.
+    in_aveiro_district = _postcode_in_aveiro_district(code_clean)
+    return {
+        "hand_delivery_available": hand_delivery_available,
+        "in_aveiro_district": in_aveiro_district,
+        "postcode": code_clean,
+        "valid_zones": aveiro,
+    }
 
 # ---------- Stock reservation ----------
 async def _reserve_stock(lines: List[dict]) -> List[dict]:
@@ -1611,6 +1622,104 @@ async def _restore_stock(adjustments: List[dict]):
     for adj in adjustments:
         await db.books.update_one({"isbn13": adj["isbn13"]}, {"$inc": {"stock_qty": adj["qty"]}})
 
+# Bloco B: Concelhos do distrito de Aveiro (canónicos, ordem alfabética).
+# Esta lista é a fonte-de-verdade para o dropdown do checkout e para o
+# painel de custos de entrega do admin. Se um concelho não estiver aqui,
+# NÃO é aceite como opção de entrega em mão.
+AVEIRO_CONCELHOS = [
+    "Águeda", "Albergaria-a-Velha", "Anadia", "Arouca", "Aveiro",
+    "Castelo de Paiva", "Espinho", "Estarreja", "Ílhavo", "Mealhada",
+    "Murtosa", "Oliveira de Azeméis", "Oliveira do Bairro", "Ovar",
+    "Santa Maria da Feira", "São João da Madeira", "Sever do Vouga",
+    "Vagos", "Vale de Cambra",
+]
+
+
+def _default_shipping_rates() -> Dict[str, float]:
+    """Bloco B: valor por defeito para cada concelho é 0 € (grátis).
+    O admin pode ajustar depois em /admin/entregas."""
+    return {c: 0.0 for c in AVEIRO_CONCELHOS}
+
+
+async def _get_shipping_rates() -> Dict[str, float]:
+    """Devolve o mapa concelho→preço a partir das settings, aplicando o default
+    para concelhos que ainda não estejam guardados (para o admin poder ver
+    todos os 19 mesmo antes de os configurar pela 1.ª vez)."""
+    settings = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
+    stored = settings.get("shipping_rates") or {}
+    rates = _default_shipping_rates()
+    for k, v in stored.items():
+        if k in rates:
+            try:
+                rates[k] = round(float(v), 2)
+            except Exception:
+                pass
+    return rates
+
+
+# Bloco B: intervalos de código postal do distrito de Aveiro (aviso, não bloqueio).
+# Fonte: CTT — o distrito de Aveiro cobre 3700-3899 (parte central+sul) e
+# 4500-4550 (Espinho, Sta Maria da Feira, S. João da Madeira, zona norte).
+# NOTA: se detectares moradas legítimas fora destes prefixos, ajusta aqui.
+_AVEIRO_DISTRICT_POSTCODE_PREFIXES = (
+    "37", "38",       # Aveiro cidade e envolvente (Águeda, Anadia, Ílhavo, ...)
+    "45",             # Norte do distrito (Espinho, Feira, SJM, Arouca, Vale de Cambra, ...)
+)
+
+
+def _postcode_in_aveiro_district(code: str) -> bool:
+    """Bloco B: verificação por prefixo — devolve True se o CP parece pertencer
+    ao distrito. Conservador de propósito (só marca como fora em casos claros)."""
+    clean = re.sub(r"[^0-9]", "", code or "")
+    if len(clean) < 4:
+        return True  # não temos dados suficientes — não avisamos
+    return clean[:2] in _AVEIRO_DISTRICT_POSTCODE_PREFIXES
+
+
+# ------------ Shipping rates endpoints (Bloco B) ------------
+
+@api.get("/shipping/zones")
+async def public_shipping_zones():
+    """Público: lista dos 19 concelhos + preço. Usado pelo dropdown do checkout."""
+    rates = await _get_shipping_rates()
+    return {
+        "concelhos": [{"name": c, "rate": rates[c]} for c in AVEIRO_CONCELHOS],
+    }
+
+
+@api.get("/admin/shipping-rates")
+async def admin_get_shipping_rates(admin: dict = Depends(require_admin)):
+    return {"rates": await _get_shipping_rates(), "concelhos": AVEIRO_CONCELHOS}
+
+
+class ShippingRatesIn(BaseModel):
+    rates: Dict[str, float]
+
+
+@api.put("/admin/shipping-rates")
+async def admin_put_shipping_rates(payload: ShippingRatesIn, admin: dict = Depends(require_manager)):
+    """Bloco B: substitui todos os custos de entrega por concelho. Aceita apenas
+    concelhos que estejam na lista canónica AVEIRO_CONCELHOS."""
+    clean: Dict[str, float] = {}
+    for k, v in (payload.rates or {}).items():
+        if k not in AVEIRO_CONCELHOS:
+            continue  # ignora concelhos não canónicos, não dá erro para ser tolerante
+        try:
+            price = round(float(v), 2)
+        except Exception:
+            price = 0.0
+        if price < 0:
+            price = 0.0
+        clean[k] = price
+    await db.settings.update_one(
+        {"id": "global"},
+        {"$set": {"shipping_rates": clean, "id": "global"}},
+        upsert=True,
+    )
+    await log_action(admin["id"], "update", "shipping_rates", "global", {"count": len(clean)})
+    return {"rates": await _get_shipping_rates()}
+
+
 # ---------- Orders ----------
 @api.post("/orders")
 async def create_order(payload: OrderCreateIn):
@@ -1619,10 +1728,17 @@ async def create_order(payload: OrderCreateIn):
         raise HTTPException(400, "Carrinho vazio ou livros indisponíveis")
 
     shipping_cost = 0.0
+    delivery_concelho = (payload.delivery_concelho or "").strip() or None
     if payload.delivery_method == "hand_delivery":
-        chk = await check_postcode(payload.postal_code)
-        if not chk["hand_delivery_available"]:
-            raise HTTPException(400, "Entrega em mão disponível apenas no distrito de Aveiro para este código postal.")
+        # Bloco B: concelho obrigatório para entrega em mão
+        if not delivery_concelho:
+            raise HTTPException(400, "Indique o concelho de entrega (distrito de Aveiro).")
+        if delivery_concelho not in AVEIRO_CONCELHOS:
+            raise HTTPException(400, "Concelho fora do distrito de Aveiro. Não fazemos entregas em mão fora do distrito.")
+        rates = await _get_shipping_rates()
+        shipping_cost = float(rates.get(delivery_concelho, 0.0))
+        # Aviso não-bloqueante: se o código postal estiver fora do distrito
+        # (aceita-se na mesma — pode haver exceções, ver spec Bloco B3).
     elif payload.delivery_method == "shipping":
         if not payload.address or not payload.postal_code:
             raise HTTPException(400, "Indique a morada e o código postal para envio.")
@@ -1662,6 +1778,7 @@ async def create_order(payload: OrderCreateIn):
         },
         "delivery": {
             "method": payload.delivery_method,
+            "concelho": delivery_concelho,
             "address": payload.address,
             "postal_code": payload.postal_code,
         },

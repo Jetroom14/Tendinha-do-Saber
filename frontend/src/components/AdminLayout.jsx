@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard, BookOpen, School2, FileText, ShoppingCart, Handshake,
   Users, Settings, ScrollText, LogOut, Upload, Home, Palette, Menu, X,
-  Tag, UserCircle, Ticket, BarChart3, FileEdit, Key,
+  Tag, UserCircle, Ticket, BarChart3, FileEdit, Key, Truck,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -17,6 +17,7 @@ const NAV = [
   { to: "/admin/importar", icon: Upload, label: "Importações" },
   { to: "/admin/escolas", icon: School2, label: "Escolas", superOnly: true },
   { to: "/admin/encomendas", icon: ShoppingCart, label: "Encomendas" },
+  { to: "/admin/entregas", icon: Truck, label: "Custos de Entrega", managerOnly: true },
   { to: "/admin/clientes", icon: UserCircle, label: "Clientes", managerOnly: true },
   { to: "/admin/vouchers", icon: FileText, label: "Vouchers MEGA" },
   { to: "/admin/codigos", icon: Ticket, label: "Códigos Promo", managerOnly: true },

@@ -32,6 +32,7 @@ import AdminChangePassword from "@/pages/admin/AdminChangePassword";
 import { AdminVouchers, AdminOrders, AdminPartners, AdminLogs, AdminSettings, AdminUsers } from "@/pages/admin/AdminOther";
 import { AdminCategories, AdminCustomers, AdminPromoCodes, AdminReports, AdminContent } from "@/pages/admin/AdminExtra";
 import AdminBrand from "@/pages/admin/AdminBrand";
+import AdminShipping from "@/pages/admin/AdminShipping";
 
 const Site = ({ children }) => (
   <SiteLayout>{children}</SiteLayout>
@@ -75,6 +76,7 @@ function App() {
               <Route path="importar" element={<AdminImport/>}/>
               <Route path="escolas" element={<AdminSchools/>}/>
               <Route path="encomendas" element={<AdminOrders/>}/>
+              <Route path="entregas" element={<AdminShipping/>}/>
               <Route path="clientes" element={<AdminCustomers/>}/>
               <Route path="vouchers" element={<AdminVouchers/>}/>
               <Route path="codigos" element={<AdminPromoCodes/>}/>
