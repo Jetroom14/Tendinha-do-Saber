@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import SEO from "@/components/SEO";
 import { toast } from "sonner";
-import { Truck, Check, AlertTriangle, CreditCard } from "lucide-react";
+import { Truck, Check, AlertTriangle, CreditCard, MapPin } from "lucide-react";
 
 export default function CheckoutPage() {
   const { items, summary, promoCode, clear } = useCart();
@@ -20,17 +21,24 @@ export default function CheckoutPage() {
     name: user?.name || "",
     email: user?.email || "",
     phone: "",
+    concelho: "",
     address: "",
     postal_code: "",
     notes: "",
     accept_terms: false,
   });
   const [postcodeCheck, setPostcodeCheck] = useState(null);
+  const [shippingZones, setShippingZones] = useState([]);   // Bloco B
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (items.length === 0) navigate("/carrinho");
   }, [items, navigate]);
+
+  // Bloco B: carregar lista de concelhos + custo por concelho
+  useEffect(() => {
+    api.get("/shipping/zones").then((r) => setShippingZones(r.data.concelhos || [])).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (form.postal_code && form.postal_code.length >= 4) {
@@ -42,10 +50,15 @@ export default function CheckoutPage() {
 
   const handle = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
+  // Bloco B: custo de entrega do concelho selecionado
+  const selectedZone = shippingZones.find((z) => z.name === form.concelho);
+  const shippingCost = selectedZone ? Number(selectedZone.rate || 0) : 0;
+  const grandTotal = (summary?.total || 0) + shippingCost;
+
   const submit = async (e) => {
     e.preventDefault();
-    if (!postcodeCheck?.hand_delivery_available) {
-      toast.error("Apenas fazemos entrega em mão no distrito de Aveiro. Para outras localidades, contacte-nos.");
+    if (!form.concelho) {
+      toast.error("Escolha o concelho de entrega.");
       return;
     }
     if (!form.accept_terms) {
@@ -61,6 +74,7 @@ export default function CheckoutPage() {
         customer_email: form.email,
         customer_phone: form.phone,
         delivery_method: "hand_delivery",
+        delivery_concelho: form.concelho,
         address: form.address,
         postal_code: form.postal_code,
         notes: form.notes,
@@ -103,27 +117,44 @@ export default function CheckoutPage() {
               <Truck className="w-5 h-5 text-[#5A8F1E] mt-0.5 shrink-0" strokeWidth={1.5}/>
               <div>
                 <h2 className="font-display font-medium text-[#1A202C]">Entrega em mão · Distrito de Aveiro</h2>
-                <p className="text-sm text-[#4A5568] mt-1">A Tendinha do Saber entrega-lhe os manuais pessoalmente, sem custos adicionais.</p>
+                <p className="text-sm text-[#4A5568] mt-1">A Tendinha do Saber entrega-lhe os manuais pessoalmente em qualquer concelho do distrito de Aveiro. O valor de entrega depende do concelho.</p>
               </div>
             </div>
             <div className="space-y-4">
+              <div>
+                <Label className="text-xs uppercase tracking-wider text-[#4A5568] mb-1.5 block">Concelho de entrega *</Label>
+                <Select value={form.concelho} onValueChange={(v) => setForm({...form, concelho: v})}>
+                  <SelectTrigger data-testid="checkout-concelho"><SelectValue placeholder="Selecione o concelho..."/></SelectTrigger>
+                  <SelectContent>
+                    {shippingZones.map((z) => (
+                      <SelectItem key={z.name} value={z.name}>
+                        {z.name} · {z.rate > 0 ? `${z.rate.toFixed(2).replace(".", ",")} €` : "Grátis"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div>
                 <Label className="text-xs uppercase tracking-wider text-[#4A5568] mb-1.5 block">Morada de entrega *</Label>
                 <Input required value={form.address} onChange={handle("address")} placeholder="Rua, número, andar" data-testid="checkout-address"/>
               </div>
               <div>
                 <Label className="text-xs uppercase tracking-wider text-[#4A5568] mb-1.5 block">Código Postal *</Label>
-                <Input required value={form.postal_code} onChange={handle("postal_code")} placeholder="3800-XXX" data-testid="checkout-postcode"/>
+                <Input required value={form.postal_code} onChange={handle("postal_code")} placeholder="Ex: 3800-XXX ou 4500-XXX" data-testid="checkout-postcode"/>
                 {postcodeCheck && form.postal_code && (
-                  postcodeCheck.hand_delivery_available ? (
-                    <p className="text-xs text-[#2F855A] mt-1.5 flex items-center gap-1" data-testid="postcode-ok"><Check className="w-3.5 h-3.5"/> Entrega em mão disponível</p>
+                  postcodeCheck.in_aveiro_district ? (
+                    <p className="text-xs text-[#2F855A] mt-1.5 flex items-center gap-1" data-testid="postcode-ok"><Check className="w-3.5 h-3.5"/> Código postal do distrito de Aveiro</p>
                   ) : (
-                    <p className="text-xs text-[#C53030] mt-1.5 flex items-start gap-1" data-testid="postcode-bad">
+                    <p className="text-xs text-[#B85F0E] mt-1.5 flex items-start gap-1" data-testid="postcode-bad">
                       <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0"/>
-                      <span>Fora do distrito de Aveiro. Contacte-nos diretamente em <a href="mailto:tendinhadosaber@gmail.com" className="underline">tendinhadosaber@gmail.com</a> ou +351 961 194 491.</span>
+                      <span>Este código postal não parece ser do distrito de Aveiro. Confirme, por favor. Se está correto e é do distrito, pode continuar na mesma.</span>
                     </p>
                   )
                 )}
+              </div>
+              <div className="flex items-start gap-2 p-3 bg-slate-50 border border-slate-200 rounded text-xs text-slate-600">
+                <MapPin className="w-3.5 h-3.5 text-slate-500 mt-0.5 shrink-0"/>
+                <span>Confirme que o <strong>concelho</strong> e o <strong>código postal</strong> correspondem à morada de entrega.</span>
               </div>
             </div>
           </section>
@@ -165,9 +196,12 @@ export default function CheckoutPage() {
               <div className="flex justify-between"><dt className="text-[#4A5568]">Cadernos</dt><dd>{summary?.subtotal_workbooks?.toFixed(2)}€</dd></div>
               {summary?.discount_workbooks > 0 && <div className="flex justify-between text-[#E07A1F]"><dt>Desconto</dt><dd>−{summary.discount_workbooks.toFixed(2)}€</dd></div>}
               {summary?.lamination_total > 0 && <div className="flex justify-between"><dt className="text-[#4A5568]">Plastificação</dt><dd>{summary.lamination_total.toFixed(2)}€</dd></div>}
-              <div className="flex justify-between"><dt className="text-[#4A5568]">Entrega em mão</dt><dd className="text-[#2F855A]">Grátis</dd></div>
+              <div className="flex justify-between" data-testid="checkout-shipping-line">
+                <dt className="text-[#4A5568]">Entrega em mão {form.concelho && <span className="text-xs text-slate-400">· {form.concelho}</span>}</dt>
+                <dd className={shippingCost === 0 ? "text-[#2F855A]" : ""}>{shippingCost === 0 ? "Grátis" : `${shippingCost.toFixed(2).replace(".", ",")} €`}</dd>
+              </div>
               <div className="flex justify-between text-lg font-display font-medium pt-3 border-t border-[#E2E8F0]">
-                <dt>Total</dt><dd>{summary?.total?.toFixed(2)}€</dd>
+                <dt>Total</dt><dd data-testid="checkout-total">{grandTotal.toFixed(2).replace(".", ",")} €</dd>
               </div>
             </dl>
             <Button type="submit" disabled={submitting} className="w-full mt-6 h-12 bg-[#E07A1F] hover:bg-[#B85F0E] text-white" data-testid="place-order-btn">
