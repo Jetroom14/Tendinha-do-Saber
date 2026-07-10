@@ -36,3 +36,18 @@
 .stock-dot.available { background: #2F855A; }
 .stock-dot.preorder { background: #D69E2E; }
 .stock-dot.unavailable { background: #C53030; }
+
+/* Bloco D — Estilização do conteúdo legal renderizado (Rich text sanitizado) */
+.legal-content h1 { font-size: 1.75rem; font-weight: 500; margin: 2rem 0 1rem; font-family: inherit; }
+.legal-content h2 { font-size: 1.4rem; font-weight: 500; margin: 1.75rem 0 0.75rem; }
+.legal-content h3 { font-size: 1.15rem; font-weight: 600; margin: 1.5rem 0 0.5rem; }
+.legal-content p { margin: 0.75rem 0; }
+.legal-content strong, .legal-content b { font-weight: 600; }
+.legal-content em, .legal-content i { font-style: italic; }
+.legal-content ul { list-style: disc; padding-left: 1.5rem; margin: 0.75rem 0; }
+.legal-content ol { list-style: decimal; padding-left: 1.5rem; margin: 0.75rem 0; }
+.legal-content li { margin: 0.25rem 0; }
+.legal-content a { color: #5A8F1E; text-decoration: underline; text-underline-offset: 2px; }
+.legal-content a:hover { color: #3E6E11; }
+.legal-content blockquote { border-left: 3px solid #E2E8F0; padding-left: 1rem; margin: 1rem 0; color: #4A5568; font-style: italic; }
+.legal-content hr { border: 0; border-top: 1px solid #E2E8F0; margin: 1.5rem 0; }

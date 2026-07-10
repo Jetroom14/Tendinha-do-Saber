@@ -381,13 +381,18 @@ export function AdminOrders() {
     setExporting(true);
     try {
       const selectedOrders = orders.filter(o => selected.has(o.order_no));
-      const headers = ["Encomenda #", "Data", "Cliente", "Email", "Telefone", "Entrega", "Manuais", "Cadernos", "Desconto", "Plastificação", "Envio", "Total", "Estado", "Pagamento"];
+      const headers = ["Encomenda #", "Data", "Cliente", "Email", "Telefone", "NIF", "Nome Fiscal", "Concelho", "Entrega", "Manuais", "Cadernos", "Desconto", "Plastificação", "Envio", "Total", "Estado", "Pagamento"];
       const rows = selectedOrders.map(o => [
         o.order_no,
         new Date(o.created_at).toLocaleDateString("pt-PT"),
         o.customer?.name || "",
         o.customer?.email || "",
         o.customer?.phone || "",
+        // Bloco C: NIF + Nome Fiscal (só preenchidos quando cliente pediu fatura)
+        o.customer?.nif || "",
+        o.customer?.fiscal_name || "",
+        // Bloco B: concelho
+        o.delivery?.concelho || "",
         o.delivery?.method === "hand_delivery" ? "Em mão" : "Envio",
         (o.totals?.manuals || 0).toFixed(2),
         (o.totals?.workbooks || 0).toFixed(2),
