@@ -11,7 +11,18 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import SEO from "@/components/SEO";
 import { toast } from "sonner";
-import { Truck, Check, AlertTriangle, CreditCard, MapPin } from "lucide-react";
+import { Truck, Check, AlertTriangle, CreditCard, MapPin, FileText } from "lucide-react";
+
+// Bloco C: validação NIF PT (algoritmo oficial do dígito de controlo)
+function validatePtNif(nif) {
+  const n = (nif || "").replace(/\D/g, "");
+  if (n.length !== 9 || n[0] === "0") return false;
+  const weights = [9, 8, 7, 6, 5, 4, 3, 2];
+  const sum = weights.reduce((acc, w, i) => acc + parseInt(n[i], 10) * w, 0);
+  const remainder = sum % 11;
+  const check = remainder < 2 ? 0 : 11 - remainder;
+  return check === parseInt(n[8], 10);
+}
 
 export default function CheckoutPage() {
   const { items, summary, promoCode, clear } = useCart();
@@ -26,6 +37,10 @@ export default function CheckoutPage() {
     postal_code: "",
     notes: "",
     accept_terms: false,
+    // Bloco C: fatura com NIF
+    wants_invoice: false,
+    nif: "",
+    fiscal_name: "",
   });
   const [postcodeCheck, setPostcodeCheck] = useState(null);
   const [shippingZones, setShippingZones] = useState([]);   // Bloco B
@@ -65,6 +80,17 @@ export default function CheckoutPage() {
       toast.error("Aceite os termos para continuar");
       return;
     }
+    // Bloco C: validação NIF quando fatura pedida
+    if (form.wants_invoice) {
+      if (!validatePtNif(form.nif)) {
+        toast.error("NIF inválido, verifique.");
+        return;
+      }
+      if (!form.fiscal_name.trim()) {
+        toast.error("Indique o nome fiscal (quem levará a fatura).");
+        return;
+      }
+    }
     setSubmitting(true);
     try {
       const { data } = await api.post("/orders", {
@@ -78,6 +104,9 @@ export default function CheckoutPage() {
         address: form.address,
         postal_code: form.postal_code,
         notes: form.notes,
+        wants_invoice: form.wants_invoice,
+        nif: form.wants_invoice ? form.nif.replace(/\D/g, "") : null,
+        fiscal_name: form.wants_invoice ? form.fiscal_name.trim() : null,
       });
       toast.success(`Encomenda ${data.order_no} criada!`);
       clear();
@@ -127,9 +156,7 @@ export default function CheckoutPage() {
                   <SelectTrigger data-testid="checkout-concelho"><SelectValue placeholder="Selecione o concelho..."/></SelectTrigger>
                   <SelectContent>
                     {shippingZones.map((z) => (
-                      <SelectItem key={z.name} value={z.name}>
-                        {z.name} · {z.rate > 0 ? `${z.rate.toFixed(2).replace(".", ",")} €` : "Grátis"}
-                      </SelectItem>
+                      <SelectItem key={z.name} value={z.name}>{z.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -157,6 +184,56 @@ export default function CheckoutPage() {
                 <span>Confirme que o <strong>concelho</strong> e o <strong>código postal</strong> correspondem à morada de entrega.</span>
               </div>
             </div>
+          </section>
+
+          {/* Bloco C — Fatura com NIF */}
+          <section className="bg-white border border-[#E2E8F0] rounded-md p-6" data-testid="invoice-section">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <Checkbox
+                checked={form.wants_invoice}
+                onCheckedChange={(v) => setForm({...form, wants_invoice: !!v, nif: v ? form.nif : "", fiscal_name: v ? form.fiscal_name : ""})}
+                data-testid="checkout-wants-invoice"
+              />
+              <span className="flex-1">
+                <span className="flex items-center gap-2 font-display font-medium text-[#1A202C]">
+                  <FileText className="w-4 h-4 text-[#5A8F1E]" strokeWidth={1.5}/>
+                  Quero fatura com NIF (contribuinte)
+                </span>
+                <span className="block text-xs text-[#4A5568] mt-1">
+                  Recolhemos os dados de faturação; a fatura será emitida manualmente e enviada por email.
+                </span>
+              </span>
+            </label>
+            {form.wants_invoice && (
+              <div className="mt-5 grid sm:grid-cols-2 gap-4" data-testid="invoice-fields">
+                <div>
+                  <Label className="text-xs uppercase tracking-wider text-[#4A5568] mb-1.5 block">NIF *</Label>
+                  <Input
+                    value={form.nif}
+                    onChange={(e) => setForm({...form, nif: e.target.value.replace(/\D/g, "").slice(0, 9)})}
+                    inputMode="numeric"
+                    placeholder="9 dígitos"
+                    className={`font-mono ${form.nif && !validatePtNif(form.nif) ? "border-rose-400" : ""}`}
+                    data-testid="checkout-nif"
+                  />
+                  {form.nif && !validatePtNif(form.nif) && (
+                    <p className="text-xs text-rose-600 mt-1" data-testid="nif-error">NIF inválido, verifique.</p>
+                  )}
+                  {form.nif && validatePtNif(form.nif) && (
+                    <p className="text-xs text-emerald-700 mt-1 flex items-center gap-1" data-testid="nif-ok"><Check className="w-3 h-3"/> NIF válido</p>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-xs uppercase tracking-wider text-[#4A5568] mb-1.5 block">Nome fiscal *</Label>
+                  <Input
+                    value={form.fiscal_name}
+                    onChange={(e) => setForm({...form, fiscal_name: e.target.value})}
+                    placeholder="Nome de quem levará a fatura"
+                    data-testid="checkout-fiscal-name"
+                  />
+                </div>
+              </div>
+            )}
           </section>
 
           <section className="bg-white border border-[#E2E8F0] rounded-md p-6">

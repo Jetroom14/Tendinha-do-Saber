@@ -33,6 +33,7 @@ import { AdminVouchers, AdminOrders, AdminPartners, AdminLogs, AdminSettings, Ad
 import { AdminCategories, AdminCustomers, AdminPromoCodes, AdminReports, AdminContent } from "@/pages/admin/AdminExtra";
 import AdminBrand from "@/pages/admin/AdminBrand";
 import AdminShipping from "@/pages/admin/AdminShipping";
+import AdminLegal from "@/pages/admin/AdminLegal";
 
 const Site = ({ children }) => (
   <SiteLayout>{children}</SiteLayout>
@@ -82,6 +83,7 @@ function App() {
               <Route path="codigos" element={<AdminPromoCodes/>}/>
               <Route path="parceiros" element={<AdminPartners/>}/>
               <Route path="conteudo" element={<AdminContent/>}/>
+              <Route path="legal" element={<AdminLegal/>}/>
               <Route path="brand" element={<AdminBrand/>}/>
               <Route path="relatorios" element={<AdminReports/>}/>
               <Route path="logs" element={<AdminLogs/>}/>

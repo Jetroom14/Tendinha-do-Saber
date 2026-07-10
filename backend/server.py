@@ -324,6 +324,10 @@ class OrderCreateIn(BaseModel):
     address: Optional[str] = ""
     postal_code: Optional[str] = ""
     notes: Optional[str] = ""
+    # Bloco C: dados de faturação (opcionais; obrigatórios apenas quando o cliente pede fatura com NIF)
+    wants_invoice: Optional[bool] = False
+    nif: Optional[str] = None
+    fiscal_name: Optional[str] = None
 
 class SettingIn(BaseModel):
     lamination_price: Optional[float] = None
@@ -1676,6 +1680,24 @@ def _postcode_in_aveiro_district(code: str) -> bool:
     return clean[:2] in _AVEIRO_DISTRICT_POSTCODE_PREFIXES
 
 
+# Bloco C: validação do NIF português (algoritmo oficial do dígito de controlo)
+def validate_pt_nif(nif: str) -> bool:
+    """Devolve True se o NIF for válido (9 dígitos + dígito de controlo módulo 11).
+    Fórmula oficial:  soma = d1*9 + d2*8 + d3*7 + d4*6 + d5*5 + d6*4 + d7*3 + d8*2
+                       resto = soma % 11
+                       controlo = 0 se resto ∈ {0,1} ; caso contrário 11-resto
+    O primeiro dígito também tem de estar entre 1-9 (não pode começar em 0).
+    """
+    n = re.sub(r"[^0-9]", "", nif or "")
+    if len(n) != 9 or n[0] == "0":
+        return False
+    weights = [9, 8, 7, 6, 5, 4, 3, 2]
+    total = sum(int(n[i]) * weights[i] for i in range(8))
+    remainder = total % 11
+    check = 0 if remainder < 2 else 11 - remainder
+    return check == int(n[8])
+
+
 # ------------ Shipping rates endpoints (Bloco B) ------------
 
 @api.get("/shipping/zones")
@@ -1720,12 +1742,111 @@ async def admin_put_shipping_rates(payload: ShippingRatesIn, admin: dict = Depen
     return {"rates": await _get_shipping_rates()}
 
 
+# ------------ Legal pages (Bloco D) ------------
+
+LEGAL_SLUGS = ("privacidade", "termos", "ral")
+LEGAL_TITLES = {
+    "privacidade": "Política de Privacidade",
+    "termos": "Termos e Condições",
+    "ral": "Resolução Alternativa de Litígios",
+}
+
+# Tags permitidas no HTML do editor rico (Bloco D2). Qualquer <script>, on*, style
+# malicioso é removido. Bleach lida com todo o clean-up.
+_LEGAL_ALLOWED_TAGS = [
+    "h1", "h2", "h3", "h4", "h5", "h6",
+    "p", "br", "hr",
+    "strong", "b", "em", "i", "u", "s", "del", "ins",
+    "ul", "ol", "li",
+    "blockquote", "code", "pre",
+    "a", "span", "div",
+]
+_LEGAL_ALLOWED_ATTRS = {
+    "a": ["href", "title", "target", "rel"],
+    "*": [],
+}
+
+
+def _sanitize_legal_html(html: str) -> str:
+    """Bloco D: sanitização defensiva. Remove <script>, event handlers e
+    atributos perigosos. Ainda que o editor seja admin (confiável), evita
+    danos acidentais e blinda contra XSS caso um dia haja um sub-admin."""
+    import bleach
+    return bleach.clean(
+        html or "",
+        tags=_LEGAL_ALLOWED_TAGS,
+        attributes=_LEGAL_ALLOWED_ATTRS,
+        strip=True,
+    )
+
+
+class LegalPageIn(BaseModel):
+    content_html: str
+
+
+@api.get("/legal/{slug}")
+async def public_legal_page(slug: str):
+    """Público: usado pelas páginas /legal/{slug} do site."""
+    if slug not in LEGAL_SLUGS:
+        raise HTTPException(404, "Página desconhecida")
+    doc = await db.legal_pages.find_one({"slug": slug}, {"_id": 0}) or {}
+    return {
+        "slug": slug,
+        "title": LEGAL_TITLES[slug],
+        "content_html": doc.get("content_html") or "",
+        "updated_at": doc.get("updated_at"),
+    }
+
+
+@api.get("/admin/legal")
+async def admin_legal_list(admin: dict = Depends(require_admin)):
+    """Devolve as 3 páginas legais (mesmo que ainda não tenham conteúdo)."""
+    docs = {d["slug"]: d async for d in db.legal_pages.find({}, {"_id": 0})}
+    return {
+        "pages": [
+            {
+                "slug": s,
+                "title": LEGAL_TITLES[s],
+                "content_html": docs.get(s, {}).get("content_html", ""),
+                "updated_at": docs.get(s, {}).get("updated_at"),
+            }
+            for s in LEGAL_SLUGS
+        ]
+    }
+
+
+@api.put("/admin/legal/{slug}")
+async def admin_legal_save(slug: str, payload: LegalPageIn, admin: dict = Depends(require_manager)):
+    if slug not in LEGAL_SLUGS:
+        raise HTTPException(404, "Página desconhecida")
+    clean = _sanitize_legal_html(payload.content_html)
+    await db.legal_pages.update_one(
+        {"slug": slug},
+        {"$set": {
+            "slug": slug,
+            "content_html": clean,
+            "updated_at": iso(now_utc()),
+            "updated_by": admin["id"],
+        }},
+        upsert=True,
+    )
+    await log_action(admin["id"], "update", "legal_page", slug, {"len": len(clean)})
+    return {"ok": True, "slug": slug, "content_html": clean}
+
+
 # ---------- Orders ----------
 @api.post("/orders")
 async def create_order(payload: OrderCreateIn):
     summary = await _compute_cart(payload.items, payload.promo_code)
     if not summary["lines"]:
         raise HTTPException(400, "Carrinho vazio ou livros indisponíveis")
+
+    # Bloco C: se pediu fatura com NIF, valida NIF PT + exige nome fiscal
+    if payload.wants_invoice:
+        if not validate_pt_nif(payload.nif or ""):
+            raise HTTPException(400, "NIF inválido, verifique.")
+        if not (payload.fiscal_name or "").strip():
+            raise HTTPException(400, "Nome fiscal em falta.")
 
     shipping_cost = 0.0
     delivery_concelho = (payload.delivery_concelho or "").strip() or None
@@ -1775,6 +1896,10 @@ async def create_order(payload: OrderCreateIn):
             "name": payload.customer_name,
             "email": payload.customer_email.lower(),
             "phone": payload.customer_phone,
+            # Bloco C: dados de faturação (guardados sempre, mesmo quando não pediu fatura)
+            "wants_invoice": bool(payload.wants_invoice),
+            "nif": (payload.nif or "").strip() if payload.wants_invoice else None,
+            "fiscal_name": (payload.fiscal_name or "").strip() if payload.wants_invoice else None,
         },
         "delivery": {
             "method": payload.delivery_method,
