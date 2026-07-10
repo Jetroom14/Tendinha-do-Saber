@@ -1681,15 +1681,28 @@ def _postcode_in_aveiro_district(code: str) -> bool:
 
 
 # Bloco C: validação do NIF português (algoritmo oficial do dígito de controlo)
+# Primeiros dígitos válidos, oficiais:
+#   1, 2, 3 → pessoas singulares
+#   5       → pessoas coletivas (empresas)
+#   6       → administração pública
+#   8       → empresário em nome individual
+#   9       → outras pessoas coletivas (associações, etc.)
+# 4 e 7 NÃO são atribuídos como 1.º dígito de NIFs regulares em Portugal.
+_VALID_NIF_FIRST_DIGITS = {"1", "2", "3", "5", "6", "8", "9"}
+
+
 def validate_pt_nif(nif: str) -> bool:
-    """Devolve True se o NIF for válido (9 dígitos + dígito de controlo módulo 11).
-    Fórmula oficial:  soma = d1*9 + d2*8 + d3*7 + d4*6 + d5*5 + d6*4 + d7*3 + d8*2
-                       resto = soma % 11
-                       controlo = 0 se resto ∈ {0,1} ; caso contrário 11-resto
-    O primeiro dígito também tem de estar entre 1-9 (não pode começar em 0).
+    """Devolve True se o NIF for válido segundo o algoritmo oficial:
+    1) exatamente 9 dígitos numéricos
+    2) o 1.º dígito ∈ {1,2,3,5,6,8,9}
+    3) checksum mód 11 sobre os primeiros 8 dígitos com pesos 9..2
+       - se resto < 2  ⇒ dígito de controlo esperado = 0
+       - caso contrário ⇒ dígito de controlo esperado = 11 − resto
     """
     n = re.sub(r"[^0-9]", "", nif or "")
-    if len(n) != 9 or n[0] == "0":
+    if len(n) != 9:
+        return False
+    if n[0] not in _VALID_NIF_FIRST_DIGITS:
         return False
     weights = [9, 8, 7, 6, 5, 4, 3, 2]
     total = sum(int(n[i]) * weights[i] for i in range(8))

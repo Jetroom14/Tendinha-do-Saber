@@ -13,10 +13,14 @@ import SEO from "@/components/SEO";
 import { toast } from "sonner";
 import { Truck, Check, AlertTriangle, CreditCard, MapPin, FileText } from "lucide-react";
 
-// Bloco C: validação NIF PT (algoritmo oficial do dígito de controlo)
+// Bloco C: validação NIF PT (algoritmo oficial do dígito de controlo).
+// 1º dígito válido: 1,2,3 (singulares), 5 (empresas), 6 (adm. pública),
+// 8 (ENI), 9 (outras coletivas). 4 e 7 não são atribuídos oficialmente.
+const NIF_FIRST_DIGITS = new Set(["1", "2", "3", "5", "6", "8", "9"]);
 function validatePtNif(nif) {
   const n = (nif || "").replace(/\D/g, "");
-  if (n.length !== 9 || n[0] === "0") return false;
+  if (n.length !== 9) return false;
+  if (!NIF_FIRST_DIGITS.has(n[0])) return false;
   const weights = [9, 8, 7, 6, 5, 4, 3, 2];
   const sum = weights.reduce((acc, w, i) => acc + parseInt(n[i], 10) * w, 0);
   const remainder = sum % 11;
