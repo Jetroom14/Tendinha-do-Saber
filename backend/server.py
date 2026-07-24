@@ -1009,7 +1009,17 @@ async def import_book_links(file: UploadFile = File(...), admin: dict = Depends(
             skipped.append({"line": line_no, "reason": f"manual com ISBN '{isbn}' não existe"})
             continue
         # Ligação bidirecional. O caderno guarda o ID do manual e vice-versa.
-        # (Reescreve sempre — idempotente por design.)
+        # Antes de escrever, limpar ligações reversas obsoletas noutros livros
+        # que apontassem para este par (caso a associação tenha mudado numa
+        # corrida anterior). Torna o import verdadeiramente idempotente.
+        await db.books.update_many(
+            {"related_book_id": manual["id"], "id": {"$nin": [caderno["id"], manual["id"]]}},
+            {"$unset": {"related_book_id": ""}},
+        )
+        await db.books.update_many(
+            {"related_book_id": caderno["id"], "id": {"$nin": [caderno["id"], manual["id"]]}},
+            {"$unset": {"related_book_id": ""}},
+        )
         await db.books.update_one({"id": caderno["id"]}, {"$set": {"related_book_id": manual["id"]}})
         await db.books.update_one({"id": manual["id"]}, {"$set": {"related_book_id": caderno["id"]}})
         linked += 1
