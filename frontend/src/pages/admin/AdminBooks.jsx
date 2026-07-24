@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Trash2, Plus, Search, Image, RefreshCw, CheckCircle2 } from "lucide-react";
+import { Pencil, Trash2, Plus, Search, Image, RefreshCw, CheckCircle2, Download, Link2 } from "lucide-react";
 import { toast } from "sonner";
 
 const BLANK = { isbn13: "", pe_code: "", slug: "", related_book_id: "", title: "", author: "", publisher: "", subject: "", year: 2025, price: 0, type: "Manual", status: "Available", stock_qty: 0, synopsis: "", image_url: "", is_lamination_eligible: true };
@@ -79,6 +79,42 @@ export default function AdminBooks() {
     toast.success("Livro eliminado"); fetchBooks();
   };
 
+  // Bloco B — Exportar TODOS os livros para Excel (via backend, formato texto no ISBN)
+  const exportBooks = async () => {
+    try {
+      const res = await api.get("/admin/books/export", { responseType: "blob" });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = url;
+      const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+      a.download = `livros-tendinha-${today}.xlsx`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      toast.success("Ficheiro descarregado");
+    } catch { toast.error("Erro ao exportar"); }
+  };
+
+  // Bloco C — Importar ligações caderno↔manual a partir de um Excel "Ligacoes"
+  const importLinks = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const { data } = await api.post("/admin/books/links/import", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      const msg = `Ligações criadas/atualizadas: ${data.linked}` + (data.skipped_count > 0 ? ` · Saltadas: ${data.skipped_count}` : "");
+      toast.success(msg);
+      if (data.skipped_count > 0) {
+        console.info("[Ligações saltadas]", data.skipped);
+      }
+      fetchBooks();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Erro ao importar ligações");
+    } finally {
+      e.target.value = "";
+    }
+  };
+
   return (
     <div className="p-8" data-testid="admin-books">
       <div className="flex items-center justify-between mb-6">
@@ -87,6 +123,11 @@ export default function AdminBooks() {
           <h1 className="font-display text-3xl font-medium text-slate-900">Livros</h1>
         </div>
         <Button onClick={openCreate} className="bg-[#5A8F1E] hover:bg-[#3E6E11] text-white" data-testid="add-book-btn"><Plus className="w-4 h-4 mr-2"/>Novo livro</Button>
+        <Button onClick={exportBooks} variant="outline" className="ml-2" data-testid="export-books-btn"><Download className="w-4 h-4 mr-2"/>Exportar livros</Button>
+        <label className="ml-2 inline-flex" data-testid="import-links-wrap">
+          <Button variant="outline" asChild><span><Link2 className="w-4 h-4 mr-2"/>Importar ligações</span></Button>
+          <input type="file" accept=".xlsx,.xls" className="hidden" onChange={importLinks} data-testid="import-links-input"/>
+        </label>
       </div>
 
       {/* Cover sync panel */}

@@ -881,6 +881,418 @@ async def import_books_commit(payload: ImportCommitIn, admin: dict = Depends(req
     return {"created": created, "updated": updated}
 
 
+# ============================================================
+# BLOCO B — Exportar livros para Excel
+# ============================================================
+@api.get("/admin/books/export")
+async def export_books_xlsx(admin: dict = Depends(require_admin)):
+    """Exporta TODOS os livros para .xlsx (openpyxl). ISBN e Código PE ficam
+    formatados como texto para preservar zeros à esquerda (05000072 fica intacto)."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment
+    from fastapi.responses import StreamingResponse
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Livros"
+    headers = [
+        "ISBN", "Código PE", "Slug", "Título", "Autor(es)", "Editora",
+        "Disciplina", "Ano", "Ciclo de Ensino", "Tipo/Artigo",
+        "PVP (€)", "Stock", "URL da capa", "ID interno",
+    ]
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal="left")
+
+    # Forçar coluna ISBN e Código PE como TEXTO para preservar zeros à esquerda
+    ws.column_dimensions["A"].number_format = "@"  # ISBN
+    ws.column_dimensions["B"].number_format = "@"  # Código PE
+
+    async for b in db.books.find({}, {"_id": 0}).sort("title", 1):
+        features = b.get("features") or {}
+        row = [
+            str(b.get("isbn13") or ""),
+            str(b.get("pe_code") or ""),
+            str(b.get("slug") or ""),
+            b.get("title") or "",
+            b.get("author") or "",
+            b.get("publisher") or "",
+            b.get("subject") or "",
+            b.get("year") or features.get("grade") or "",
+            features.get("cycle") or "",
+            "Caderno" if b.get("type") == "Workbook" else "Manual",
+            float(b.get("price") or 0),
+            int(b.get("stock_qty") or 0),
+            b.get("image_url") or "",
+            b.get("id") or "",
+        ]
+        ws.append(row)
+        # Reforçar formato texto célula a célula (algumas versões do Excel ignoram
+        # o formato de coluna se o valor "parece" numérico)
+        r = ws.max_row
+        ws.cell(row=r, column=1).number_format = "@"
+        ws.cell(row=r, column=2).number_format = "@"
+
+    # Auto-fit razoável nas colunas
+    for i, col in enumerate(ws.columns, start=1):
+        max_len = max((len(str(c.value)) for c in col if c.value is not None), default=10)
+        ws.column_dimensions[chr(64 + i)].width = min(max(max_len + 2, 12), 40)
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    await log_action(admin["id"], "export", "books", None, {"count": ws.max_row - 1})
+    filename = f"livros-tendinha-{now_utc().strftime('%Y%m%d')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ============================================================
+# BLOCO C — Importação de ligações manual↔caderno
+# ============================================================
+@api.post("/admin/books/links/import")
+async def import_book_links(file: UploadFile = File(...), admin: dict = Depends(require_admin)):
+    """Importa ligações caderno→manual a partir de um Excel com uma folha "Ligacoes".
+    Colunas: Código PE (caderno) | Caderno | Ano | Disciplina | ISBN (manual) | Manual | Confianca
+    Repetível — corrida nova atualiza (não duplica).
+    """
+    content = await file.read()
+    try:
+        # Tentar folha "Ligacoes"; se não existir, usa a primeira
+        try:
+            df = pd.read_excel(BytesIO(content), sheet_name="Ligacoes")
+        except Exception:
+            df = pd.read_excel(BytesIO(content))
+    except Exception as e:
+        raise HTTPException(400, f"Falha ao ler ficheiro: {e}")
+
+    df.columns = [str(c).strip().lower() for c in df.columns]
+    col_map = {
+        "código pe (caderno)": "pe_code", "codigo pe (caderno)": "pe_code",
+        "código pe": "pe_code", "codigo pe": "pe_code",
+        "isbn (manual)": "isbn13", "isbn": "isbn13",
+    }
+    df.rename(columns={k: v for k, v in col_map.items() if k in df.columns}, inplace=True)
+
+    linked = 0
+    skipped: List[dict] = []
+    for idx, row in df.iterrows():
+        line_no = int(idx) + 2
+
+        def clean(v):
+            if v is None: return ""
+            try:
+                import pandas as _pd
+                if _pd.isna(v): return ""
+            except Exception:
+                pass
+            s = str(v).strip()
+            if s.lower() in ("nan", "none", "nat"): return ""
+            if s.endswith(".0") and s[:-2].isdigit(): s = s[:-2]
+            return s
+
+        pe = clean(row.get("pe_code", ""))
+        isbn = strip_isbn(clean(row.get("isbn13", "")))
+        if not pe or not isbn:
+            skipped.append({"line": line_no, "reason": "sem pe_code ou sem isbn"})
+            continue
+        caderno = await db.books.find_one({"pe_code": pe}, {"_id": 0, "id": 1, "title": 1})
+        manual = await db.books.find_one({"isbn13": isbn}, {"_id": 0, "id": 1, "title": 1})
+        if not caderno:
+            skipped.append({"line": line_no, "reason": f"caderno com pe_code '{pe}' não existe"})
+            continue
+        if not manual:
+            skipped.append({"line": line_no, "reason": f"manual com ISBN '{isbn}' não existe"})
+            continue
+        # Ligação bidirecional. O caderno guarda o ID do manual e vice-versa.
+        # (Reescreve sempre — idempotente por design.)
+        await db.books.update_one({"id": caderno["id"]}, {"$set": {"related_book_id": manual["id"]}})
+        await db.books.update_one({"id": manual["id"]}, {"$set": {"related_book_id": caderno["id"]}})
+        linked += 1
+
+    await log_action(admin["id"], "import", "book_links", None, {"linked": linked, "skipped": len(skipped)})
+    return {"linked": linked, "skipped_count": len(skipped), "skipped": skipped[:200]}
+
+
+# ============================================================
+# BLOCO C — Sugestão de caderno no carrinho
+# ============================================================
+@api.post("/cart/related-workbooks")
+async def cart_related_workbooks(payload: PromoValidateIn):
+    """Dado um carrinho (items com isbn13/slug/pe_code), devolve os cadernos
+    associados aos manuais que estão no carrinho — SEM incluir cadernos que
+    o cliente já tem no carrinho. Só sugestão, nunca automático."""
+    # 1. Resolver cada item para o livro real, e coletar ids em carrinho
+    in_cart_ids: set = set()
+    manuals_in_cart: List[dict] = []
+    for it in payload.items:
+        book = await _find_book_by_key(it.isbn13)
+        if not book:
+            continue
+        in_cart_ids.add(book["id"])
+        if book.get("type") == "Manual" and book.get("related_book_id"):
+            manuals_in_cart.append(book)
+    # 2. Para cada manual, buscar caderno associado
+    suggestions: List[dict] = []
+    seen: set = set()
+    for m in manuals_in_cart:
+        related_id = m.get("related_book_id")
+        if not related_id or related_id in in_cart_ids or related_id in seen:
+            continue
+        caderno = await db.books.find_one(
+            {"id": related_id, "type": "Workbook", "status": {"$ne": "Unavailable"}},
+            {"_id": 0},
+        )
+        if not caderno:
+            continue
+        seen.add(related_id)
+        suggestions.append({
+            "manual_id": m["id"],
+            "manual_title": m.get("title"),
+            "workbook": {
+                "isbn13": caderno.get("isbn13") or "",
+                "slug": caderno.get("slug") or "",
+                "id": caderno["id"],
+                "title": caderno.get("title", ""),
+                "author": caderno.get("author", ""),
+                "publisher": caderno.get("publisher", ""),
+                "price": float(caderno.get("price", 0) or 0),
+                "image_url": caderno.get("image_url", ""),
+            },
+        })
+    return {"suggestions": suggestions}
+
+
+# ============================================================
+# BLOCO D — Adoções escolares por ano letivo
+# ============================================================
+class AdoptionsSchoolYearIn(BaseModel):
+    school_year: Optional[str] = None
+
+
+async def _get_active_school_year() -> Optional[str]:
+    """Ano letivo actualmente activo (o que o site público mostra)."""
+    settings = await db.settings.find_one({"id": "global"}, {"_id": 0, "adoptions_active_year": 1}) or {}
+    year = settings.get("adoptions_active_year")
+    if year:
+        return year
+    # Fallback: pega o ano letivo mais recente disponível em adoções
+    doc = await db.school_adoptions.find_one({}, sort=[("school_year", -1)])
+    return doc.get("school_year") if doc else None
+
+
+@api.get("/admin/adoptions/years")
+async def admin_list_adoption_years(admin: dict = Depends(require_admin)):
+    years = await db.school_adoptions.distinct("school_year")
+    years.sort(reverse=True)
+    counts = {}
+    for y in years:
+        counts[y] = await db.school_adoptions.count_documents({"school_year": y})
+    active = await _get_active_school_year()
+    return {"years": [{"year": y, "count": counts[y]} for y in years], "active": active}
+
+
+@api.put("/admin/adoptions/active-year")
+async def admin_set_active_year(payload: AdoptionsSchoolYearIn, admin: dict = Depends(require_manager)):
+    """Escolhe qual o ano letivo activo (o que o site público mostra)."""
+    year = (payload.school_year or "").strip() or None
+    await db.settings.update_one(
+        {"id": "global"},
+        {"$set": {"adoptions_active_year": year, "id": "global"}},
+        upsert=True,
+    )
+    await log_action(admin["id"], "update", "adoptions_active_year", None, {"year": year})
+    return {"active": year}
+
+
+@api.post("/admin/adoptions/import")
+async def import_adoptions(
+    file: UploadFile = File(...),
+    school_year: str = Form(...),
+    admin: dict = Depends(require_admin),
+):
+    """Importa adoções DGE. Corrida com o mesmo `school_year` SUBSTITUI só esse
+    ano letivo (delete_many restrito ao ano) — não toca noutros anos guardados."""
+    if not school_year or "/" not in school_year:
+        raise HTTPException(400, "Indique o ano letivo no formato AAAA/AAAA, ex: 2026/2027")
+    content = await file.read()
+    try:
+        df = pd.read_excel(BytesIO(content))
+    except Exception as e:
+        raise HTTPException(400, f"Falha ao ler Excel: {e}")
+
+    df.columns = [str(c).strip().lower() for c in df.columns]
+    col_map = {
+        "código escola": "codigo_escola", "codigo escola": "codigo_escola",
+        "ano": "grade", "ano de escolaridade": "grade",
+        "título": "title", "titulo": "title",
+    }
+    df.rename(columns={k: v for k, v in col_map.items() if k in df.columns}, inplace=True)
+
+    def clean(v):
+        if v is None: return ""
+        try:
+            import pandas as _pd
+            if _pd.isna(v): return ""
+        except Exception: pass
+        s = str(v).strip()
+        if s.lower() in ("nan", "none", "nat"): return ""
+        if s.endswith(".0") and s[:-2].isdigit(): s = s[:-2]
+        return s
+
+    # 1) Apagar SÓ este ano letivo (nunca toca noutros)
+    prev = await db.school_adoptions.count_documents({"school_year": school_year})
+    if prev > 0:
+        await db.school_adoptions.delete_many({"school_year": school_year})
+
+    # 2) Reunir catálogo pelo ISBN uma vez para performance
+    known_isbns = set(await db.books.distinct("isbn13", {"isbn13": {"$type": "string", "$gt": ""}}))
+
+    # 3) Inserir por lotes (mantém memória controlada e não bloqueia loop)
+    BATCH = 1000
+    docs: List[dict] = []
+    total = 0
+    matched = 0
+    missing: dict = {}  # isbn -> title (para reporte)
+
+    for _, row in df.iterrows():
+        isbn = strip_isbn(clean(row.get("isbn13", "") or row.get("isbn", "")))
+        if len(isbn) != 13:
+            continue
+        title = clean(row.get("title", ""))
+        in_catalog = isbn in known_isbns
+        if in_catalog:
+            matched += 1
+        else:
+            if isbn not in missing:
+                missing[isbn] = title
+        docs.append({
+            "school_year": school_year,
+            "concelho": clean(row.get("concelho", "")),
+            "agrupamento": clean(row.get("agrupamento", "")),
+            "codigo_escola": clean(row.get("codigo_escola", "")),
+            "escola": clean(row.get("escola", "")),
+            "grade": clean(row.get("grade", "")),
+            "subject": clean(row.get("disciplina", "")),
+            "isbn13": isbn,
+            "title": title,
+            "publisher": clean(row.get("editora", "")),
+            "in_catalog": in_catalog,
+        })
+        total += 1
+        if len(docs) >= BATCH:
+            await db.school_adoptions.insert_many(docs)
+            docs = []
+    if docs:
+        await db.school_adoptions.insert_many(docs)
+
+    # 4) Se este é o único ano com dados, activa-o
+    settings = await db.settings.find_one({"id": "global"}, {"_id": 0, "adoptions_active_year": 1}) or {}
+    if not settings.get("adoptions_active_year"):
+        await db.settings.update_one(
+            {"id": "global"},
+            {"$set": {"adoptions_active_year": school_year, "id": "global"}},
+            upsert=True,
+        )
+
+    await log_action(admin["id"], "import", "adoptions", None, {"school_year": school_year, "total": total, "matched": matched, "missing": len(missing)})
+    return {
+        "school_year": school_year,
+        "previous_replaced": prev,
+        "total": total,
+        "matched": matched,
+        "missing_count": len(missing),
+        "missing_sample": [{"isbn13": k, "title": v} for k, v in list(missing.items())[:100]],
+    }
+
+
+# ---------- Adoções — endpoints públicos (para o dropdown em cascata) ----------
+@api.get("/adoptions/concelhos")
+async def adoptions_concelhos():
+    year = await _get_active_school_year()
+    if not year:
+        return {"concelhos": [], "active_year": None}
+    concelhos = await db.school_adoptions.distinct("concelho", {"school_year": year})
+    concelhos = sorted([c for c in concelhos if c])
+    return {"concelhos": concelhos, "active_year": year}
+
+
+@api.get("/adoptions/schools")
+async def adoptions_schools(concelho: str):
+    year = await _get_active_school_year()
+    if not year:
+        return {"schools": [], "active_year": None}
+    schools = await db.school_adoptions.distinct(
+        "escola", {"school_year": year, "concelho": concelho}
+    )
+    schools = sorted([s for s in schools if s])
+    return {"schools": schools, "active_year": year}
+
+
+@api.get("/adoptions/grades")
+async def adoptions_grades(concelho: str, escola: str):
+    year = await _get_active_school_year()
+    if not year:
+        return {"grades": [], "active_year": None}
+    grades = await db.school_adoptions.distinct(
+        "grade", {"school_year": year, "concelho": concelho, "escola": escola}
+    )
+    # Ordenação natural (1.º, 2.º, ..., 12.º)
+    def sort_key(g):
+        m = re.match(r"(\d+)", g or "")
+        return (int(m.group(1)) if m else 999, g or "")
+    grades = sorted([g for g in grades if g], key=sort_key)
+    return {"grades": grades, "active_year": year}
+
+
+@api.get("/adoptions/books")
+async def adoptions_books(concelho: str, escola: str, grade: str):
+    """Devolve os manuais adotados para uma escola/ano, com dados do catálogo
+    quando existem (preço, ID) ou apenas título quando não estão."""
+    year = await _get_active_school_year()
+    if not year:
+        raise HTTPException(404, "Não há adoções ativas.")
+    cursor = db.school_adoptions.find(
+        {"school_year": year, "concelho": concelho, "escola": escola, "grade": grade},
+        {"_id": 0},
+    ).sort("subject", 1)
+    adoptions: List[dict] = []
+    isbns: set = set()
+    async for a in cursor:
+        adoptions.append(a)
+        isbns.add(a["isbn13"])
+    # Enriquecer com dados do catálogo
+    catalog = {}
+    if isbns:
+        async for b in db.books.find({"isbn13": {"$in": list(isbns)}}, {"_id": 0}):
+            catalog[b["isbn13"]] = b
+    result = []
+    for a in adoptions:
+        b = catalog.get(a["isbn13"])
+        result.append({
+            "isbn13": a["isbn13"],
+            "subject": a.get("subject") or "Sem disciplina",
+            "title": (b.get("title") if b else a.get("title")) or "",
+            "publisher": (b.get("publisher") if b else a.get("publisher")) or "",
+            "in_catalog": bool(b),
+            "price": float(b.get("price", 0)) if b else None,
+            "slug": b.get("slug") if b else None,
+            "image_url": b.get("image_url") if b else None,
+            "status": b.get("status") if b else None,
+        })
+    return {
+        "school_year": year,
+        "concelho": concelho,
+        "escola": escola,
+        "grade": grade,
+        "books": result,
+    }
+
+
 @api.post("/admin/schools/import")
 async def import_schools(file: UploadFile = File(...), admin: dict = Depends(require_super_admin)):
     """Importa escolas e anos a partir de um ficheiro Excel.
