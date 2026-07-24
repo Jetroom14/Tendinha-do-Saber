@@ -10,9 +10,10 @@ import { toast } from "sonner";
 import { ShoppingBag, X, Trash2, Tag, Check, ArrowRight } from "lucide-react";
 
 export default function CartPage() {
-  const { items, summary, promoCode, setPromoCode, remove, setQty, toggleLamination, recompute } = useCart();
+  const { items, summary, promoCode, setPromoCode, add, remove, setQty, toggleLamination, recompute } = useCart();
   const [promoInput, setPromoInput] = useState(promoCode || "");
   const [bookMap, setBookMap] = useState({});
+  const [workbookSuggestions, setWorkbookSuggestions] = useState([]);   // Bloco C2
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -23,6 +24,19 @@ export default function CartPage() {
         setBookMap(map);
       });
   }, [items]);
+
+  // Bloco C2 — pedir ao backend as sugestões de caderno para os manuais no carrinho
+  useEffect(() => {
+    if (items.length === 0) { setWorkbookSuggestions([]); return; }
+    api.post("/cart/related-workbooks", { items, promo_code: promoCode || null })
+      .then((r) => setWorkbookSuggestions(r.data.suggestions || []))
+      .catch(() => setWorkbookSuggestions([]));
+  }, [items, promoCode]);
+
+  const addSuggestedWorkbook = (isbn13) => {
+    add(isbn13, 1);
+    toast.success("Caderno adicionado ao carrinho");
+  };
 
   const applyPromo = async () => {
     setPromoCode(promoInput.trim().toUpperCase());
@@ -91,6 +105,32 @@ export default function CartPage() {
               </div>
             );
           })}
+
+          {/* Bloco C2 — Sugestões discretas de caderno associado */}
+          {workbookSuggestions.length > 0 && (
+            <div className="space-y-2" data-testid="workbook-suggestions">
+              {workbookSuggestions.map((s) => (
+                <div key={s.workbook.id} className="flex items-center gap-3 p-3 bg-[#FDF6E3] border border-[#E6D28F] rounded-md" data-testid={`workbook-suggestion-${s.workbook.id}`}>
+                  <div className="w-1 h-10 bg-[#E07A1F] rounded"/>
+                  <div className="flex-1 text-sm">
+                    <div className="text-[10px] uppercase tracking-wider text-[#B85F0E] font-semibold mb-0.5">Sugestão</div>
+                    <div className="text-[#1A202C]">
+                      Este manual tem caderno de fichas disponível — <strong>{s.workbook.title}</strong> · {s.workbook.price.toFixed(2)}€
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => addSuggestedWorkbook(s.workbook.isbn13 || s.workbook.slug)}
+                    variant="outline"
+                    className="border-[#5A8F1E] text-[#5A8F1E] hover:bg-[#5A8F1E] hover:text-white"
+                    data-testid={`add-workbook-suggestion-${s.workbook.id}`}
+                  >
+                    Adicionar
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <aside className="lg:col-span-4">

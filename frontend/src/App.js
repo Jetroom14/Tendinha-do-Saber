@@ -34,6 +34,8 @@ import { AdminCategories, AdminCustomers, AdminPromoCodes, AdminReports, AdminCo
 import AdminBrand from "@/pages/admin/AdminBrand";
 import AdminShipping from "@/pages/admin/AdminShipping";
 import AdminLegal from "@/pages/admin/AdminLegal";
+import AdminAdoptions from "@/pages/admin/AdminAdoptions";
+import AdoptionsResultsPage from "@/pages/AdoptionsResultsPage";
 
 const Site = ({ children }) => (
   <SiteLayout>{children}</SiteLayout>
@@ -65,6 +67,7 @@ function App() {
             <Route path="/sobre" element={<Site><AboutPage/></Site>}/>
             <Route path="/faq" element={<Site><FaqPage/></Site>}/>
             <Route path="/legal/:slug" element={<Site><LegalPage/></Site>}/>
+            <Route path="/adopcoes" element={<Site><AdoptionsResultsPage/></Site>}/>
             <Route path="/login" element={<Site><LoginPage/></Site>}/>
             <Route path="/registar" element={<Site><RegisterPage/></Site>}/>
             <Route path="/minha-conta" element={<Site><AccountPage/></Site>}/>
@@ -84,6 +87,7 @@ function App() {
               <Route path="parceiros" element={<AdminPartners/>}/>
               <Route path="conteudo" element={<AdminContent/>}/>
               <Route path="legal" element={<AdminLegal/>}/>
+              <Route path="adocoes" element={<AdminAdoptions/>}/>
               <Route path="brand" element={<AdminBrand/>}/>
               <Route path="relatorios" element={<AdminReports/>}/>
               <Route path="logs" element={<AdminLogs/>}/>

@@ -1,0 +1,50 @@
+{
+  "summary": "Iteration 3: end-to-end validation of Blocks A/B/C/D for Tendinha do Saber. Backend: 19/19 new tests PASS (test_iter3_features.py) covering /admin/books/export (xlsx, 572 books, 14 cols, ISBN cell text-formatted, requires auth), /admin/books/links/import (auth-gated, correct response shape {linked, skipped_count, skipped}, empty-sheet ok, bad rows skipped with reason), /cart/related-workbooks (empty items -> suggestions:[]; unlinked manual -> suggestions:[]), /adoptions/concelhos (returns {concelhos:[], active_year:null} without 500), /adoptions/schools|grades (return {schools|grades:[], active_year}), /adoptions/books (404 when no active year — by design), plus regressions on /catalogo, /carrinho, /checkout, /admin/livros, /admin/entregas, /admin/legal all 200. Frontend: manual Playwright walk of homepage confirmed cascade selects (municipality-select/school-select/grade-select) render and search-school-btn is disabled until 3 selects filled; /adopcoes without params shows adoption-no-params fallback + back link; admin login OK; export-books-btn triggers xlsx download (livros-tendinha-20260724.xlsx); import-links-input present; /admin/adocoes renders 'Adoções Escolares'. Book count in DB is exactly 572 as spec expected.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/adoptions/books",
+        "issue": "Returns HTTP 404 when no active_year is set (server.py:1258). Frontend AdoptionsResultsPage.jsx does `.catch(() => setData(null))` which then falls through to the adoption-no-params branch — works, but the UX message ('Escolha uma escola') is misleading when the real cause is 'no active year configured'. Consider returning 200 with {school_year:null, books:[]} for consistency with the other three adoptions endpoints."
+      },
+      {
+        "endpoint": "GET /api/adoptions/schools|grades",
+        "issue": "Returns dict {schools|grades:[], active_year} instead of a bare list. Not a bug — HomePage.jsx correctly reads r.data.schools/r.data.grades — but the shape is inconsistent with the sibling /api/schools which returns a list."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter3_features.py",
+    "/app/test_reports/pytest/iteration_3.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: normalise /api/adoptions/books to return 200 with empty body when no active year, to match sibling adoptions endpoints and avoid confusing the 'no-params' fallback with a real error.",
+    "OPTIONAL: on homepage cascade, when activeYear is null show a subtle 'Adoções para o próximo ano ainda por publicar' hint under the card (currently the entire concelho list is empty and the user has no feedback)."
+  ],
+  "critical_code_review_comments": [
+    "server.py is now 3138 lines (was 2024 at iter 2). Long overdue for a router split — auth.py, books.py, adoptions.py, admin.py, vouchers.py. Every new block adds risk of merge conflicts.",
+    "The link-import endpoint (server.py:957) writes related_book_id both ways (caderno->manual and manual->caderno). If a manual is later re-pointed to a different caderno the previous caderno keeps a stale related_book_id pointing back to the manual. Add a cleanup step: `db.books.update_many({'related_book_id': manual['id'], 'id': {'$ne': caderno['id']}}, {'$unset': {'related_book_id': ''}})` before setting the new link.",
+    "export_books_xlsx (server.py:912) does `async for b in db.books.find(...).sort('title', 1)` — with 572 rows this is fine, but there's no streaming/pagination guard, so once the collection reaches ~50k rows the endpoint will OOM the pod. Consider `openpyxl` write-only mode + row-by-row streaming, or a temp-file StreamingResponse.",
+    "/adoptions/concelhos, /schools, /grades share identical 'no active_year → empty' scaffolding but /adoptions/books raises 404. Pick one contract.",
+    "HomePage.jsx uses concelho name as SelectItem value (line 111 — id === name). Fine while concelhos are strings, but if two escolas from different concelhos share a name the school Select will collide. Consider composite keys.",
+    "Import-links endpoint reads the whole Excel into memory (pd.read_excel(BytesIO(content))). For 12.5k adoption rows the current limit is comfortable, but there is no size cap on the UploadFile — an attacker could POST a 500MB xlsx. Add a max-body-size middleware or a manual `if len(content) > 15*1024*1024: raise HTTPException(413)`."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter3_features.py (NEW — 19 tests for Blocks A/B/C/D + regression on public endpoints)"
+  ],
+  "success_rate": {
+    "backend": "100% (19/19) — run: `cd /app/backend && python -m pytest tests/test_iter3_features.py -v -o addopts=`",
+    "frontend": "100% of the 7 spec checkpoints verified via Playwright walk (homepage/A, cascade/D, /adopcoes no-params/D, admin login+export/B, import-links input/C, admin/adocoes render, other admin pages loading)."
+  },
+  "test_credentials": "Super: jetroortej14@hotmail.com / ChangeMe!2026Super. Admin: tendinhadosaber@gmail.com / ChangeMe!2026Admin.",
+  "seed_data_creation": "None. All tests are read-only (export/list) or use disposable fake data (import with PE_DOES_NOT_EXIST_XYZ + 9999999999991 ISBN). No collections were mutated other than admin activity_logs (audit entries).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run backend tests sequentially: `cd /app/backend && python -m pytest tests/ -v -o addopts=`. All 3 test files (backend_test.py, test_v2_features.py, test_iter3_features.py) should coexist. Book count in DB is 572; if a future iteration seeds more, adjust TestSiteFunctional.test_book_count_572 accordingly. Adoption collection (school_adoptions) is currently empty AND settings.adoptions_active_year is null — that's the state the D endpoints were spec'd for. Once main agent imports a real DGE Excel, the /adoptions/books endpoint will start returning 200 and grade Selects will populate. For manual UI: use admin login flow with data-testid='login-email'/'login-password'/'login-submit'.",
+  "rca_of_the_issue": "No blocking issues found. Two consistency concerns worth folding into the next iteration: (1) /adoptions/books returns 404 when active_year is missing while the other three adoption endpoints return 200 with an empty payload — pick one style; (2) the link-import writer does not clear stale reverse-links when a manual is re-pointed to a new caderno, so the old caderno keeps a dangling related_book_id. Neither breaks the current MVP flow."
+}
