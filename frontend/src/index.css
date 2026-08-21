@@ -9,7 +9,7 @@ body {
     font-family: 'IBM Plex Sans', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    background-color: #FFFFFF;
+    background-color: #FAF8F3;
     color: #1A202C;
 }
 
@@ -32,7 +32,7 @@ h1, h2, h3, h4, h5, h6 {
 
 @layer base {
     :root {
-        --background: 42 35% 98%;
+        --background: 42 40% 97%;
         --foreground: 220 26% 14%;
         --card: 0 0% 100%;
         --card-foreground: 220 26% 14%;
@@ -40,11 +40,11 @@ h1, h2, h3, h4, h5, h6 {
         --popover-foreground: 220 26% 14%;
         --primary: 80 65% 40%;
         --primary-foreground: 0 0% 100%;
-        --secondary: 60 20% 96%;
+        --secondary: 92 28% 94%;
         --secondary-foreground: 220 26% 14%;
-        --muted: 60 20% 96%;
+        --muted: 92 22% 95%;
         --muted-foreground: 220 9% 46%;
-        --accent: 60 20% 96%;
+        --accent: 92 28% 94%;
         --accent-foreground: 220 26% 14%;
         --destructive: 14 60% 49%;
         --destructive-foreground: 0 0% 98%;

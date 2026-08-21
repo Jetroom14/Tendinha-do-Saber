@@ -5,6 +5,7 @@ import { useCart } from "@/contexts/CartContext";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import SEO from "@/components/SEO";
+import { formatSchoolGrade } from "@/lib/utils";
 import { toast } from "sonner";
 import { GraduationCap, ShoppingCart, AlertTriangle, ArrowLeft } from "lucide-react";
 
@@ -21,9 +22,11 @@ export default function AdoptionsResultsPage() {
   const concelho = params.get("concelho") || "";
   const escola = params.get("escola") || "";
   const grade = params.get("ano") || "";
+  const schoolId = params.get("school_id") || "";
 
   const { add } = useCart();
   const [data, setData] = useState(null);
+  const [availability, setAvailability] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState({});
 
@@ -41,6 +44,16 @@ export default function AdoptionsResultsPage() {
       .catch(() => setData(null))
       .finally(() => setLoading(false));
   }, [concelho, escola, grade]);
+
+  useEffect(() => {
+    if (!schoolId || !grade) {
+      setAvailability(null);
+      return;
+    }
+    api.get(`/adoptions/availability?school_id=${encodeURIComponent(schoolId)}&grade=${encodeURIComponent(grade)}`)
+      .then((r) => setAvailability(r.data))
+      .catch(() => setAvailability(null));
+  }, [schoolId, grade]);
 
   const grouped = (() => {
     if (!data?.books) return {};
@@ -93,7 +106,7 @@ export default function AdoptionsResultsPage() {
           <div>
             <div className="text-[10px] uppercase tracking-wider text-[#4A5568] font-semibold">Ano lectivo {data.school_year}</div>
             <h1 className="font-display text-2xl md:text-3xl font-medium text-[#1A202C]">{escola}</h1>
-            <div className="text-sm text-[#4A5568] mt-0.5">{concelho} · {grade}</div>
+            <div className="text-sm text-[#4A5568] mt-0.5">{concelho} · {formatSchoolGrade(grade)}</div>
           </div>
         </div>
       </div>
@@ -110,7 +123,18 @@ export default function AdoptionsResultsPage() {
       )}
 
       {Object.keys(grouped).length === 0 && (
-        <div className="text-center py-12 text-slate-500">Sem adoções registadas para esta escolha.</div>
+        <div className="text-center py-12" data-testid="adoption-empty-official-list">
+          <p className="text-slate-600 mb-4">A lista oficial de manuais desta escola ainda nao esta disponivel.</p>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Link to="/catalogo">
+              <Button className="bg-[#5A8F1E] hover:bg-[#3E6E11] text-white">Ver catalogo completo</Button>
+            </Link>
+            <Link to="/contactos" className="text-[#5A8F1E] hover:underline">Falar com a equipa</Link>
+          </div>
+          {availability && availability.active_year && (
+            <p className="text-xs text-slate-500 mt-4">Ano letivo ativo: {availability.active_year}</p>
+          )}
+        </div>
       )}
 
       {Object.entries(grouped).map(([subject, books]) => (

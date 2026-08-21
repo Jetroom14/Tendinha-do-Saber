@@ -35,6 +35,7 @@ import AdminBrand from "@/pages/admin/AdminBrand";
 import AdminShipping from "@/pages/admin/AdminShipping";
 import AdminLegal from "@/pages/admin/AdminLegal";
 import AdminAdoptions from "@/pages/admin/AdminAdoptions";
+import AdminFaq from "@/pages/admin/AdminFaq";
 import AdoptionsResultsPage from "@/pages/AdoptionsResultsPage";
 
 const Site = ({ children }) => (
@@ -85,6 +86,7 @@ function App() {
               <Route path="vouchers" element={<AdminVouchers/>}/>
               <Route path="codigos" element={<AdminPromoCodes/>}/>
               <Route path="parceiros" element={<AdminPartners/>}/>
+              <Route path="faq" element={<AdminFaq/>}/>
               <Route path="conteudo" element={<AdminContent/>}/>
               <Route path="legal" element={<AdminLegal/>}/>
               <Route path="adocoes" element={<AdminAdoptions/>}/>

@@ -236,14 +236,14 @@ export default function VouchersPage() {
           )}
         </form>
 
-        <div className="md:col-span-5 space-y-4 text-sm text-[#4A5568] leading-relaxed">
+        <div className="md:col-span-5 space-y-4 text-sm text-[#4A5568] leading-relaxed bg-[#F2F7EC] border border-[#DDE8CF] rounded-md p-5 h-fit">
           <h3 className="font-display text-lg font-medium text-[#1A202C]">Como funciona</h3>
           <ol className="space-y-3 list-decimal list-inside">
             <li>Preenche o formulário com nome, contacto e manuais pretendidos.</li>
             <li>Indica o código ALN <strong>ou</strong> anexa o PDF do voucher.</li>
             <li>Validamos em 24h úteis e entramos em contacto para combinar a entrega em mão.</li>
           </ol>
-          <div className="bg-[#F5F8EC] rounded p-4 mt-6">
+          <div className="bg-[#EAF2DF] rounded p-4 mt-6 border border-[#D3E2BF]">
             <div className="font-display font-medium text-[#1A202C] mb-1">Privacidade</div>
             <p className="text-xs">O PDF é guardado em armazenamento privado, acessível apenas pelo administrador. É eliminado automaticamente 12 meses após a utilização (RGPD).</p>
           </div>

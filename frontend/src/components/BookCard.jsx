@@ -27,9 +27,9 @@ export function BookCard({ book, onAdd }) {
       <div className="relative aspect-[3/4] bg-[#F5F8EC] overflow-hidden">
         <CoverImage book={book} className="w-full h-full object-cover" />
         <div className="absolute top-2 right-2"><StockBadge status={book.status}/></div>
-        {book.type === "Workbook" && (
-          <span className="absolute top-2 left-2 text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-[#5A8F1E] text-white">Caderno</span>
-        )}
+        <span className="absolute top-2 left-2 text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-[#5A8F1E] text-white">
+          {book.type === "Workbook" ? "Caderno" : "Manual"}
+        </span>
       </div>
       <div className="p-4 flex-1 flex flex-col">
         <div className="text-[10px] uppercase tracking-[0.18em] text-[#4A5568] mb-1">{book.subject || "Manual"}</div>

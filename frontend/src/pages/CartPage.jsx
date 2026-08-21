@@ -7,10 +7,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import api from "@/lib/api";
 import { toast } from "sonner";
-import { ShoppingBag, X, Trash2, Tag, Check, ArrowRight } from "lucide-react";
+import { ShoppingBag, X, Trash2, Tag, Check, ArrowRight, ShoppingBasket } from "lucide-react";
 
 export default function CartPage() {
-  const { items, summary, promoCode, setPromoCode, add, remove, setQty, toggleLamination, recompute } = useCart();
+  const { items, summary, promoCode, setPromoCode, add, remove, setQty, toggleLamination, recompute, bagsQty, setBags } = useCart();
   const [promoInput, setPromoInput] = useState(promoCode || "");
   const [bookMap, setBookMap] = useState({});
   const [workbookSuggestions, setWorkbookSuggestions] = useState([]);   // Bloco C2
@@ -20,7 +20,11 @@ export default function CartPage() {
     Promise.all(items.map((it) => api.get(`/books/${it.isbn13}`).then((r) => r.data).catch(() => null)))
       .then((arr) => {
         const map = {};
-        arr.filter(Boolean).forEach((b) => { map[b.isbn13] = b; });
+        arr.forEach((b, index) => {
+          if (!b) return;
+          map[b.isbn13] = b;
+          map[items[index]?.isbn13] = b;
+        });
         setBookMap(map);
       });
   }, [items]);
@@ -42,7 +46,7 @@ export default function CartPage() {
     setPromoCode(promoInput.trim().toUpperCase());
     setTimeout(async () => {
       await recompute();
-      const updated = await api.post("/cart/validate", { items, promo_code: promoInput.trim().toUpperCase() || null });
+      const updated = await api.post("/cart/validate", { items, promo_code: promoInput.trim().toUpperCase() || null, bags_qty: bagsQty });
       if (updated.data.promo) toast.success(`Código ${updated.data.promo.code} aplicado: −${updated.data.promo.discount_value}% em cadernos`);
       else if (promoInput.trim()) toast.error("Código inválido ou não aplicável");
     }, 100);
@@ -70,17 +74,25 @@ export default function CartPage() {
           {items.map((it) => {
             const book = bookMap[it.isbn13];
             const line = summary?.lines?.find((l) => l.isbn13 === it.isbn13);
-            if (!book) return null;
+            const title = book?.title || line?.title || `Livro ${it.isbn13}`;
+            const publisher = book?.publisher || "";
+            const imageUrl = book?.image_url || line?.image_url || "";
+            const detailKey = book?.isbn13 || it.isbn13;
+            const isLaminationEligible = Boolean(book?.is_lamination_eligible);
             return (
               <div key={it.isbn13} className="bg-white border border-[#E2E8F0] rounded-md p-5 flex gap-4" data-testid={`cart-item-${it.isbn13}`}>
                 <div className="w-20 h-28 bg-[#F5F8EC] rounded shrink-0 overflow-hidden">
-                  {book.image_url && <img src={book.image_url} alt="" className="w-full h-full object-cover"/>}
+                  {imageUrl && <img src={imageUrl} alt="" className="w-full h-full object-cover"/>}
                 </div>
                 <div className="flex-1">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <Link to={`/livro/${book.isbn13}`} className="font-display font-medium text-[#1A202C] hover:text-[#5A8F1E]">{book.title}</Link>
-                      <div className="text-xs text-[#4A5568]">{book.publisher} · {book.type === "Workbook" ? "Caderno" : "Manual"}</div>
+                      {book ? (
+                        <Link to={`/livro/${detailKey}`} className="font-display font-medium text-[#1A202C] hover:text-[#5A8F1E]">{title}</Link>
+                      ) : (
+                        <div className="font-display font-medium text-[#1A202C]">{title}</div>
+                      )}
+                      <div className="text-xs text-[#4A5568]">{publisher}{line?.type ? ` · ${line.type === "Workbook" ? "Caderno" : "Manual"}` : ""}</div>
                     </div>
                     <button onClick={() => remove(it.isbn13)} className="text-[#4A5568] hover:text-[#C53030] p-1" data-testid={`remove-${it.isbn13}`}><X className="w-4 h-4"/></button>
                   </div>
@@ -90,7 +102,7 @@ export default function CartPage() {
                       <span className="px-4 py-1.5 text-sm" data-testid={`qty-${it.isbn13}`}>{it.qty}</span>
                       <button onClick={() => setQty(it.isbn13, it.qty + 1)} className="px-3 py-1.5 hover:bg-[#F5F8EC]" data-testid={`qty-plus-${it.isbn13}`}>+</button>
                     </div>
-                    {book.is_lamination_eligible && (
+                    {isLaminationEligible && (
                       <div className="flex items-center gap-2">
                         <Checkbox id={`lam-${it.isbn13}`} checked={it.lamination} onCheckedChange={() => toggleLamination(it.isbn13)} data-testid={`lamination-${it.isbn13}`}/>
                         <Label htmlFor={`lam-${it.isbn13}`} className="text-sm cursor-pointer">Plastificação (+{summary?.lamination_price?.toFixed(2) || "2.00"}€)</Label>
@@ -98,7 +110,7 @@ export default function CartPage() {
                     )}
                     <div className="ml-auto text-right">
                       {line?.line_discount > 0 && <div className="text-xs text-[#E07A1F]">−{line.line_discount.toFixed(2)}€</div>}
-                      <div className="font-display font-medium text-[#1A202C]">{(line?.line_total ?? (book.price * it.qty)).toFixed(2)}€</div>
+                      <div className="font-display font-medium text-[#1A202C]">{(line?.line_total ?? ((book?.price || 0) * it.qty)).toFixed(2)}€</div>
                     </div>
                   </div>
                 </div>
@@ -131,6 +143,30 @@ export default function CartPage() {
               ))}
             </div>
           )}
+
+          <div className="bg-white border border-[#E2E8F0] rounded-md p-5" data-testid="bags-panel">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-md bg-[#F5F8EC] grid place-items-center shrink-0">
+                <ShoppingBasket className="w-5 h-5 text-[#5A8F1E]" strokeWidth={1.5}/>
+              </div>
+              <div className="flex-1">
+                <div className="font-display font-medium text-[#1A202C]">Sacos</div>
+                <p className="text-sm text-[#4A5568] mt-1">Se precisar, pode acrescentar sacos à encomenda. Cada saco custa 0,10 €.</p>
+              </div>
+              <div className="w-28">
+                <Label htmlFor="bags-qty" className="text-xs uppercase tracking-wider text-[#4A5568] mb-1.5 block">Quantidade</Label>
+                <Input
+                  id="bags-qty"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={bagsQty}
+                  onChange={(e) => setBags(e.target.value)}
+                  data-testid="bags-qty-input"
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
         <aside className="lg:col-span-4">
@@ -169,6 +205,9 @@ export default function CartPage() {
               {summary?.lamination_total > 0 && (
                 <div className="flex justify-between"><dt className="text-[#4A5568]">Plastificação</dt><dd className="text-[#1A202C]">{summary.lamination_total.toFixed(2)}€</dd></div>
               )}
+              {summary?.bags_total > 0 && (
+                <div className="flex justify-between"><dt className="text-[#4A5568]">Sacos ({summary.bags_qty || 0})</dt><dd className="text-[#1A202C]">{summary.bags_total.toFixed(2)}€</dd></div>
+              )}
               <div className="flex justify-between text-lg font-display font-medium pt-3 border-t border-[#E2E8F0]">
                 <dt>Total</dt><dd data-testid="cart-total">{summary?.total?.toFixed(2) || "0.00"}€</dd>
               </div>
@@ -177,7 +216,7 @@ export default function CartPage() {
             <Button onClick={() => navigate("/checkout")} className="w-full mt-5 h-12 bg-[#E07A1F] hover:bg-[#B85F0E] text-white" data-testid="checkout-btn">
               Continuar para pagamento <ArrowRight className="w-4 h-4 ml-2" strokeWidth={1.5}/>
             </Button>
-            <p className="text-xs text-[#4A5568] mt-3 text-center">A entrega em mão (Aveiro) é grátis. Os portes de envio são calculados no passo seguinte.</p>
+            <p className="text-xs text-[#4A5568] mt-3 text-center">O custo de entrega é calculado no checkout conforme o concelho escolhido.</p>
           </div>
         </aside>
       </div>

@@ -36,6 +36,8 @@ ACCESS_TOKEN_EXPIRE_MIN = 60 * 24  # 24h
 JWT_SECRET = os.environ["JWT_SECRET"]
 LAMINATION_PRICE = float(os.environ.get("LAMINATION_PRICE", "2.00"))
 SHIPPING_FLAT_RATE = float(os.environ.get("SHIPPING_FLAT_RATE", "4.90"))
+BAG_PRICE = float(os.environ.get("BAG_PRICE", "0.10"))
+STOCK_LOW_THRESHOLD = 5  # "pouco stock" no admin; ajuste fácil se necessário.
 
 # Private, non-public storage for MEGA voucher PDFs. NEVER place this under
 # frontend/public or mount it as a FastAPI StaticFiles route — it must only
@@ -312,6 +314,7 @@ class CartItem(BaseModel):
 class PromoValidateIn(BaseModel):
     items: List[CartItem]
     promo_code: Optional[str] = None
+    bags_qty: Optional[int] = 0
 
 class OrderCreateIn(BaseModel):
     items: List[CartItem]
@@ -328,6 +331,7 @@ class OrderCreateIn(BaseModel):
     wants_invoice: Optional[bool] = False
     nif: Optional[str] = None
     fiscal_name: Optional[str] = None
+    bags_qty: Optional[int] = 0
 
 class SettingIn(BaseModel):
     lamination_price: Optional[float] = None
@@ -484,7 +488,10 @@ async def list_books(
     type: Optional[str] = None,
     status: Optional[str] = None,
     school_id: Optional[str] = None,
+    concelho: Optional[str] = None,
+    school_name: Optional[str] = None,
     grade_level: Optional[str] = None,
+    stock: Optional[str] = None,
     limit: int = 20,
     skip: int = 0,
     page: Optional[int] = None,
@@ -493,7 +500,7 @@ async def list_books(
     if q:
         q_clean = strip_isbn(q)
         regex = {"$regex": re.escape(q), "$options": "i"}
-        ors = [{"title": regex}, {"author": regex}, {"subject": regex}, {"publisher": regex}]
+        ors = [{"title": regex}, {"author": regex}, {"subject": regex}, {"publisher": regex}, {"pe_code": regex}]
         if q_clean:
             ors.append({"isbn13": q_clean})
         filt["$or"] = ors
@@ -504,12 +511,46 @@ async def list_books(
     if status:
         filt["status"] = status
 
-    if school_id:
-        sb_filter: Dict[str, Any] = {"school_id": school_id}
-        if grade_level:
-            sb_filter["grade_level"] = grade_level
-        isbns = await db.school_books.distinct("isbn13", sb_filter)
-        filt["isbn13"] = {"$in": isbns}
+    if stock == "low":
+        filt["stock_qty"] = {"$lte": STOCK_LOW_THRESHOLD}
+    elif stock == "high":
+        filt["stock_qty"] = {"$gt": STOCK_LOW_THRESHOLD}
+
+    adoption_isbns: List[str] = []
+    if concelho and school_name:
+        active_year = await _get_active_school_year()
+        if active_year:
+            adoption_filter: Dict[str, Any] = {
+                "school_year": active_year,
+                "concelho": concelho,
+                "escola": school_name,
+            }
+            if grade_level:
+                adoption_filter["grade"] = grade_level
+            adoption_isbns = await db.school_adoptions.distinct("isbn13", adoption_filter)
+            filt["isbn13"] = {"$in": adoption_isbns}
+    elif school_id:
+        school = await db.schools.find_one({"id": school_id}, {"_id": 0, "name": 1, "municipality_id": 1})
+        if school:
+            mun = await db.municipalities.find_one({"id": school.get("municipality_id")}, {"_id": 0, "name": 1})
+            active_year = await _get_active_school_year()
+            if mun and active_year:
+                adoption_filter = {
+                    "school_year": active_year,
+                    "concelho": mun.get("name"),
+                    "escola": school.get("name"),
+                }
+                if grade_level:
+                    adoption_filter["grade"] = grade_level
+                adoption_isbns = await db.school_adoptions.distinct("isbn13", adoption_filter)
+        if adoption_isbns:
+            filt["isbn13"] = {"$in": adoption_isbns}
+        else:
+            sb_filter: Dict[str, Any] = {"school_id": school_id}
+            if grade_level:
+                sb_filter["grade_level"] = grade_level
+            isbns = await db.school_books.distinct("isbn13", sb_filter)
+            filt["isbn13"] = {"$in": isbns}
 
     limit = max(1, min(limit, 500))
     if page is not None:
@@ -1259,6 +1300,42 @@ async def adoptions_grades(concelho: str, escola: str):
     return {"grades": grades, "active_year": year}
 
 
+@api.get("/adoptions/availability")
+async def adoptions_availability(school_id: str, grade: Optional[str] = None):
+    """Indica se existe lista oficial para uma escola/ano no ano ativo.
+    Não altera dados; serve só para UX (mensagem quando não há adoções)."""
+    school = await db.schools.find_one({"id": school_id}, {"_id": 0})
+    if not school:
+        raise HTTPException(404, "Escola não encontrada")
+
+    mun = await db.municipalities.find_one({"id": school.get("municipality_id")}, {"_id": 0, "name": 1})
+    year = await _get_active_school_year()
+    if not mun or not year:
+        return {
+            "has_adoptions": False,
+            "count": 0,
+            "active_year": year,
+            "concelho": mun.get("name") if mun else None,
+            "escola": school.get("name"),
+        }
+
+    filt: Dict[str, Any] = {
+        "school_year": year,
+        "concelho": mun.get("name"),
+        "escola": school.get("name"),
+    }
+    if grade:
+        filt["grade"] = grade
+    count = await db.school_adoptions.count_documents(filt)
+    return {
+        "has_adoptions": count > 0,
+        "count": count,
+        "active_year": year,
+        "concelho": mun.get("name"),
+        "escola": school.get("name"),
+    }
+
+
 @api.get("/adoptions/books")
 async def adoptions_books(concelho: str, escola: str, grade: str):
     """Devolve os manuais adotados para uma escola/ano, com dados do catálogo
@@ -1316,6 +1393,7 @@ async def import_schools(file: UploadFile = File(...), admin: dict = Depends(req
     df.columns = [str(c).strip().lower() for c in df.columns]
     col_map = {
         "escola": "school", "school": "school",
+        "concelho": "municipality",
         "município": "municipality", "municipio": "municipality", "municipality": "municipality",
         "anos": "grades", "grades": "grades",
     }
@@ -1624,9 +1702,7 @@ async def list_schools(municipality_id: Optional[str] = None, grade: Optional[st
 
 @api.get("/grade-levels")
 async def list_grades():
-    grades = ["1.º Ano", "2.º Ano", "3.º Ano", "4.º Ano", "5.º Ano", "6.º Ano",
-              "7.º Ano", "8.º Ano", "9.º Ano", "10.º Ano", "11.º Ano", "12.º Ano"]
-    return grades
+    return list(_GRADES_ALL)
 
 @api.post("/admin/municipalities")
 async def create_mun(payload: MunicipalityIn, admin: dict = Depends(require_admin)):
@@ -1925,6 +2001,60 @@ _CONTENT_DEFAULTS = {
     "promotions_label": "Desconto exclusivo para parceiros",
 }
 
+_DEFAULT_FAQS = [
+    {
+        "question": "Como faço para encomendar os livros da escola do meu filho?",
+        "answer": "Use o seletor da página inicial: escolha o ano, o concelho e a escola. Mostramos imediatamente a lista oficial e pode adicionar tudo ao carrinho. Em alternativa, pesquise por título ou ISBN.",
+    },
+    {
+        "question": "Os preços são iguais aos das outras livrarias?",
+        "answer": "Sim. Praticamos o Preço de Venda ao Público (PVP) recomendado pelas editoras. A diferença está no serviço de proximidade e na plastificação.",
+    },
+    {
+        "question": "Quanto custa a plastificação?",
+        "answer": "2€ por livro. É opcional e escolhe por cada livro no carrinho. Apenas se aplica a manuais (cadernos de fichas não são plastificados).",
+    },
+    {
+        "question": "Tenho um código de parceiro. Onde o aplico?",
+        "answer": "Na página do carrinho existe um campo para inserir o código promocional. Basta introduzi-lo para que o desconto seja aplicado automaticamente à sua encomenda.",
+    },
+    {
+        "question": "Vocês entregam em casa?",
+        "answer": "Sim. Fazemos entrega em mão, gratuitamente, em todo o distrito de Aveiro. Para combinar a entrega, entre em contacto connosco após a encomenda.",
+    },
+    {
+        "question": "Como funciona o voucher MEGA?",
+        "answer": "Pode submeter o voucher (código ou PDF) na página dedicada. A nossa equipa valida em 24h úteis e o desconto é aplicado à sua próxima encomenda. Veja o passo-a-passo na página Como funciona o voucher MEGA.",
+    },
+    {
+        "question": "E se o livro estiver indicado como 'Disponível por encomenda'?",
+        "answer": "Significa que não temos stock imediato, mas pode comprar. Pediremos ao fornecedor e contactamo-lo quando estiver pronto. O prazo depende do fornecedor.",
+    },
+    {
+        "question": "Posso pagar com MB Way?",
+        "answer": "Sim. Após a sua encomenda, entraremos em contacto para combinar o pagamento por MB Way ou transferência bancária. A fatura é enviada após a confirmação do pagamento.",
+    },
+]
+
+
+async def _ensure_default_faqs_seeded():
+    if await db.faqs.count_documents({}) > 0:
+        return
+    now = iso(now_utc())
+    docs = [
+        {
+            "id": gen_id(),
+            "question": item["question"],
+            "answer": item["answer"],
+            "sort_order": idx,
+            "created_at": now,
+            "updated_at": now,
+        }
+        for idx, item in enumerate(_DEFAULT_FAQS, start=1)
+    ]
+    if docs:
+        await db.faqs.insert_many(docs)
+
 @api.get("/content")
 async def get_content():
     doc = await db.site_content.find_one({"id": "main"}, {"_id": 0}) or {}
@@ -1938,8 +2068,100 @@ async def update_content(payload: ContentIn, admin: dict = Depends(require_super
     doc = await db.site_content.find_one({"id": "main"}, {"_id": 0}) or {}
     return {**_CONTENT_DEFAULTS, **{k: v for k, v in doc.items() if v not in (None, "") and k != "id"}}
 
+
+class FAQIn(BaseModel):
+    question: str
+    answer: str
+    sort_order: Optional[int] = None
+
+
+class FAQReorderItem(BaseModel):
+    id: str
+    sort_order: int
+
+
+class FAQReorderIn(BaseModel):
+    items: List[FAQReorderItem]
+
+
+@api.get("/faq")
+async def public_faq_list():
+    await _ensure_default_faqs_seeded()
+    items = await db.faqs.find({}, {"_id": 0}).sort([("sort_order", 1), ("created_at", 1)]).to_list(200)
+    return {"items": items}
+
+
+@api.get("/admin/faq")
+async def admin_faq_list(admin: dict = Depends(require_admin)):
+    await _ensure_default_faqs_seeded()
+    items = await db.faqs.find({}, {"_id": 0}).sort([("sort_order", 1), ("created_at", 1)]).to_list(200)
+    return {"items": items}
+
+
+@api.post("/admin/faq")
+async def admin_faq_create(payload: FAQIn, admin: dict = Depends(require_manager)):
+    question = (payload.question or "").strip()
+    answer = (payload.answer or "").strip()
+    if not question or not answer:
+        raise HTTPException(400, "Pergunta e resposta são obrigatórias.")
+    max_doc = await db.faqs.find_one({}, sort=[("sort_order", -1)], projection={"_id": 0, "sort_order": 1}) or {}
+    sort_order = payload.sort_order if payload.sort_order is not None else int(max_doc.get("sort_order") or 0) + 1
+    doc = {
+        "id": gen_id(),
+        "question": question,
+        "answer": answer,
+        "sort_order": max(1, int(sort_order)),
+        "created_at": iso(now_utc()),
+        "updated_at": iso(now_utc()),
+    }
+    await db.faqs.insert_one(doc)
+    await log_action(admin["id"], "create", "faq", doc["id"])
+    doc.pop("_id", None)
+    return doc
+
+
+@api.put("/admin/faq/{faq_id}")
+async def admin_faq_update(faq_id: str, payload: FAQIn, admin: dict = Depends(require_manager)):
+    existing = await db.faqs.find_one({"id": faq_id}, {"_id": 0, "id": 1})
+    if not existing:
+        raise HTTPException(404, "FAQ não encontrada")
+    question = (payload.question or "").strip()
+    answer = (payload.answer or "").strip()
+    if not question or not answer:
+        raise HTTPException(400, "Pergunta e resposta são obrigatórias.")
+    update = {
+        "question": question,
+        "answer": answer,
+        "updated_at": iso(now_utc()),
+    }
+    if payload.sort_order is not None:
+        update["sort_order"] = max(1, int(payload.sort_order))
+    await db.faqs.update_one({"id": faq_id}, {"$set": update})
+    await log_action(admin["id"], "update", "faq", faq_id)
+    return {"ok": True}
+
+
+@api.delete("/admin/faq/{faq_id}")
+async def admin_faq_delete(faq_id: str, admin: dict = Depends(require_manager)):
+    res = await db.faqs.delete_one({"id": faq_id})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "FAQ não encontrada")
+    await log_action(admin["id"], "delete", "faq", faq_id)
+    return {"ok": True}
+
+
+@api.post("/admin/faq/reorder")
+async def admin_faq_reorder(payload: FAQReorderIn, admin: dict = Depends(require_manager)):
+    for item in payload.items:
+        await db.faqs.update_one(
+            {"id": item.id},
+            {"$set": {"sort_order": max(1, int(item.sort_order)), "updated_at": iso(now_utc())}},
+        )
+    await log_action(admin["id"], "reorder", "faq", None, {"count": len(payload.items)})
+    return {"ok": True}
+
 # ---------- Cart / Promo ----------
-async def _compute_cart(items: List[CartItem], promo_code: Optional[str]) -> dict:
+async def _compute_cart(items: List[CartItem], promo_code: Optional[str], bags_qty: int = 0) -> dict:
     promo = None
     if promo_code:
         candidate = await db.partners.find_one({"promo_code": promo_code.upper()}, {"_id": 0})
@@ -1986,13 +2208,17 @@ async def _compute_cart(items: List[CartItem], promo_code: Optional[str]) -> dic
             "line_total": round(line_price - line_discount + line_lam, 2),
         })
 
-    total = subtotal_manuals + subtotal_workbooks - discount_workbooks + lamination_total
+    bags_qty = max(0, int(bags_qty or 0))
+    bags_total = round(bags_qty * BAG_PRICE, 2)
+    total = subtotal_manuals + subtotal_workbooks - discount_workbooks + lamination_total + bags_total
     return {
         "lines": lines,
         "subtotal_manuals": round(subtotal_manuals, 2),
         "subtotal_workbooks": round(subtotal_workbooks, 2),
         "discount_workbooks": round(discount_workbooks, 2),
         "lamination_total": round(lamination_total, 2),
+        "bags_qty": bags_qty,
+        "bags_total": bags_total,
         "total": round(total, 2),
         "promo": {"code": promo["promo_code"], "discount_value": promo["discount_value"], "partner": promo["name"]} if promo else None,
         "lamination_price": lam_price,
@@ -2001,7 +2227,7 @@ async def _compute_cart(items: List[CartItem], promo_code: Optional[str]) -> dic
 
 @api.post("/cart/validate")
 async def cart_validate(payload: PromoValidateIn):
-    return await _compute_cart(payload.items, payload.promo_code)
+    return await _compute_cart(payload.items, payload.promo_code, payload.bags_qty or 0)
 
 # ---------- Postcodes (Aveiro geofencing — distrito) ----------
 @api.get("/postcode/check")
@@ -2272,7 +2498,7 @@ async def admin_legal_save(slug: str, payload: LegalPageIn, admin: dict = Depend
 # ---------- Orders ----------
 @api.post("/orders")
 async def create_order(payload: OrderCreateIn):
-    summary = await _compute_cart(payload.items, payload.promo_code)
+    summary = await _compute_cart(payload.items, payload.promo_code, payload.bags_qty or 0)
     if not summary["lines"]:
         raise HTTPException(400, "Carrinho vazio ou livros indisponíveis")
 
@@ -2322,6 +2548,7 @@ async def create_order(payload: OrderCreateIn):
             "subtotal_workbooks": summary["subtotal_workbooks"],
             "discount_workbooks": summary["discount_workbooks"],
             "lamination_total": summary["lamination_total"],
+            "bags_total": summary["bags_total"],
             "shipping_cost": round(shipping_cost, 2),
             "total": total_with_shipping,
         },
@@ -2343,6 +2570,7 @@ async def create_order(payload: OrderCreateIn):
             "postal_code": payload.postal_code,
         },
         "notes": payload.notes,
+        "bags_qty": max(0, int(payload.bags_qty or 0)),
         "status": "pending_payment",
         "payment_status": "pending",
         "payment_provider": "ifthenpay_mocked",
@@ -2854,7 +3082,8 @@ def _parse_grade_list(s: str) -> List[str]:
     return unique
 
 _GRADES_ALL = ["1.º Ano", "2.º Ano", "3.º Ano", "4.º Ano", "5.º Ano", "6.º Ano",
-               "7.º Ano", "8.º Ano", "9.º Ano", "10.º Ano", "11.º Ano", "12.º Ano"]
+               "7.º Ano", "8.º Ano", "9.º Ano", "10.º Ano", "11.º Ano", "12.º Ano",
+               "Profissional", "Secundário Profissional"]
 _GRADES_EB1 = ["1.º Ano", "2.º Ano", "3.º Ano", "4.º Ano"]
 _GRADES_EB23 = ["5.º Ano", "6.º Ano", "7.º Ano", "8.º Ano", "9.º Ano"]
 _GRADES_SEC = ["10.º Ano", "11.º Ano", "12.º Ano"]

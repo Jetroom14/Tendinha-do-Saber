@@ -7,6 +7,7 @@ import { BookCard } from "@/components/BookCard";
 import { useCart } from "@/contexts/CartContext";
 import SEO, { ORGANIZATION_JSONLD } from "@/components/SEO";
 import PartnerLogo from "@/components/PartnerLogo";
+import { formatSchoolGrade } from "@/lib/utils";
 import { ArrowRight, GraduationCap, MapPin, School, BookOpen, ShieldCheck, Truck, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
@@ -16,7 +17,7 @@ export default function HomePage() {
   const [schools, setSchools] = useState([]);
   const [grade, setGrade] = useState("");
   const [mun, setMun] = useState("");
-  const [school, setSchool] = useState("");
+  const [schoolId, setSchoolId] = useState("");
   const [activeYear, setActiveYear] = useState(null);
   const [featured, setFeatured] = useState([]);
   const [partners, setPartners] = useState([]);
@@ -24,12 +25,10 @@ export default function HomePage() {
   const navigate = useNavigate();
   const { add } = useCart();
 
-  // Bloco D — a cascata usa a coleção `school_adoptions` (ano lectivo activo)
+  // Bloco 1 — a cascata de menus usa a coleção completa de escolas.
   useEffect(() => {
-    api.get("/adoptions/concelhos").then((r) => {
-      setMunis((r.data.concelhos || []).map((c) => ({ id: c, name: c })));
-      setActiveYear(r.data.active_year);
-    }).catch(() => setMunis([]));
+    api.get("/municipalities").then((r) => setMunis(r.data || [])).catch(() => setMunis([]));
+    api.get("/adoptions/concelhos").then((r) => setActiveYear(r.data.active_year)).catch(() => setActiveYear(null));
     api.get("/books?limit=8").then((r) => setFeatured(r.data.items || []));
     api.get("/partners").then((r) => setPartners(r.data));
     api.get("/content").then((r) => setContent(r.data)).catch(() => {});
@@ -37,30 +36,30 @@ export default function HomePage() {
 
   useEffect(() => {
     if (mun) {
-      api.get(`/adoptions/schools?concelho=${encodeURIComponent(mun)}`)
-        .then((r) => setSchools((r.data.schools || []).map((s) => ({ id: s, name: s }))))
+      api.get(`/schools?municipality_id=${encodeURIComponent(mun)}`)
+        .then((r) => setSchools(Array.isArray(r.data) ? r.data : []))
         .catch(() => setSchools([]));
     } else setSchools([]);
-    setSchool("");
+    setSchoolId("");
     setGrades([]);
     setGrade("");
   }, [mun]);
 
+  const selectedSchool = schools.find((s) => s.id === schoolId) || null;
+  const selectedMunicipality = munis.find((m) => m.id === mun) || null;
+
   useEffect(() => {
-    if (school && mun) {
-      api.get(`/adoptions/grades?concelho=${encodeURIComponent(mun)}&escola=${encodeURIComponent(school)}`)
-        .then((r) => setGrades(r.data.grades || []))
-        .catch(() => setGrades([]));
-    } else setGrades([]);
+    if (selectedSchool) setGrades(selectedSchool.grades_taught || []);
+    else setGrades([]);
     setGrade("");
-  }, [school, mun]);
+  }, [selectedSchool]);
 
   const searchSchool = () => {
-    if (!mun || !school || !grade) {
+    if (!mun || !schoolId || !grade || !selectedSchool || !selectedMunicipality) {
       toast.error("Escolha concelho, escola e ano");
       return;
     }
-    navigate(`/adopcoes?concelho=${encodeURIComponent(mun)}&escola=${encodeURIComponent(school)}&ano=${encodeURIComponent(grade)}`);
+    navigate(`/adopcoes?concelho=${encodeURIComponent(selectedMunicipality.name)}&escola=${encodeURIComponent(selectedSchool.name)}&ano=${encodeURIComponent(grade)}&school_id=${encodeURIComponent(schoolId)}`);
   };
 
   const handleAdd = (book) => { add(book.isbn13); toast.success("Adicionado ao carrinho"); };
@@ -98,7 +97,7 @@ export default function HomePage() {
 
           {/* CASCADING SELECTOR */}
           <div className="md:col-span-5">
-            <div className="bg-white rounded-md shadow-2xl p-7 border border-white/10" data-testid="cascading-selector">
+            <div className="bg-[#F2F7EC] rounded-md shadow-2xl p-7 border border-[#DDE8CF]" data-testid="cascading-selector">
               <div className="text-[10px] tracking-[0.2em] uppercase text-[#4A5568] font-semibold mb-1">Encontre os seus manuais</div>
               <h2 className="font-display font-medium text-2xl text-[#1A202C] mb-1">Lista oficial da sua escola</h2>
               {activeYear && <div className="text-xs text-[#4A5568] mb-4">Ano lectivo {activeYear}</div>}
@@ -114,7 +113,7 @@ export default function HomePage() {
                 </div>
                 <div>
                   <label className="text-xs text-[#4A5568] uppercase tracking-wider mb-1.5 flex items-center gap-1.5"><School className="w-3.5 h-3.5" strokeWidth={1.5}/> Escola</label>
-                  <Select value={school} onValueChange={setSchool} disabled={!mun}>
+                  <Select value={schoolId} onValueChange={setSchoolId} disabled={!mun}>
                     <SelectTrigger className="h-11 bg-white" data-testid="school-select"><SelectValue placeholder={mun ? "Selecionar escola" : "Escolha primeiro o concelho"} /></SelectTrigger>
                     <SelectContent>
                       {schools.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
@@ -123,14 +122,14 @@ export default function HomePage() {
                 </div>
                 <div>
                   <label className="text-xs text-[#4A5568] uppercase tracking-wider mb-1.5 flex items-center gap-1.5"><GraduationCap className="w-3.5 h-3.5" strokeWidth={1.5}/> Ano de escolaridade</label>
-                  <Select value={grade} onValueChange={setGrade} disabled={!school}>
-                    <SelectTrigger className="h-11 bg-white" data-testid="grade-select"><SelectValue placeholder={school ? "Selecionar ano" : "Escolha primeiro a escola"} /></SelectTrigger>
+                  <Select value={grade} onValueChange={setGrade} disabled={!schoolId}>
+                    <SelectTrigger className="h-11 bg-white" data-testid="grade-select"><SelectValue placeholder={schoolId ? "Selecionar ano" : "Escolha primeiro a escola"} /></SelectTrigger>
                     <SelectContent>
-                      {grades.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                      {grades.map((g) => <SelectItem key={g} value={g}>{formatSchoolGrade(g)}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
-                <Button onClick={searchSchool} disabled={!mun || !school || !grade} className="w-full h-11 bg-[#5A8F1E] hover:bg-[#3E6E11] text-white disabled:bg-slate-300 mt-2" data-testid="search-school-btn">
+                <Button onClick={searchSchool} disabled={!mun || !schoolId || !grade} className="w-full h-11 bg-[#5A8F1E] hover:bg-[#3E6E11] text-white disabled:bg-slate-300 mt-2" data-testid="search-school-btn">
                   Ver lista de livros
                 </Button>
               </div>
@@ -140,7 +139,7 @@ export default function HomePage() {
       </section>
 
       {/* TRUST BAR */}
-      <section className="border-y border-[#E2E8F0] bg-white">
+      <section className="border-y border-[#E2E8F0] bg-[#FBF9F4]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid grid-cols-2 md:grid-cols-4 gap-6">
           {[
             { icon: BookOpen, t: "Manuais & Cadernos", s: "Todas as editoras certificadas" },
