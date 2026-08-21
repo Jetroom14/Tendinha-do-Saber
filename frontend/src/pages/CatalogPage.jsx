@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
 import { BookCard } from "@/components/BookCard";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
 import SEO from "@/components/SEO";
+import { formatSchoolGrade } from "@/lib/utils";
 import { toast } from "sonner";
 import { Search, Filter, X, ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -21,6 +22,7 @@ export default function CatalogPage() {
   const [grades, setGrades] = useState([]);
   const [munis, setMunis] = useState([]);
   const [schools, setSchools] = useState([]);
+  const [availability, setAvailability] = useState(null);
   const [loading, setLoading] = useState(false);
   const [q, setQ] = useState(params.get("q") || "");
   const { add } = useCart();
@@ -29,17 +31,27 @@ export default function CatalogPage() {
   const type = params.get("type") || "all";
   const grade = params.get("grade") || "";
   const mun = params.get("mun") || "";
-  const schoolId = params.get("school_id") || "";
+  const schoolId = params.get("school") || "";
   const page = Math.max(1, parseInt(params.get("page") || "1", 10));
 
-  const setParam = (k, v) => {
+  const selectedMunicipality = munis.find((m) => m.id === mun || m.name === mun) || null;
+  const municipalityId = selectedMunicipality?.id || "";
+  const municipalityName = selectedMunicipality?.name || mun;
+  const selectedSchool = schools.find((s) => s.id === schoolId || s.name === schoolId) || null;
+  const schoolName = selectedSchool?.name || "";
+
+  const setParam = useCallback((k, v) => {
     const next = new URLSearchParams(params);
     if (v && v !== "all") next.set(k, v); else next.delete(k);
-    if (k === "grade" || k === "mun") next.delete("school_id");
+    if (k === "mun") {
+      next.delete("school");
+      next.delete("grade");
+    }
+    if (k === "school") next.delete("grade");
     // reset to page 1 whenever a filter changes (not when changing page)
     if (k !== "page") next.delete("page");
     setParams(next);
-  };
+  }, [params, setParams]);
 
   const goToPage = (p) => {
     const next = new URLSearchParams(params);
@@ -48,13 +60,14 @@ export default function CatalogPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const fetchBooks = async () => {
+  const fetchBooks = useCallback(async () => {
     setLoading(true);
     const qs = new URLSearchParams();
     if (q) qs.set("q", q);
     if (subject !== "all") qs.set("subject", subject);
     if (type !== "all") qs.set("type", type);
-    if (schoolId) qs.set("school_id", schoolId);
+    if (municipalityName) qs.set("concelho", municipalityName);
+    if (schoolName) qs.set("school_name", schoolName);
     if (grade) qs.set("grade_level", grade);
     qs.set("limit", String(PAGE_SIZE));
     qs.set("page", String(page));
@@ -63,23 +76,49 @@ export default function CatalogPage() {
     setTotal(data.total ?? 0);
     setPages(data.pages ?? 1);
     setLoading(false);
-  };
+  }, [grade, municipalityName, page, q, schoolName, subject, type]);
 
   useEffect(() => {
     api.get("/books/subjects").then((r) => setSubjects(r.data.filter(Boolean)));
-    api.get("/grade-levels").then((r) => setGrades(r.data));
-    api.get("/municipalities").then((r) => setMunis(r.data));
+    api.get("/municipalities").then((r) => setMunis(Array.isArray(r.data) ? r.data : []));
   }, []);
 
   useEffect(() => {
-    if (mun) {
-      const qs = new URLSearchParams({ municipality_id: mun });
-      if (grade) qs.set("grade", grade);
-      api.get(`/schools?${qs.toString()}`).then((r) => setSchools(Array.isArray(r.data) ? r.data : []));
+    if (municipalityId) {
+      api.get(`/schools?municipality_id=${encodeURIComponent(municipalityId)}`)
+        .then((r) => setSchools(Array.isArray(r.data) ? r.data : []))
+        .catch(() => setSchools([]));
     } else setSchools([]);
-  }, [mun, grade]);
+  }, [municipalityId]);
 
-  useEffect(() => { fetchBooks(); /* eslint-disable-next-line */ }, [params]);
+  useEffect(() => {
+    if (selectedSchool) setGrades(selectedSchool.grades_taught || []);
+    else setGrades([]);
+  }, [selectedSchool]);
+
+  useEffect(() => {
+    if (mun && selectedMunicipality && mun !== selectedMunicipality.id) {
+      setParam("mun", selectedMunicipality.id);
+    }
+  }, [mun, selectedMunicipality, setParam]);
+
+  useEffect(() => {
+    if (schoolId && selectedSchool && schoolId !== selectedSchool.id) {
+      setParam("school", selectedSchool.id);
+    }
+  }, [schoolId, selectedSchool, setParam]);
+
+  useEffect(() => {
+    if (!schoolId || !grade) {
+      setAvailability(null);
+      return;
+    }
+    api.get(`/adoptions/availability?school_id=${encodeURIComponent(schoolId)}&grade=${encodeURIComponent(grade)}`)
+      .then((r) => setAvailability(r.data))
+      .catch(() => setAvailability(null));
+  }, [schoolId, grade]);
+
+  useEffect(() => { fetchBooks(); }, [fetchBooks]);
 
   const submitSearch = (e) => {
     e?.preventDefault();
@@ -88,17 +127,15 @@ export default function CatalogPage() {
 
   const clearAll = () => { setQ(""); setParams(new URLSearchParams()); };
   const handleAdd = (book) => { add(book.isbn13); toast.success("Adicionado ao carrinho"); };
-  const activeFilters = ["q", "subject", "type", "grade", "mun", "school_id"].filter((k) => params.get(k));
+  const activeFilters = ["q", "subject", "type", "grade", "mun", "school"].filter((k) => params.get(k));
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12" data-testid="catalog-page">
       <SEO title="Catálogo de Manuais Escolares" path="/catalogo" description="Catálogo completo de manuais escolares e cadernos de fichas. Filtre por ano, concelho, escola, disciplina e tipo. Compra online com entrega em Aveiro."/>
       <div className="mb-10">
         <div className="text-[10px] tracking-[0.2em] uppercase text-[#4A5568] font-semibold mb-2">Catálogo</div>
-        <h1 className="font-display text-4xl md:text-5xl font-medium text-[#1A202C] mb-3">
-          {schoolId ? "Manuais da escola" : "Manuais Escolares"}
-        </h1>
-        {grade && <p className="text-[#4A5568]">Ano: <span className="font-medium text-[#1A202C]">{grade}</span></p>}
+        <h1 className="font-display text-4xl md:text-5xl font-medium text-[#1A202C] mb-3">{schoolName ? "Manuais da escola" : "Manuais Escolares"}</h1>
+        {grade && <p className="text-[#4A5568]">Ano: <span className="font-medium text-[#1A202C]">{formatSchoolGrade(grade)}</span></p>}
       </div>
 
       {/* Filters */}
@@ -110,14 +147,14 @@ export default function CatalogPage() {
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <Select value={grade || "all"} onValueChange={(v) => setParam("grade", v === "all" ? "" : v)}>
-            <SelectTrigger className="h-10" data-testid="filter-grade"><SelectValue placeholder="Ano"/></SelectTrigger>
+            <SelectTrigger className="h-10" data-testid="filter-grade"><SelectValue placeholder={schoolName ? "Ano" : "Escolha escola"}/></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Qualquer ano</SelectItem>
-              {grades.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+              {grades.map((g) => <SelectItem key={g} value={g}>{formatSchoolGrade(g)}</SelectItem>)}
             </SelectContent>
           </Select>
 
-          <Select value={mun || "all"} onValueChange={(v) => setParam("mun", v === "all" ? "" : v)}>
+          <Select value={(selectedMunicipality?.id || mun) || "all"} onValueChange={(v) => setParam("mun", v === "all" ? "" : v)}>
             <SelectTrigger className="h-10" data-testid="filter-municipality"><SelectValue placeholder="Concelho"/></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Qualquer concelho</SelectItem>
@@ -125,7 +162,7 @@ export default function CatalogPage() {
             </SelectContent>
           </Select>
 
-          <Select value={schoolId || "all"} onValueChange={(v) => setParam("school_id", v === "all" ? "" : v)} disabled={!mun}>
+          <Select value={(selectedSchool?.id || schoolId) || "all"} onValueChange={(v) => setParam("school", v === "all" ? "" : v)} disabled={!municipalityId}>
             <SelectTrigger className="h-10" data-testid="filter-school"><SelectValue placeholder={mun ? "Escola" : "Escolha concelho"}/></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Qualquer escola</SelectItem>
@@ -163,8 +200,22 @@ export default function CatalogPage() {
       ) : books.length === 0 ? (
         <div className="text-center py-20" data-testid="catalog-empty">
           <Filter className="w-10 h-10 text-[#4A5568] mx-auto mb-3" strokeWidth={1.5}/>
-          <p className="text-[#4A5568] mb-3">Sem resultados para os filtros selecionados.</p>
-          <Button variant="outline" onClick={clearAll}>Limpar filtros</Button>
+          {availability && !availability.has_adoptions ? (
+            <>
+              <p className="text-[#4A5568] mb-4">A lista oficial de manuais desta escola ainda nao esta disponivel.</p>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <Link to="/catalogo">
+                  <Button className="bg-[#5A8F1E] hover:bg-[#3E6E11] text-white">Ver catalogo completo</Button>
+                </Link>
+                <Link to="/contactos" className="text-[#5A8F1E] hover:underline">Falar com a equipa</Link>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-[#4A5568] mb-3">Sem resultados para os filtros selecionados.</p>
+              <Button variant="outline" onClick={clearAll}>Limpar filtros</Button>
+            </>
+          )}
         </div>
       ) : (
         <>

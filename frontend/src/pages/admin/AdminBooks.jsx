@@ -1,16 +1,17 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Trash2, Plus, Search, Image, RefreshCw, CheckCircle2, Download, Link2 } from "lucide-react";
+import { Pencil, Trash2, Plus, Search, Image, RefreshCw, CheckCircle2, Download, Link2, Save, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 
 const BLANK = { isbn13: "", pe_code: "", slug: "", related_book_id: "", title: "", author: "", publisher: "", subject: "", year: 2025, price: 0, type: "Manual", status: "Available", stock_qty: 0, synopsis: "", image_url: "", is_lamination_eligible: true };
+const PAGE_SIZE = 50;
 
 // Bloco A: retorna a chave a usar em URLs de admin (edit/delete). Para livros
 // com ISBN, é o ISBN. Para livros sem ISBN, é o slug (ou pe_code como fallback).
@@ -19,20 +20,40 @@ const bookKey = (b) => b.isbn13 || b.slug || b.pe_code || b.id;
 export default function AdminBooks() {
   const [books, setBooks] = useState([]);
   const [q, setQ] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [stockFilter, setStockFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(BLANK);
   const [coverStatus, setCoverStatus] = useState(null);
   const [syncing, setSyncing] = useState(false);
+  const [stockDrafts, setStockDrafts] = useState({});
+  const [savingStock, setSavingStock] = useState("");
 
-  const fetchBooks = async () => {
-    const { data } = await api.get(`/books?limit=200${q ? `&q=${encodeURIComponent(q)}` : ""}`);
+  const fetchBooks = useCallback(async () => {
+    const qs = new URLSearchParams({ limit: String(PAGE_SIZE), page: String(page) });
+    if (q) qs.set("q", q);
+    if (typeFilter !== "all") qs.set("type", typeFilter);
+    if (stockFilter !== "all") qs.set("stock", stockFilter);
+    const { data } = await api.get(`/books?${qs.toString()}`);
     setBooks(data.items || []);
-  };
+    setPages(data.pages || 1);
+    setTotal(data.total || 0);
+    setStockDrafts((cur) => {
+      const next = { ...cur };
+      (data.items || []).forEach((book) => {
+        if (next[book.id] === undefined) next[book.id] = book.stock_qty ?? 0;
+      });
+      return next;
+    });
+  }, [page, q, stockFilter, typeFilter]);
   const fetchCoverStatus = async () => {
     try { const { data } = await api.get("/admin/books/covers-status"); setCoverStatus(data); } catch { /* ignore */ }
   };
-  useEffect(() => { fetchBooks(); /* eslint-disable-next-line */ }, [q]);
+  useEffect(() => { fetchBooks(); }, [fetchBooks]);
   useEffect(() => { fetchCoverStatus(); }, []);
 
   // Runs cover enrichment in batches until the backend reports done. Each call
@@ -77,6 +98,26 @@ export default function AdminBooks() {
     if (!confirm("Eliminar este livro?")) return;
     await api.delete(`/admin/books/${encodeURIComponent(bookKey(b))}`);
     toast.success("Livro eliminado"); fetchBooks();
+  };
+
+  const saveStock = async (book) => {
+    const stockQty = parseInt(stockDrafts[book.id], 10);
+    setSavingStock(book.id);
+    try {
+      const payload = {
+        ...book,
+        price: parseFloat(book.price) || 0,
+        stock_qty: Number.isFinite(stockQty) ? Math.max(0, stockQty) : 0,
+        year: parseInt(book.year, 10) || null,
+      };
+      await api.put(`/admin/books/${encodeURIComponent(bookKey(book))}`, payload);
+      toast.success("Stock atualizado");
+      fetchBooks();
+    } catch (e) {
+      toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Erro ao atualizar stock");
+    } finally {
+      setSavingStock("");
+    }
   };
 
   // Bloco B — Exportar TODOS os livros para Excel (via backend, formato texto no ISBN)
@@ -163,7 +204,23 @@ export default function AdminBooks() {
 
       <div className="bg-white border border-slate-200 rounded p-4 mb-4 flex items-center gap-3">
         <Search className="w-4 h-4 text-slate-400"/>
-        <Input value={q} onChange={(e)=>setQ(e.target.value)} placeholder="Pesquisar por ISBN, título, autor..." className="border-0 focus-visible:ring-0 h-8" data-testid="admin-books-search"/>
+        <Input value={q} onChange={(e)=>{ setPage(1); setQ(e.target.value); }} placeholder="Pesquisar por título, ISBN ou código PE..." className="border-0 focus-visible:ring-0 h-8" data-testid="admin-books-search"/>
+        <Select value={typeFilter} onValueChange={(v) => { setPage(1); setTypeFilter(v); }}>
+          <SelectTrigger className="w-40 h-9" data-testid="admin-books-type-filter"><SelectValue placeholder="Tipo"/></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os tipos</SelectItem>
+            <SelectItem value="Manual">Manual</SelectItem>
+            <SelectItem value="Workbook">Caderno</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={stockFilter} onValueChange={(v) => { setPage(1); setStockFilter(v); }}>
+          <SelectTrigger className="w-44 h-9" data-testid="admin-books-stock-filter"><SelectValue placeholder="Stock"/></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todo o stock</SelectItem>
+            <SelectItem value="low">Pouco stock</SelectItem>
+            <SelectItem value="high">Muito stock</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="bg-white border border-slate-200 rounded overflow-x-auto">
@@ -177,7 +234,7 @@ export default function AdminBooks() {
               <th className="text-right p-3">Preço</th>
               <th className="text-center p-3">Stock</th>
               <th className="text-left p-3">Estado</th>
-              <th className="p-3 w-24"></th>
+              <th className="p-3 w-36"></th>
             </tr>
           </thead>
           <tbody>
@@ -195,7 +252,27 @@ export default function AdminBooks() {
                 <td className="p-3 text-slate-600">{b.subject}</td>
                 <td className="p-3"><Badge variant="outline" className="text-xs">{b.type === "Workbook" ? "Caderno" : "Manual"}</Badge></td>
                 <td className="p-3 text-right font-mono">{b.price?.toFixed(2)}€</td>
-                <td className="p-3 text-center">{b.stock_qty}</td>
+                <td className="p-3 text-center">
+                  <div className="flex items-center justify-center gap-2">
+                    <Input
+                      type="number"
+                      min="0"
+                      value={stockDrafts[b.id] ?? b.stock_qty ?? 0}
+                      onChange={(e) => setStockDrafts((cur) => ({ ...cur, [b.id]: e.target.value }))}
+                      className="w-20 h-8 text-center"
+                      data-testid={`stock-input-${bookKey(b)}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => saveStock(b)}
+                      className="p-1.5 rounded hover:bg-slate-200 text-slate-600"
+                      data-testid={`save-stock-${bookKey(b)}`}
+                      disabled={savingStock === b.id}
+                    >
+                      <Save className="w-3.5 h-3.5"/>
+                    </button>
+                  </div>
+                </td>
                 <td className="p-3 text-xs">
                   {b.status === "Available" && <span className="text-emerald-700">● Disponível</span>}
                   {b.status === "PreOrder" && <span className="text-amber-700">● Pré-Venda</span>}
@@ -210,6 +287,18 @@ export default function AdminBooks() {
             {books.length === 0 && <tr><td colSpan={8} className="p-10 text-center text-slate-500">Sem resultados.</td></tr>}
           </tbody>
         </table>
+      </div>
+
+      <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
+        <span>{total} livro(s) · página {page} de {pages}</span>
+        <div className="flex items-center gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} data-testid="admin-books-prev">
+            <ChevronLeft className="w-4 h-4 mr-1"/>Anterior
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages} data-testid="admin-books-next">
+            Seguinte<ChevronRight className="w-4 h-4 ml-1"/>
+          </Button>
+        </div>
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>

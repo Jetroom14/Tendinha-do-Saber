@@ -100,7 +100,7 @@ export default function AdminImport() {
             <input type="file" accept=".xlsx,.xls" onChange={(e) => setSchoolFile(e.target.files[0])} className="hidden" data-testid="school-excel-input"/>
             <span className="text-sm text-slate-700">{schoolFile ? schoolFile.name : "Clique para selecionar um ficheiro .xlsx"}</span>
           </label>
-          <p className="text-xs text-slate-500 mt-2">Colunas obrigatórias: Escola, Município, Anos</p>
+          <p className="text-xs text-slate-500 mt-2">Colunas obrigatorias: Escola, Municipio/Concelho, Anos</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
           <Button onClick={importSchools} disabled={!schoolFile || schoolLoading} className="bg-[#5A8F1E] hover:bg-[#3E6E11] text-white" data-testid="import-schools-btn">

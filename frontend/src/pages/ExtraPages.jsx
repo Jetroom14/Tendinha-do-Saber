@@ -24,30 +24,36 @@ export function AboutPage() {
 }
 
 export function FaqPage() {
-  const FAQS = [
-    { q: "Como faço para encomendar os livros da escola do meu filho?", a: "Use o seletor da página inicial: escolha o ano, o concelho e a escola. Mostramos imediatamente a lista oficial e pode adicionar tudo ao carrinho. Em alternativa, pesquise por título ou ISBN." },
-    { q: "Os preços são iguais aos das outras livrarias?", a: "Sim. Praticamos o Preço de Venda ao Público (PVP) recomendado pelas editoras. A diferença está no serviço de proximidade e na plastificação." },
-    { q: "Quanto custa a plastificação?", a: "2€ por livro. É opcional e escolhe por cada livro no carrinho. Apenas se aplica a manuais (cadernos de fichas não são plastificados)." },
-    { q: "Tenho um código de parceiro. Onde o aplico?", a: "Na página do carrinho existe um campo para inserir o código promocional. Basta introduzi-lo para que o desconto seja aplicado automaticamente à sua encomenda." },
-    { q: "Vocês entregam em casa?", a: "Sim. Fazemos entrega em mão, gratuitamente, em todo o distrito de Aveiro. Para combinar a entrega, entre em contacto connosco após a encomenda." },
-    { q: "Como funciona o voucher MEGA?", a: "Pode submeter o voucher (código ou PDF) na página dedicada. A nossa equipa valida em 24h úteis e o desconto é aplicado à sua próxima encomenda. Veja o passo-a-passo na página Como funciona o voucher MEGA." },
-    { q: "E se o livro estiver indicado como 'Disponível por encomenda'?", a: "Significa que não temos stock imediato, mas pode comprar. Pediremos ao fornecedor e contactamo-lo quando estiver pronto. O prazo depende do fornecedor." },
-    { q: "Posso pagar com MB Way?", a: "Sim. Após a sua encomenda, entraremos em contacto para combinar o pagamento por MB Way ou transferência bancária. A fatura é enviada após a confirmação do pagamento." },
-  ];
+  const [faqs, setFaqs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get("/faq")
+      .then((r) => setFaqs(r.data.items || []))
+      .catch(() => setFaqs([]))
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16" data-testid="faq-page">
       <div className="text-[10px] tracking-[0.2em] uppercase text-[#4A5568] font-semibold mb-2">Ajuda</div>
       <h1 className="font-display text-4xl md:text-5xl font-medium mb-10">Perguntas frequentes</h1>
-      <div className="space-y-5">
-        {FAQS.map((f, i) => (
-          <details key={i} className="group bg-white border border-[#E2E8F0] rounded-md p-5" data-testid={`faq-${i}`}>
+      {loading ? (
+        <p className="text-[#4A5568]">A carregar…</p>
+      ) : faqs.length === 0 ? (
+        <p className="text-[#4A5568] italic">Conteúdo em preparação.</p>
+      ) : (
+        <div className="space-y-5">
+          {faqs.map((f, i) => (
+          <details key={f.id || i} className="group bg-white border border-[#E2E8F0] rounded-md p-5" data-testid={`faq-${i}`}>
             <summary className="cursor-pointer font-display font-medium text-[#1A202C] flex items-center justify-between">
-              {f.q}<span className="text-[#5A8F1E] group-open:rotate-45 transition-transform">+</span>
+              {f.question}<span className="text-[#5A8F1E] group-open:rotate-45 transition-transform">+</span>
             </summary>
-            <p className="mt-3 text-[#4A5568] leading-relaxed">{f.a}</p>
+            <p className="mt-3 text-[#4A5568] leading-relaxed whitespace-pre-line">{f.answer}</p>
           </details>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

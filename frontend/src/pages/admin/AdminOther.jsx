@@ -381,7 +381,7 @@ export function AdminOrders() {
     setExporting(true);
     try {
       const selectedOrders = orders.filter(o => selected.has(o.order_no));
-      const headers = ["Encomenda #", "Data", "Cliente", "Email", "Telefone", "NIF", "Nome Fiscal", "Concelho", "Entrega", "Manuais", "Cadernos", "Desconto", "Plastificação", "Envio", "Total", "Estado", "Pagamento"];
+      const headers = ["Encomenda #", "Data", "Cliente", "Email", "Telefone", "NIF", "Nome Fiscal", "Concelho", "Entrega", "Manuais", "Cadernos", "Desconto", "Plastificação", "Sacos", "Qtd. Sacos", "Envio", "Total", "Estado", "Pagamento"];
       const rows = selectedOrders.map(o => [
         o.order_no,
         new Date(o.created_at).toLocaleDateString("pt-PT"),
@@ -394,11 +394,13 @@ export function AdminOrders() {
         // Bloco B: concelho
         o.delivery?.concelho || "",
         o.delivery?.method === "hand_delivery" ? "Em mão" : "Envio",
-        (o.totals?.manuals || 0).toFixed(2),
-        (o.totals?.workbooks || 0).toFixed(2),
-        (o.totals?.discount || 0).toFixed(2),
-        (o.totals?.lamination || 0).toFixed(2),
-        (o.totals?.shipping || 0).toFixed(2),
+        (o.totals?.subtotal_manuals || 0).toFixed(2),
+        (o.totals?.subtotal_workbooks || 0).toFixed(2),
+        (o.totals?.discount_workbooks || 0).toFixed(2),
+        (o.totals?.lamination_total || 0).toFixed(2),
+        (o.totals?.bags_total || 0).toFixed(2),
+        o.bags_qty || 0,
+        (o.totals?.shipping_cost || 0).toFixed(2),
         (o.totals?.total || 0).toFixed(2),
         o.status,
         o.payment_status || "—",

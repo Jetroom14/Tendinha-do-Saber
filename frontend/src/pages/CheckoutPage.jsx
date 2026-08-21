@@ -29,7 +29,7 @@ function validatePtNif(nif) {
 }
 
 export default function CheckoutPage() {
-  const { items, summary, promoCode, clear } = useCart();
+  const { items, summary, promoCode, clear, bagsQty } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({
@@ -100,6 +100,7 @@ export default function CheckoutPage() {
       const { data } = await api.post("/orders", {
         items,
         promo_code: promoCode || null,
+        bags_qty: bagsQty,
         customer_name: form.name,
         customer_email: form.email,
         customer_phone: form.phone,
@@ -250,7 +251,7 @@ export default function CheckoutPage() {
             <div>
               <div className="font-display font-medium text-sm">Pagamento</div>
               <p className="text-sm text-[#4A5568] mt-1">
-                Será contactado para combinar o pagamento via <strong>MB Way / Multibanco (Ifthenpay)</strong>. A fatura-recibo é emitida automaticamente após confirmação.
+                Será contactado pela Tendinha do Saber para efetuar o pagamento. A fatura-recibo é emitida após confirmação.
               </p>
             </div>
           </section>
@@ -277,6 +278,7 @@ export default function CheckoutPage() {
               <div className="flex justify-between"><dt className="text-[#4A5568]">Cadernos</dt><dd>{summary?.subtotal_workbooks?.toFixed(2)}€</dd></div>
               {summary?.discount_workbooks > 0 && <div className="flex justify-between text-[#E07A1F]"><dt>Desconto</dt><dd>−{summary.discount_workbooks.toFixed(2)}€</dd></div>}
               {summary?.lamination_total > 0 && <div className="flex justify-between"><dt className="text-[#4A5568]">Plastificação</dt><dd>{summary.lamination_total.toFixed(2)}€</dd></div>}
+              {summary?.bags_total > 0 && <div className="flex justify-between"><dt className="text-[#4A5568]">Sacos ({summary.bags_qty || 0})</dt><dd>{summary.bags_total.toFixed(2)}€</dd></div>}
               <div className="flex justify-between" data-testid="checkout-shipping-line">
                 <dt className="text-[#4A5568]">Entrega em mão {form.concelho && <span className="text-xs text-slate-400">· {form.concelho}</span>}</dt>
                 <dd className={shippingCost === 0 ? "text-[#2F855A]" : ""}>{shippingCost === 0 ? "Grátis" : `${shippingCost.toFixed(2).replace(".", ",")} €`}</dd>
