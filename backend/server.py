@@ -1888,13 +1888,26 @@ async def _resolve_cover_url(
     return {"url": None, "source": None, "skipped_no_isbn": not isbn_is_valid}
 
 
+def _missing_cover_query() -> Dict[str, Any]:
+    return {
+        "$or": [
+            {"image_url": ""},
+            {"image_url": None},
+            {
+                "$and": [
+                    {"image_url": {"$regex": "openlibrary"}},
+                    {"cover_source": {"$ne": "open_library"}},
+                ]
+            },
+        ]
+    }
+
+
 @api.get("/admin/books/covers-status")
 async def covers_status(admin: dict = Depends(require_admin)):
     """How many books still need a real cover (so the UI can show progress)."""
     total = await db.books.count_documents({})
-    missing = await db.books.count_documents(
-        {"$or": [{"image_url": ""}, {"image_url": None}, {"image_url": {"$regex": "openlibrary"}}]}
-    )
+    missing = await db.books.count_documents(_missing_cover_query())
     return {"total": total, "with_cover": total - missing, "missing": missing}
 
 
@@ -1917,7 +1930,7 @@ async def enrich_covers(admin: dict = Depends(require_admin), limit: int = 50, c
     settings = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
     publisher_template = settings.get("publisher_cover_template") or None
     diagnostics: dict = {}
-    missing_filter: Dict[str, Any] = {"$or": [{"image_url": ""}, {"image_url": None}, {"image_url": {"$regex": "openlibrary"}}]}
+    missing_filter: Dict[str, Any] = _missing_cover_query()
     query: Dict[str, Any] = dict(missing_filter)
     if cursor:
         query["id"] = {"$gt": cursor}
@@ -1931,7 +1944,7 @@ async def enrich_covers(admin: dict = Depends(require_admin), limit: int = 50, c
                 url = (resolved or {}).get("url")
                 source = (resolved or {}).get("source")
                 if url and source:
-                    await db.books.update_one({"id": b["id"]}, {"$set": {"image_url": url}})
+                    await db.books.update_one({"id": b["id"]}, {"$set": {"image_url": url, "cover_source": source}})
                     updated += 1
                     if source in source_counts:
                         source_counts[source] += 1
