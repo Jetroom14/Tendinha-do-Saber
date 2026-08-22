@@ -136,8 +136,8 @@ export function Footer() {
         <div>
           <h4 className="text-[10px] tracking-[0.2em] uppercase text-[#A0AEC0] mb-4 font-semibold">Contactos</h4>
           <ul className="space-y-2.5 text-sm">
-            <li className="flex items-start gap-2"><User className="w-4 h-4 mt-0.5 text-[#E07A1F]" strokeWidth={1.5}/> Francisco Tendinha</li>
-            <li className="flex items-start gap-2"><Phone className="w-4 h-4 mt-0.5 text-[#E07A1F]" strokeWidth={1.5}/> +351 961 194 491</li>
+            <li className="flex items-start gap-2"><User className="w-4 h-4 mt-0.5 text-[#E07A1F]" strokeWidth={1.5}/> Francisco Neves Tendinha</li>
+            <li className="flex items-start gap-2"><Phone className="w-4 h-4 mt-0.5 text-[#E07A1F]" strokeWidth={1.5}/> <span>+351 961 194 491<span className="block text-xs text-[#A0AEC0]">Chamada para rede móvel nacional</span></span></li>
             <li className="flex items-start gap-2"><Mail className="w-4 h-4 mt-0.5 text-[#E07A1F]" strokeWidth={1.5}/> tendinhadosaber@gmail.com</li>
             <li className="flex items-start gap-2"><MapPin className="w-4 h-4 mt-0.5 text-[#E07A1F]" strokeWidth={1.5}/> Aveiro, Portugal</li>
             <li className="flex items-center gap-3 pt-2">

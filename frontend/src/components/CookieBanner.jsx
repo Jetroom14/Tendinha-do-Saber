@@ -94,7 +94,7 @@ export function CookieBanner() {
               <label className="flex items-start justify-between gap-3 text-sm text-[#1A202C]">
                 <span>
                   <strong>Análise</strong>
-                  <span className="block text-xs text-[#4A5568]">Medição anónima de utilização e desempenho.</span>
+                  <span className="block text-xs text-[#4A5568]">Medição estatística de utilização e desempenho.</span>
                 </span>
                 <input
                   type="checkbox"
