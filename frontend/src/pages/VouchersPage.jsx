@@ -224,6 +224,10 @@ export default function VouchersPage() {
             </div>
           )}
 
+          <p className="text-xs text-[#4A5568] leading-relaxed">
+            Os dados e documentos submetidos serão utilizados para validar o voucher MEGA e processar o respetivo pedido. Consulte a <a href="/legal/privacidade" className="text-[#5A8F1E] hover:underline">Política de Privacidade</a> para saber como são tratados e conservados.
+          </p>
+
           <Button type="submit" disabled={!canSubmit} className="w-full h-11 bg-[#5A8F1E] hover:bg-[#3E6E11] disabled:bg-[#A0AEC0] disabled:hover:bg-[#A0AEC0] text-white" data-testid="submit-voucher-btn">
             <Upload className="w-4 h-4 mr-2" strokeWidth={1.5}/> {submitting ? "A enviar..." : "Submeter voucher"}
           </Button>

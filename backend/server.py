@@ -2847,7 +2847,7 @@ async def admin_list_orders(admin: dict = Depends(require_admin), status: Option
         filt["archived"] = {"$ne": True}
     if status:
         filt["status"] = status
-    return await db.orders.find(filt, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return await db.orders.find(filt, {"_id": 0, "access_token_hash": 0}).sort("created_at", -1).to_list(500)
 
 @api.put("/admin/orders/{order_no}/status")
 async def admin_update_order(order_no: str, status: str = Form(...), admin: dict = Depends(require_admin)):

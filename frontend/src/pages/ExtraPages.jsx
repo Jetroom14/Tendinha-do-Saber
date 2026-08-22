@@ -15,9 +15,9 @@ export function AboutPage() {
         "O catálogo completo de manuais de uma grande livraria, com o cuidado de quem conhece cada família pelo nome."
       </p>
       <div className="prose max-w-none space-y-5 text-[#1A202C] leading-relaxed">
-        <p>Há mais de uma década que a Tendinha do Saber acompanha as famílias de Aveiro e arredores no início de cada ano letivo. Cresceu com a confiança dos pais, professores e alunos — e hoje continua dedicada à mesma missão: <strong>tornar simples a vida escolar das famílias</strong>.</p>
+        <p>Há mais de uma década que a Tendinha do Saber acompanha as famílias do distrito de Aveiro no início de cada ano letivo. Cresceu com a confiança dos pais, professores e alunos — e hoje continua dedicada à mesma missão: <strong>tornar simples a vida escolar das famílias</strong>.</p>
         <p>Trabalhamos diretamente com as principais editoras nacionais para garantir manuais e cadernos de fichas oficiais, ao preço de capa, com o serviço opcional de plastificação que dá outra vida aos livros — para que durem o ano inteiro e ainda sirvam o(a) irmã(o) seguinte.</p>
-        <p>Acreditamos numa loja local, próxima e digital. Por isso construímos este espaço online, onde pode encontrar a lista completa da sua escola em poucos cliques, submeter o seu voucher MEGA, e escolher entre entrega ao domicílio no distrito de Aveiro ou envio para outras zonas.</p>
+        <p>Acreditamos numa livraria local, próxima e digital. Por isso construímos este espaço online, onde pode encontrar a lista completa da sua escola em poucos cliques, submeter o seu voucher MEGA, e escolher a entrega ao domicílio no distrito de Aveiro, com custo dependente do concelho.</p>
       </div>
     </div>
   );
@@ -68,7 +68,7 @@ export function VoucherGuidePage() {
       <div className="grid md:grid-cols-3 gap-6 mb-12">
         {[
           { n: "1", icon: Upload, t: "Submeta o voucher", s: "Insira o código manualmente ou envie um link para o PDF. Demora 30 segundos." },
-          { n: "2", icon: Sparkles, t: "Validamos em 24h", s: "A nossa equipa confirma o voucher e atribui o desconto. Receberá um email de confirmação." },
+          { n: "2", icon: Sparkles, t: "Validamos em 24h", s: "A nossa equipa confirma o voucher e atribui o desconto. Entraremos em contacto após a validação." },
           { n: "3", icon: BookOpen, t: "Receba os manuais", s: "Receba os seus manuais em mão, na morada combinada. Plastificação opcional." },
         ].map((s, i) => (
           <div key={i} className="bg-white border border-[#E2E8F0] rounded-md p-7" data-testid={`voucher-step-${s.n}`}>

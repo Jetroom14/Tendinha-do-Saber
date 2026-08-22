@@ -274,7 +274,7 @@ export default function CheckoutPage() {
 
           <label className="flex items-start gap-2 text-sm text-[#1A202C]">
             <Checkbox required checked={form.accept_terms} onCheckedChange={(v) => setForm({...form, accept_terms: !!v})} data-testid="checkout-terms"/>
-            <span>Li e aceito a <a href="/legal/privacidade" className="text-[#5A8F1E] hover:underline" target="_blank" rel="noreferrer">Política de Privacidade</a> e os <a href="/legal/termos" className="text-[#5A8F1E] hover:underline" target="_blank" rel="noreferrer">Termos & Condições</a>.</span>
+            <span>Li e aceito os <a href="/legal/termos" className="text-[#5A8F1E] hover:underline" target="_blank" rel="noreferrer">Termos & Condições</a> e declaro ter tomado conhecimento da <a href="/legal/privacidade" className="text-[#5A8F1E] hover:underline" target="_blank" rel="noreferrer">Política de Privacidade</a>.</span>
           </label>
           {hasLaminationItems && (
             <label className="flex items-start gap-2 text-sm text-[#1A202C]" data-testid="checkout-lamination-ack">
@@ -284,7 +284,7 @@ export default function CheckoutPage() {
                 onCheckedChange={(v) => setForm({...form, lamination_early_start_ack: !!v})}
               />
               <span>
-                Solicitei plastificação e autorizo o início antecipado desta prestação de serviço após confirmação da encomenda.
+                Solicito expressamente que o serviço de plastificação seja iniciado antes do termo do prazo de livre resolução e reconheço que, após a execução integral desse serviço, perco o direito de livre resolução relativamente ao serviço de plastificação.
               </span>
             </label>
           )}
