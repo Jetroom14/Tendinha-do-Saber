@@ -47,7 +47,7 @@ export default function SEO({
 
 export const ORGANIZATION_JSONLD = {
   "@context": "https://schema.org",
-  "@type": "LocalBusiness",
+  "@type": "Organization",
   name: "Tendinha do Saber",
   description: "Livraria especializada em manuais escolares e cadernos de fichas, em Aveiro.",
   url: typeof window !== "undefined" ? window.location.origin : "",
@@ -61,7 +61,6 @@ export const ORGANIZATION_JSONLD = {
   },
   areaServed: ["Aveiro", "Ílhavo", "Vagos", "Águeda", "Oliveira do Bairro", "Ovar", "Estarreja", "Distrito de Aveiro"],
   priceRange: "€",
-  openingHours: "Mo-Sa 09:00-19:00",
 };
 
 export const buildBookJsonLd = (book) => ({

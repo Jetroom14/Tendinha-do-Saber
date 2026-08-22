@@ -154,6 +154,16 @@ export function Footer() {
           <ul className="space-y-2 text-sm">
             <li><Link to="/legal/privacidade" className="hover:text-white">Política de Privacidade</Link></li>
             <li><Link to="/legal/termos" className="hover:text-white">Termos & Condições</Link></li>
+            <li><Link to="/legal/cookies" className="hover:text-white">Política de Cookies</Link></li>
+            <li>
+              <button
+                type="button"
+                className="hover:text-white"
+                onClick={() => window.dispatchEvent(new Event("ts:open-cookie-preferences"))}
+              >
+                Gerir preferências de cookies
+              </button>
+            </li>
             <li><Link to="/legal/ral" className="hover:text-white">Resolução de Litígios (RAL)</Link></li>
             <li><a href="https://www.livroreclamacoes.pt" target="_blank" rel="noreferrer" className="hover:text-white">Livro de Reclamações</a></li>
           </ul>
@@ -177,7 +187,7 @@ export function Footer() {
       <div className="border-t border-[#1E2F44]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-[#A0AEC0]">
           <span>© {new Date().getFullYear()} Tendinha do Saber. Todos os direitos reservados.</span>
-          <span>RNEC · NIF protegido · Cumprimento GDPR</span>
+          <span>Aviso legal e informação comercial disponíveis nas páginas legais.</span>
         </div>
       </div>
     </footer>

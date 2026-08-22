@@ -21,6 +21,13 @@ def _books(api, **params):
     return data
 
 
+def _first_in_stock_book(books, min_stock=1):
+    for b in books:
+        if b.get("status") == "Available" and (b.get("stock_qty") or 0) >= min_stock:
+            return b
+    return books[0] if books else None
+
+
 
 # ============================ AUTH ============================
 class TestAuth:
@@ -276,37 +283,89 @@ class TestPostcode:
 # ============================ ORDERS ============================
 class TestOrders:
     def test_create_order_and_fetch(self, api):
-        books = _books(api, limit=2)
+        books = _books(api, limit=50)
+        chosen = _first_in_stock_book(books, min_stock=1)
+        assert chosen is not None
         payload = {
-            "items": [{"isbn13": books[0]["isbn13"], "qty": 1, "lamination": False}],
+            "items": [{"isbn13": chosen["isbn13"], "qty": 1, "lamination": False}],
             "promo_code": None,
             "customer_name": "TEST Buyer",
             "customer_email": "test_buyer@example.com",
             "customer_phone": "910000000",
             "delivery_method": "hand_delivery",
+            "delivery_concelho": "Aveiro",
             "address": "Rua Teste 1",
             "postal_code": "3800",
             "notes": "TEST order",
+            "terms_accepted": True,
         }
         r = api.post(f"{BASE_URL}/api/orders", json=payload)
         assert r.status_code == 200, r.text
-        o = r.json()
+        created = r.json()
+        assert "order" in created
+        assert "access_token" in created
+        o = created["order"]
         assert o["order_no"].startswith("TS-")
         assert o["status"] == "pending_payment"
         assert o["totals"]["total"] > 0
-        # GET
-        r2 = api.get(f"{BASE_URL}/api/orders/{o['order_no']}")
+        assert "access_token_hash" not in o
+
+        # GET requires secure header token
+        r2 = api.get(
+            f"{BASE_URL}/api/orders/{o['order_no']}",
+            headers={"X-Order-Access-Token": created["access_token"]},
+        )
         assert r2.status_code == 200
         assert r2.json()["order_no"] == o["order_no"]
 
-    def test_create_order_hand_delivery_outside_aveiro(self, api):
-        books = _books(api, limit=1)
+        # Track by order_no + email continues to work without token (backwards compatibility path)
+        r3 = api.post(
+            f"{BASE_URL}/api/orders/track",
+            json={"order_no": o["order_no"], "email": payload["customer_email"]},
+        )
+        assert r3.status_code == 200, r3.text
+        tracked = r3.json()
+        assert tracked["order_no"] == o["order_no"]
+        assert "customer" not in tracked
+
+    def test_order_fetch_without_token_denied(self, api):
+        books = _books(api, limit=50)
+        chosen = _first_in_stock_book(books, min_stock=1)
+        assert chosen is not None
         payload = {
-            "items": [{"isbn13": books[0]["isbn13"], "qty": 1, "lamination": False}],
+            "items": [{"isbn13": chosen["isbn13"], "qty": 1, "lamination": False}],
+            "promo_code": None,
+            "customer_name": "TEST Buyer 2",
+            "customer_email": f"test_buyer2_{uuid.uuid4().hex[:6]}@example.com",
+            "customer_phone": "910000003",
+            "delivery_method": "hand_delivery",
+            "delivery_concelho": "Aveiro",
+            "address": "Rua Teste 2",
+            "postal_code": "3800",
+            "notes": "TEST order",
+            "terms_accepted": True,
+        }
+        create_resp = api.post(f"{BASE_URL}/api/orders", json=payload)
+        assert create_resp.status_code == 200, create_resp.text
+        created = create_resp.json()
+        order_no = created["order"]["order_no"]
+
+        r = api.get(f"{BASE_URL}/api/orders/{order_no}")
+        assert r.status_code == 404
+        assert "acesso inválido" in r.text.lower()
+
+    def test_create_order_hand_delivery_outside_aveiro(self, api):
+        books = _books(api, limit=50)
+        chosen = _first_in_stock_book(books, min_stock=1)
+        assert chosen is not None
+        payload = {
+            "items": [{"isbn13": chosen["isbn13"], "qty": 1, "lamination": False}],
             "customer_name": "TEST", "customer_email": "t@t.pt", "customer_phone": "910",
             "delivery_method": "hand_delivery",
+            "delivery_concelho": "Lisboa",
             "postal_code": "4000",
             "address": "rua x",
+            "terms_accepted": True,
         }
         r = api.post(f"{BASE_URL}/api/orders", json=payload)
         assert r.status_code == 400

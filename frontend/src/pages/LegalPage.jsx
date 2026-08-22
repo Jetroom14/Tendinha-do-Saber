@@ -41,7 +41,7 @@ export default function LegalPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16" data-testid={`legal-${slug}`}>
-      <SEO title={page.title} description={page.title} url={`/legal/${slug}`}/>
+      <SEO title={page.title} description={page.title} path={`/legal/${slug}`}/>
       <div className="text-[10px] tracking-[0.2em] uppercase text-[#4A5568] font-semibold mb-2">Legal</div>
       <h1 className="font-display text-3xl md:text-4xl font-medium mb-8">{page.title}</h1>
       {isEmpty ? (
