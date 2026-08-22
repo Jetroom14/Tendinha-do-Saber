@@ -57,22 +57,55 @@ export default function AdminBooks() {
   useEffect(() => { fetchCoverStatus(); }, []);
 
   // Runs cover enrichment in batches until the backend reports done. Each call
-  // handles up to 50 books; we loop so a 291-book catalog completes in one click.
+  // handles up to 10 books and advances by cursor so a large catalog progresses
+  // without repeating the same missing titles forever.
   const syncCovers = async () => {
     setSyncing(true);
     let safety = 0; // hard cap so a persistent failure can't loop forever
+    let cursor = null;
+    let lastCursor = null;
+    let totalUpdated = 0;
+    let totalSources = { publisher: 0, isbndb: 0, google_books: 0, open_library: 0 };
+    let interrupted = false;
     try {
       let done = false;
-      while (!done && safety < 40) {
+      while (!done && safety < 120) {
         safety += 1;
-        const { data } = await api.post("/admin/books/enrich-covers?limit=50");
-        setCoverStatus((cs) => cs ? { ...cs, missing: data.remaining, with_cover: cs.total - data.remaining } : cs);
-        done = data.done || data.processed === 0;
+        const qs = new URLSearchParams({ limit: "10" });
+        if (cursor) qs.set("cursor", cursor);
+        const { data } = await api.post(`/admin/books/enrich-covers?${qs.toString()}`);
+        totalUpdated += data.updated || 0;
+        totalSources = {
+          publisher: totalSources.publisher + (data.sources?.publisher || 0),
+          isbndb: totalSources.isbndb + (data.sources?.isbndb || 0),
+          google_books: totalSources.google_books + (data.sources?.google_books || 0),
+          open_library: totalSources.open_library + (data.sources?.open_library || 0),
+        };
+        if (data.rate_limited) {
+          toast.warning("ISBNdb atingiu o limite temporário. A procura foi interrompida e pode ser retomada mais tarde.");
+          interrupted = true;
+          break;
+        }
+        if (lastCursor && data.next_cursor && data.next_cursor === lastCursor) {
+          toast.error("A procura de capas não avançou. A operação foi interrompida por segurança.");
+          interrupted = true;
+          break;
+        }
+        lastCursor = data.next_cursor || lastCursor;
+        cursor = data.next_cursor || cursor;
+        done = Boolean(data.done) || !cursor || data.processed === 0;
       }
       await fetchCoverStatus();
       await fetchBooks();
-      toast.success("Procura de capas concluída.");
+      if (!interrupted) {
+        toast.success(`Procura concluída: ${totalUpdated} capas encontradas${totalSources.isbndb ? ` · ISBNdb: ${totalSources.isbndb}` : ""}${(totalSources.publisher + totalSources.google_books + totalSources.open_library) ? ` · outras fontes: ${totalSources.publisher + totalSources.google_books + totalSources.open_library}` : ""}`);
+      }
     } catch (e) {
+      const detail = e.response?.data?.detail;
+      if (detail === "ISBNdb recusou a autenticação. Verifique ISBNDB_API_KEY.") {
+        toast.error(detail);
+        return;
+      }
       toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Erro ao procurar capas");
     } finally { setSyncing(false); }
   };
@@ -181,7 +214,7 @@ export default function AdminBooks() {
           {coverStatus ? (
             coverStatus.missing > 0 ? (
               <p className="text-xs text-slate-600 mt-0.5">
-                {coverStatus.with_cover} de {coverStatus.total} livros têm capa · <span className="text-amber-700 font-medium">{coverStatus.missing} sem capa</span>. Procuramos pelo ISBN na editora (se configurada em Definições), Google Books e Open Library.
+                {coverStatus.with_cover} de {coverStatus.total} livros têm capa · <span className="text-amber-700 font-medium">{coverStatus.missing} sem capa</span>. Procuramos pelo ISBN na editora (se configurada em Definições), ISBNdb, Google Books e Open Library.
               </p>
             ) : (
               <p className="text-xs text-emerald-700 mt-0.5 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5"/> Todos os {coverStatus.total} livros têm capa.</p>

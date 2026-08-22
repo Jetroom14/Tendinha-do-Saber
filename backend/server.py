@@ -7,6 +7,8 @@ load_dotenv(ROOT_DIR / ".env")
 
 import os
 import re
+import asyncio
+import time
 import uuid
 import json
 import shutil
@@ -40,6 +42,11 @@ LAMINATION_PRICE = float(os.environ.get("LAMINATION_PRICE", "2.00"))
 SHIPPING_FLAT_RATE = float(os.environ.get("SHIPPING_FLAT_RATE", "4.90"))
 BAG_PRICE = float(os.environ.get("BAG_PRICE", "0.10"))
 STOCK_LOW_THRESHOLD = 5  # "pouco stock" no admin; ajuste fácil se necessário.
+ISBNDB_API_KEY = os.environ.get("ISBNDB_API_KEY", "").strip()
+ISBNDB_BASE_URL = "https://api2.isbndb.com"
+ISBNDB_MIN_INTERVAL = 1.05
+_ISBNDB_LOCK = asyncio.Lock()
+_ISBNDB_LAST_REQUEST_AT = 0.0
 
 # Private, non-public storage for MEGA voucher PDFs. NEVER place this under
 # frontend/public or mount it as a FastAPI StaticFiles route — it must only
@@ -1668,6 +1675,16 @@ async def import_books(file: UploadFile = File(...), admin: dict = Depends(requi
 GOOGLE_BOOKS_API_KEY = os.environ.get("GOOGLE_BOOKS_API_KEY", "").strip()
 
 
+class ISBNdbAuthError(Exception):
+    pass
+
+
+class ISBNdbRateLimitError(Exception):
+    def __init__(self, retry_after: Optional[str] = None):
+        super().__init__("ISBNdb rate limited")
+        self.retry_after = retry_after
+
+
 def _gb_url(query: str) -> str:
     """Google Books API URL builder. `country=PT` is REQUIRED (without it the
     API returns 403 'unknownLocation' because it can't derive the caller's
@@ -1679,29 +1696,91 @@ def _gb_url(query: str) -> str:
     return url
 
 
+async def _image_ok(client_http, url: str) -> bool:
+    try:
+        r = await client_http.get(url, follow_redirects=True)
+        ctype = r.headers.get("content-type", "")
+        return r.status_code == 200 and ctype.startswith("image") and len(r.content) > 1500
+    except Exception:
+        return False
+
+
+async def _throttle_isbndb_request():
+    global _ISBNDB_LAST_REQUEST_AT
+    async with _ISBNDB_LOCK:
+        now = time.monotonic()
+        wait_for = (_ISBNDB_LAST_REQUEST_AT + ISBNDB_MIN_INTERVAL) - now
+        if wait_for > 0:
+            await asyncio.sleep(wait_for)
+            now = time.monotonic()
+        _ISBNDB_LAST_REQUEST_AT = now
+
+
+async def _resolve_isbndb_cover(client_http, isbn: str) -> Optional[str]:
+    clean_isbn = strip_isbn(isbn or "")
+    if not ISBNDB_API_KEY or not re.fullmatch(r"\d{13}", clean_isbn):
+        return None
+
+    await _throttle_isbndb_request()
+    url = f"{ISBNDB_BASE_URL}/book/{clean_isbn}?with_prices=false"
+    headers = {"Authorization": ISBNDB_API_KEY, "Accept": "application/json"}
+
+    try:
+        r = await client_http.get(url, headers=headers)
+    except Exception as e:
+        logger.warning(f"[covers] ISBNdb exception for ISBN {clean_isbn}: {type(e).__name__}: {e}")
+        return None
+
+    if r.status_code in (401, 403):
+        logger.warning("[covers] ISBNdb auth error. Verifique ISBNDB_API_KEY.")
+        raise ISBNdbAuthError("ISBNdb recusou a autenticação. Verifique ISBNDB_API_KEY.")
+    if r.status_code == 429:
+        retry_after = r.headers.get("retry-after")
+        logger.warning("[covers] ISBNdb rate limit atingido.")
+        raise ISBNdbRateLimitError(retry_after)
+    if r.status_code == 404:
+        logger.info(f"[covers] ISBNdb 404 para ISBN {clean_isbn}")
+        return None
+    if r.status_code >= 400:
+        logger.warning(f"[covers] ISBNdb HTTP {r.status_code} para ISBN {clean_isbn}: {r.text[:200]}")
+        return None
+
+    try:
+        data = r.json()
+    except Exception as e:
+        logger.warning(f"[covers] ISBNdb JSON inválido para ISBN {clean_isbn}: {type(e).__name__}: {e}")
+        return None
+
+    image = (data.get("book") or {}).get("image")
+    if image and await _image_ok(client_http, image):
+        return image.replace("http://", "https://")
+
+    logger.info(f"[covers] ISBNdb sem imagem válida para ISBN {clean_isbn}")
+    return None
+
+
 async def _resolve_cover_url(
     client_http,
     book: dict,
     publisher_template: Optional[str] = None,
     diag: Optional[dict] = None,
-) -> Optional[str]:
+) -> Optional[dict]:
     """Tries several public sources, in order of reliability, and returns the
     first WORKING cover URL (or None). Records per-source outcomes into
     `diag` (dict keyed by source name → {success,not_found,blocked,error}) so
     the admin UI can show WHY a run produced few/no covers.
 
     Sources tried:
-      0. Publisher URL template (configured in Settings) — TRUSTED, no server
-         validation because outbound cloud IPs are usually blocked by publisher
-         CDNs (Cloudflare). The browser fetches these directly and the
-         front-end already has a placeholder fallback if the image 404s.
-      1. Google Books by ISBN (with own API key + country=PT)
-      2. Google Books by title (+ author when available)
-      3. Open Library by ISBN
+      0. Publisher URL template (configured in Settings) — validated before use.
+      1. ISBNdb by ISBN (when configured, with 1 req/s throttle)
+      2. Google Books by ISBN (with own API key + country=PT)
+      3. Google Books by title (+ author when available)
+      4. Open Library by ISBN
     """
     isbn = book.get("isbn13", "") or ""
     title = (book.get("title", "") or "").strip()
     author = (book.get("author", "") or "").strip()
+    isbn_is_valid = bool(re.fullmatch(r"\d{13}", strip_isbn(isbn)))
 
     def note(source: str, outcome: str):
         if diag is None:
@@ -1709,45 +1788,60 @@ async def _resolve_cover_url(
         d = diag.setdefault(source, {"success": 0, "not_found": 0, "blocked": 0, "error": 0})
         d[outcome] = d.get(outcome, 0) + 1
 
-    async def _image_ok(url: str) -> bool:
-        try:
-            r = await client_http.get(url, follow_redirects=True)
-            ctype = r.headers.get("content-type", "")
-            return r.status_code == 200 and ctype.startswith("image") and len(r.content) > 1500
-        except Exception:
-            return False
-
     # 0. Publisher cover template — TRUSTED (see docstring).
     if publisher_template and "{isbn}" in publisher_template:
         pub_url = publisher_template.replace("{isbn}", isbn)
-        note("publisher_template", "success")
-        return pub_url
+        if await _image_ok(client_http, pub_url):
+            note("publisher_template", "success")
+            return {"url": pub_url, "source": "publisher"}
+        note("publisher_template", "not_found")
 
-    # 1. Google Books by ISBN
-    try:
-        r = await client_http.get(_gb_url(f"q=isbn:{isbn}"))
-        if r.status_code == 429:
-            note("google_isbn", "blocked")
-            logger.warning(f"[covers] Google Books quota (429) for ISBN {isbn}. Set GOOGLE_BOOKS_API_KEY.")
-        elif r.status_code >= 400:
-            note("google_isbn", "error")
-            logger.warning(f"[covers] Google Books HTTP {r.status_code} for ISBN {isbn}: {r.text[:200]}")
-        else:
-            data = r.json()
-            if data.get("totalItems", 0) > 0:
-                links = (data["items"][0].get("volumeInfo", {}).get("imageLinks") or {})
-                u = links.get("thumbnail") or links.get("smallThumbnail")
-                if u:
-                    note("google_isbn", "success")
-                    return u.replace("http://", "https://").replace("&edge=curl", "")
-                note("google_isbn", "not_found")
+    # 1. ISBNdb by ISBN
+    if isbn_is_valid and ISBNDB_API_KEY:
+        try:
+            isbndb_url = await _resolve_isbndb_cover(client_http, isbn)
+            if isbndb_url:
+                note("isbndb", "success")
+                return {"url": isbndb_url, "source": "isbndb"}
+            note("isbndb", "not_found")
+        except ISBNdbAuthError:
+            note("isbndb", "error")
+            raise
+        except ISBNdbRateLimitError:
+            note("isbndb", "blocked")
+            raise
+        except Exception as e:
+            note("isbndb", "error")
+            logger.warning(f"[covers] ISBNdb unexpected exception for {isbn}: {type(e).__name__}: {e}")
+    elif not isbn_is_valid:
+        note("isbndb", "not_found")
+
+    # 2. Google Books by ISBN
+    if isbn_is_valid:
+        try:
+            r = await client_http.get(_gb_url(f"q=isbn:{isbn}"))
+            if r.status_code == 429:
+                note("google_isbn", "blocked")
+                logger.warning(f"[covers] Google Books quota (429) for ISBN {isbn}. Set GOOGLE_BOOKS_API_KEY.")
+            elif r.status_code >= 400:
+                note("google_isbn", "error")
+                logger.warning(f"[covers] Google Books HTTP {r.status_code} for ISBN {isbn}: {r.text[:200]}")
             else:
-                note("google_isbn", "not_found")
-    except Exception as e:
-        note("google_isbn", "error")
-        logger.warning(f"[covers] Google Books ISBN exception for {isbn}: {type(e).__name__}: {e}")
+                data = r.json()
+                if data.get("totalItems", 0) > 0:
+                    links = (data["items"][0].get("volumeInfo", {}).get("imageLinks") or {})
+                    u = links.get("thumbnail") or links.get("smallThumbnail")
+                    if u:
+                        note("google_isbn", "success")
+                        return {"url": u.replace("http://", "https://").replace("&edge=curl", ""), "source": "google_books"}
+                    note("google_isbn", "not_found")
+                else:
+                    note("google_isbn", "not_found")
+        except Exception as e:
+            note("google_isbn", "error")
+            logger.warning(f"[covers] Google Books ISBN exception for {isbn}: {type(e).__name__}: {e}")
 
-    # 2. Google Books by title (+ author when present)
+    # 3. Google Books by title (+ author when present)
     if title:
         try:
             q = f'intitle:"{title}"'
@@ -1766,7 +1860,7 @@ async def _resolve_cover_url(
                     u = links.get("thumbnail") or links.get("smallThumbnail")
                     if u:
                         note("google_title", "success")
-                        return u.replace("http://", "https://").replace("&edge=curl", "")
+                        return {"url": u.replace("http://", "https://").replace("&edge=curl", ""), "source": "google_books"}
                     note("google_title", "not_found")
                 else:
                     note("google_title", "not_found")
@@ -1774,23 +1868,24 @@ async def _resolve_cover_url(
             note("google_title", "error")
             logger.warning(f"[covers] Google Books title exception for {isbn}: {type(e).__name__}: {e}")
 
-    # 3. Open Library by ISBN
-    ol_url = f"https://covers.openlibrary.org/b/isbn/{isbn}-L.jpg?default=false"
-    try:
-        r = await client_http.get(ol_url, follow_redirects=True)
-        ctype = r.headers.get("content-type", "")
-        if r.status_code == 200 and ctype.startswith("image") and len(r.content) > 1500:
-            note("openlibrary", "success")
-            return ol_url
-        elif r.status_code == 404:
-            note("openlibrary", "not_found")
-        else:
+    # 4. Open Library by ISBN
+    if isbn_is_valid:
+        ol_url = f"https://covers.openlibrary.org/b/isbn/{isbn}-L.jpg?default=false"
+        try:
+            r = await client_http.get(ol_url, follow_redirects=True)
+            ctype = r.headers.get("content-type", "")
+            if r.status_code == 200 and ctype.startswith("image") and len(r.content) > 1500:
+                note("openlibrary", "success")
+                return {"url": ol_url, "source": "open_library"}
+            elif r.status_code == 404:
+                note("openlibrary", "not_found")
+            else:
+                note("openlibrary", "error")
+        except Exception as e:
             note("openlibrary", "error")
-    except Exception as e:
-        note("openlibrary", "error")
-        logger.warning(f"[covers] Open Library exception for {isbn}: {type(e).__name__}: {e}")
+            logger.warning(f"[covers] Open Library exception for {isbn}: {type(e).__name__}: {e}")
 
-    return None
+    return {"url": None, "source": None, "skipped_no_isbn": not isbn_is_valid}
 
 
 @api.get("/admin/books/covers-status")
@@ -1804,47 +1899,74 @@ async def covers_status(admin: dict = Depends(require_admin)):
 
 
 @api.post("/admin/books/enrich-covers")
-async def enrich_covers(admin: dict = Depends(require_admin), limit: int = 50):
+async def enrich_covers(admin: dict = Depends(require_admin), limit: int = 50, cursor: Optional[str] = None):
     """Fills in missing book covers from public sources (see _resolve_cover_url).
     Processes up to `limit` books per call so a large catalog can be done in
     batches without timing out. Returns:
-      - updated / processed / remaining / done
-      - diagnostics: per-source counters (success, not_found, blocked, error)
-        + api_key_configured flag + publisher_template flag, so the admin can
-        see WHY the run produced few or no covers.
+      - updated / processed / remaining / done / next_cursor
+      - source counters and rate_limit flags so the admin can see progress.
     """
     import httpx
     updated = 0
     processed = 0
+    not_found = 0
+    skipped_no_isbn = 0
+    rate_limited = False
+    next_cursor = cursor
+    source_counts = {"publisher": 0, "isbndb": 0, "google_books": 0, "open_library": 0}
     settings = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
     publisher_template = settings.get("publisher_cover_template") or None
     diagnostics: dict = {}
-    cursor = db.books.find(
-        {"$or": [{"image_url": ""}, {"image_url": None}, {"image_url": {"$regex": "openlibrary"}}]},
-        {"_id": 0},
-    ).limit(limit)
+    missing_filter: Dict[str, Any] = {"$or": [{"image_url": ""}, {"image_url": None}, {"image_url": {"$regex": "openlibrary"}}]}
+    query: Dict[str, Any] = dict(missing_filter)
+    if cursor:
+        query["id"] = {"$gt": cursor}
+    batch = await db.books.find(query, {"_id": 0}).sort("id", 1).limit(limit).to_list(limit)
     async with httpx.AsyncClient(timeout=10.0, headers={"User-Agent": "TendinhaDoSaber/1.0"}) as client_http:
-        async for b in cursor:
+        for b in batch:
             processed += 1
+            next_cursor = b.get("id") or next_cursor
             try:
-                url = await _resolve_cover_url(client_http, b, publisher_template, diag=diagnostics)
-                if url:
-                    await db.books.update_one({"isbn13": b["isbn13"]}, {"$set": {"image_url": url}})
+                resolved = await _resolve_cover_url(client_http, b, publisher_template, diag=diagnostics)
+                url = (resolved or {}).get("url")
+                source = (resolved or {}).get("source")
+                if url and source:
+                    await db.books.update_one({"id": b["id"]}, {"$set": {"image_url": url}})
                     updated += 1
+                    if source in source_counts:
+                        source_counts[source] += 1
+                else:
+                    not_found += 1
+                    if (resolved or {}).get("skipped_no_isbn"):
+                        skipped_no_isbn += 1
+            except ISBNdbRateLimitError:
+                rate_limited = True
+                logger.warning("[covers] ISBNdb rate limit atingido. Parando lote atual.")
+                break
+            except ISBNdbAuthError:
+                logger.warning("[covers] ISBNdb recusou a autenticação. Parando lote atual.")
+                raise HTTPException(status_code=403, detail="ISBNdb recusou a autenticação. Verifique ISBNDB_API_KEY.")
             except Exception as e:
                 logger.warning(f"[covers] Unexpected exception for {b.get('isbn13')}: {type(e).__name__}: {e}")
                 diagnostics.setdefault("_unhandled", {"count": 0})
                 diagnostics["_unhandled"]["count"] += 1
                 continue
-    remaining = await db.books.count_documents(
-        {"$or": [{"image_url": ""}, {"image_url": None}, {"image_url": {"$regex": "openlibrary"}}]}
-    )
-    await log_action(admin["id"], "enrich", "covers", None, {"updated": updated, "processed": processed, "diag": diagnostics})
+    remaining_query: Dict[str, Any] = dict(missing_filter)
+    if next_cursor:
+        remaining_query["id"] = {"$gt": next_cursor}
+    remaining = await db.books.count_documents(remaining_query)
+    done = remaining == 0 and not rate_limited
+    await log_action(admin["id"], "enrich", "covers", None, {"updated": updated, "processed": processed, "diag": diagnostics, "rate_limited": rate_limited, "next_cursor": next_cursor})
     return {
         "updated": updated,
         "processed": processed,
         "remaining": remaining,
-        "done": remaining == 0,
+        "done": done,
+        "next_cursor": next_cursor,
+        "sources": source_counts,
+        "not_found": not_found,
+        "skipped_no_isbn": skipped_no_isbn,
+        "rate_limited": rate_limited,
         "diagnostics": diagnostics,
         "api_key_configured": bool(GOOGLE_BOOKS_API_KEY),
         "publisher_template_configured": bool(publisher_template and "{isbn}" in (publisher_template or "")),
