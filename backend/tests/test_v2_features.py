@@ -237,10 +237,12 @@ class TestPostcodeAveiroExpanded:
 
 class TestOrdersHandDelivery:
     def _first_book_isbn(self, api):
-        data = api.get(f"{BASE_URL}/api/books?limit=1").json()
+        data = api.get(f"{BASE_URL}/api/books?limit=50").json()
         # /api/books returns a paginated dict {items, total, ...} as of iteration 2.
         items = data["items"] if isinstance(data, dict) else data
-        return items[0]["isbn13"]
+        chosen = next((b for b in items if b.get("status") == "Available" and (b.get("stock_qty") or 0) > 0), None)
+        assert chosen is not None, "No in-stock available books found for order tests"
+        return chosen["isbn13"]
 
     def test_order_hand_delivery_3700_ok(self, api):
         isbn = self._first_book_isbn(api)
@@ -250,12 +252,14 @@ class TestOrdersHandDelivery:
             "customer_email": "test_oaz@example.com",
             "customer_phone": "910000001",
             "delivery_method": "hand_delivery",
+            "delivery_concelho": "Oliveira de Azeméis",
             "address": "Rua de Teste 1",
             "postal_code": "3700",
+            "terms_accepted": True,
         }
         r = api.post(f"{BASE_URL}/api/orders", json=payload)
         assert r.status_code == 200, r.text
-        assert r.json()["order_no"].startswith("TS-")
+        assert r.json()["order"]["order_no"].startswith("TS-")
 
     def test_order_hand_delivery_1000_blocked(self, api):
         isbn = self._first_book_isbn(api)
@@ -265,8 +269,10 @@ class TestOrdersHandDelivery:
             "customer_email": "test_lx@example.com",
             "customer_phone": "910000002",
             "delivery_method": "hand_delivery",
+            "delivery_concelho": "Lisboa",
             "address": "Lisboa",
             "postal_code": "1000",
+            "terms_accepted": True,
         }
         r = api.post(f"{BASE_URL}/api/orders", json=payload)
         assert r.status_code == 400

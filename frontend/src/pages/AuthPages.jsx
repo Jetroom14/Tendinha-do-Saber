@@ -113,6 +113,9 @@ export function RegisterPage() {
             <Label className="text-xs uppercase tracking-wider text-[#4A5568] mb-1.5 block">Palavra-passe</Label>
             <Input type="password" required minLength={6} value={form.password} onChange={(e)=>setForm({...form, password: e.target.value})} data-testid="register-password"/>
           </div>
+          <p className="text-xs text-[#4A5568]">
+            Ao criar uma conta, os seus dados serão tratados nos termos da <Link to="/legal/privacidade" className="text-[#5A8F1E] hover:underline">Política de Privacidade</Link>.
+          </p>
           {err && <p className="text-sm text-[#C53030]" data-testid="register-error">{err}</p>}
           <Button type="submit" disabled={loading} className="w-full bg-[#5A8F1E] hover:bg-[#3E6E11] h-11" data-testid="register-submit">
             {loading ? "A criar..." : "Criar conta"}

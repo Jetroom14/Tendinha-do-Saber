@@ -245,7 +245,7 @@ export default function VouchersPage() {
           </ol>
           <div className="bg-[#EAF2DF] rounded p-4 mt-6 border border-[#D3E2BF]">
             <div className="font-display font-medium text-[#1A202C] mb-1">Privacidade</div>
-            <p className="text-xs">O PDF é guardado em armazenamento privado, acessível apenas pelo administrador. É eliminado automaticamente 12 meses após a utilização (RGPD).</p>
+            <p className="text-xs">O PDF é guardado em armazenamento privado, acessível apenas pelo administrador, e tratado de acordo com a política de retenção aplicável ao serviço.</p>
           </div>
         </div>
       </div>

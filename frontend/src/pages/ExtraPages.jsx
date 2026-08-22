@@ -17,7 +17,7 @@ export function AboutPage() {
       <div className="prose max-w-none space-y-5 text-[#1A202C] leading-relaxed">
         <p>Há mais de uma década que a Tendinha do Saber acompanha as famílias de Aveiro e arredores no início de cada ano letivo. Cresceu com a confiança dos pais, professores e alunos — e hoje continua dedicada à mesma missão: <strong>tornar simples a vida escolar das famílias</strong>.</p>
         <p>Trabalhamos diretamente com as principais editoras nacionais para garantir manuais e cadernos de fichas oficiais, ao preço de capa, com o serviço opcional de plastificação que dá outra vida aos livros — para que durem o ano inteiro e ainda sirvam o(a) irmã(o) seguinte.</p>
-        <p>Acreditamos numa loja local, próxima e digital. Por isso construímos este espaço online, onde pode encontrar a lista completa da sua escola em poucos cliques, submeter o seu voucher MEGA, e escolher entre entrega em mão (Aveiro) ou envio por transportadora.</p>
+        <p>Acreditamos numa loja local, próxima e digital. Por isso construímos este espaço online, onde pode encontrar a lista completa da sua escola em poucos cliques, submeter o seu voucher MEGA, e escolher entre entrega ao domicílio no distrito de Aveiro ou envio para outras zonas.</p>
       </div>
     </div>
   );
@@ -84,7 +84,7 @@ export function VoucherGuidePage() {
         <h2 className="font-display text-lg font-medium mb-3">Nota importante</h2>
         <p className="text-sm text-[#4A5568] leading-relaxed">
           Não existe integração oficial com a plataforma MEGA. A submissão aqui serve para a Tendinha registar o seu voucher e processar manualmente no portal oficial.
-          Após a validação, o desconto é refletido na sua encomenda. Todos os PDFs são armazenados de forma <strong>privada e segura</strong>, com eliminação automática 12 meses após a sua utilização (conforme RGPD).
+          Após a validação, o desconto é refletido na sua encomenda. Os PDFs são armazenados de forma <strong>privada e segura</strong> e seguem a política de retenção definida para este serviço.
         </p>
       </div>
 
@@ -103,12 +103,13 @@ export function TrackOrderPage() {
     e.preventDefault();
     setErr(""); setOrder(null);
     try {
-      const { data } = await api.get(`/orders/${orderNo}`);
-      if (data.customer?.email?.toLowerCase() !== email.toLowerCase()) {
-        setErr("Os dados não correspondem. Verifique o número e o email.");
-      } else setOrder(data);
-    } catch {
-      setErr("Encomenda não encontrada.");
+      const { data } = await api.post("/orders/track", {
+        order_no: orderNo,
+        email,
+      });
+      setOrder(data);
+    } catch (err) {
+      setErr(err?.response?.data?.detail || "Não foi possível encontrar uma encomenda correspondente aos dados indicados.");
     }
   };
 
@@ -147,7 +148,7 @@ export function TrackOrderPage() {
           <div className="grid grid-cols-2 gap-4 text-sm mb-5">
             <div><div className="text-[10px] uppercase tracking-wider text-[#4A5568]">Nº</div><div className="font-mono">{order.order_no}</div></div>
             <div><div className="text-[10px] uppercase tracking-wider text-[#4A5568]">Estado</div><div className="font-medium text-[#5A8F1E]">{STATUS_PT[order.status] || order.status}</div></div>
-            <div><div className="text-[10px] uppercase tracking-wider text-[#4A5568]">Entrega</div><div>{order.delivery?.method === "hand_delivery" ? "Em mão" : "Levantamento"}</div></div>
+            <div><div className="text-[10px] uppercase tracking-wider text-[#4A5568]">Entrega</div><div>{order.delivery?.method === "hand_delivery" ? "Entrega ao domicílio" : "Envio"}</div></div>
             <div><div className="text-[10px] uppercase tracking-wider text-[#4A5568]">Total</div><div className="font-display text-xl">{order.totals?.total?.toFixed(2)}€</div></div>
           </div>
         </div>

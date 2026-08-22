@@ -12,6 +12,8 @@ import json
 import shutil
 import logging
 import secrets
+import hashlib
+import hmac
 import mimetypes
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any, Annotated
@@ -45,7 +47,15 @@ STOCK_LOW_THRESHOLD = 5  # "pouco stock" no admin; ajuste fácil se necessário.
 VOUCHERS_DIR = ROOT_DIR / "private_storage" / "vouchers"
 VOUCHERS_DIR.mkdir(parents=True, exist_ok=True)
 VOUCHER_MAX_BYTES = 8 * 1024 * 1024  # 8MB
-VOUCHER_RETENTION_DAYS = 365  # RGPD: purge PDFs of completed orders after 1 year
+VOUCHER_RETENTION_DAYS = 365  # Current technical retention window for voucher PDFs.
+ORDER_ACCESS_TOKEN_TTL_HOURS = 24
+ORDER_ACCESS_TOKEN_HEADER = "X-Order-Access-Token"
+ORDER_TRACK_LIMIT_WINDOW_SECONDS = 300
+ORDER_TRACK_LIMIT_MAX_ATTEMPTS = 12
+ORDER_TRACK_GLOBAL_LIMIT_WINDOW_SECONDS = 300
+ORDER_TRACK_GLOBAL_LIMIT_MAX_ATTEMPTS = 40
+ORDER_CONFIRM_LIMIT_WINDOW_SECONDS = 300
+ORDER_CONFIRM_LIMIT_MAX_ATTEMPTS = 25
 
 app = FastAPI(title="Tendinha do Saber API")
 api = APIRouter(prefix="/api")
@@ -152,6 +162,153 @@ def clean_doc(d: Optional[dict]) -> Optional[dict]:
         return None
     d.pop("_id", None)
     return d
+
+
+def _normalize_order_no(order_no: str) -> str:
+    return (order_no or "").strip().upper()
+
+
+def _new_order_access_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def _hash_order_access_token(token: str) -> str:
+    return hashlib.sha256((token or "").encode("utf-8")).hexdigest()
+
+
+def _order_access_expires_at() -> datetime:
+    return now_utc() + timedelta(hours=ORDER_ACCESS_TOKEN_TTL_HOURS)
+
+
+def _request_origin_hint(request: Request) -> str:
+    xff = (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
+    x_real_ip = (request.headers.get("X-Real-IP") or "").strip()
+    remote = request.client.host if request.client else ""
+    return xff or x_real_ip or remote or "anon"
+
+
+def _hash_identifier(value: str) -> str:
+    return hashlib.sha256((value or "").encode("utf-8")).hexdigest()
+
+
+def _public_order_access_error() -> HTTPException:
+    return HTTPException(404, "Encomenda não encontrada ou acesso inválido")
+
+
+def _public_order_track_error() -> HTTPException:
+    return HTTPException(404, "Não foi possível encontrar uma encomenda correspondente aos dados indicados.")
+
+
+def _coerce_datetime(value: Any) -> Optional[datetime]:
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError:
+            return None
+    return None
+
+
+def _is_valid_order_access_token(order: dict, provided_token: Optional[str]) -> bool:
+    if not provided_token:
+        return False
+    stored_hash = order.get("access_token_hash")
+    expires_at = _coerce_datetime(order.get("access_token_expires_at"))
+    if not stored_hash or not expires_at:
+        return False
+    if expires_at <= now_utc():
+        return False
+    provided_hash = _hash_order_access_token(provided_token)
+    return hmac.compare_digest(str(stored_hash), provided_hash)
+
+
+def _order_confirmation_payload(order: dict) -> dict:
+    return {
+        "order_no": order.get("order_no"),
+        "status": order.get("status"),
+        "created_at": order.get("created_at"),
+        "items": [
+            {
+                "isbn13": it.get("isbn13"),
+                "title": it.get("title"),
+                "qty": it.get("qty"),
+                "line_total": it.get("line_total"),
+            }
+            for it in (order.get("items") or [])
+        ],
+        "totals": {
+            "subtotal_manuals": (order.get("totals") or {}).get("subtotal_manuals"),
+            "subtotal_workbooks": (order.get("totals") or {}).get("subtotal_workbooks"),
+            "discount_workbooks": (order.get("totals") or {}).get("discount_workbooks"),
+            "lamination_total": (order.get("totals") or {}).get("lamination_total"),
+            "bags_total": (order.get("totals") or {}).get("bags_total"),
+            "shipping_cost": (order.get("totals") or {}).get("shipping_cost"),
+            "total": (order.get("totals") or {}).get("total"),
+        },
+        "delivery": {
+            "method": (order.get("delivery") or {}).get("method"),
+            "concelho": (order.get("delivery") or {}).get("concelho"),
+        },
+        "customer": {
+            "phone": (order.get("customer") or {}).get("phone"),
+        },
+    }
+
+
+def _order_tracking_payload(order: dict) -> dict:
+    return {
+        "order_no": order.get("order_no"),
+        "status": order.get("status"),
+        "created_at": order.get("created_at"),
+        "delivery": {
+            "method": (order.get("delivery") or {}).get("method"),
+            "concelho": (order.get("delivery") or {}).get("concelho"),
+        },
+        "totals": {
+            "total": (order.get("totals") or {}).get("total"),
+            "shipping_cost": (order.get("totals") or {}).get("shipping_cost"),
+        },
+        "items": [
+            {
+                "title": it.get("title"),
+                "qty": it.get("qty"),
+                "line_total": it.get("line_total"),
+            }
+            for it in (order.get("items") or [])
+        ],
+    }
+
+
+async def _new_unique_order_no(max_attempts: int = 12) -> str:
+    for _ in range(max_attempts):
+        ts = int(now_utc().timestamp())
+        suffix = secrets.token_hex(3).upper()
+        candidate = f"TS-{ts}-{suffix}"
+        exists = await db.orders.find_one({"order_no": candidate}, {"_id": 1})
+        if not exists:
+            return candidate
+    raise HTTPException(500, "Não foi possível gerar número de encomenda único")
+
+
+async def _check_order_access_rate_limit(scope: str, key_parts: List[str], max_attempts: int, window_seconds: int):
+    now = now_utc()
+    window_start = now - timedelta(seconds=window_seconds)
+    raw = "|".join([scope] + [str(k or "") for k in key_parts])
+    identifier_hash = _hash_identifier(raw.lower())
+    count = await db.order_access_rate_limits.count_documents({
+        "scope": scope,
+        "identifier_hash": identifier_hash,
+        "created_at_dt": {"$gte": window_start},
+    })
+    if count >= max_attempts:
+        raise HTTPException(429, "Demasiadas tentativas. Tente novamente em instantes.")
+    await db.order_access_rate_limits.insert_one({
+        "scope": scope,
+        "identifier_hash": identifier_hash,
+        "created_at_dt": now,
+        "expires_at": now + timedelta(seconds=window_seconds + 60),
+    })
 
 # ---------- Auth dependency ----------
 async def get_current_user(request: Request) -> dict:
@@ -332,6 +489,13 @@ class OrderCreateIn(BaseModel):
     nif: Optional[str] = None
     fiscal_name: Optional[str] = None
     bags_qty: Optional[int] = 0
+    terms_accepted: Optional[bool] = False
+    lamination_early_start_ack: Optional[bool] = False
+
+
+class OrderTrackIn(BaseModel):
+    order_no: str
+    email: EmailStr
 
 class SettingIn(BaseModel):
     lamination_price: Optional[float] = None
@@ -2020,7 +2184,7 @@ _DEFAULT_FAQS = [
     },
     {
         "question": "Vocês entregam em casa?",
-        "answer": "Sim. Fazemos entrega em mão, gratuitamente, em todo o distrito de Aveiro. Para combinar a entrega, entre em contacto connosco após a encomenda.",
+        "answer": "Sim. Fazemos entrega ao domicílio no distrito de Aveiro. O custo é apresentado no checkout e depende do concelho selecionado.",
     },
     {
         "question": "Como funciona o voucher MEGA?",
@@ -2028,11 +2192,11 @@ _DEFAULT_FAQS = [
     },
     {
         "question": "E se o livro estiver indicado como 'Disponível por encomenda'?",
-        "answer": "Significa que não temos stock imediato, mas pode comprar. Pediremos ao fornecedor e contactamo-lo quando estiver pronto. O prazo depende do fornecedor.",
+        "answer": "Significa que o artigo não está em stock imediato e será solicitado ao fornecedor. O prazo depende da disponibilidade do fornecedor. Salvo indicação ou acordo diferente, a encomenda será cumprida no prazo legal aplicável, em regra até 30 dias. Se tal não for possível, será informado.",
     },
     {
         "question": "Posso pagar com MB Way?",
-        "answer": "Sim. Após a sua encomenda, entraremos em contacto para combinar o pagamento por MB Way ou transferência bancária. A fatura é enviada após a confirmação do pagamento.",
+        "answer": "Após a sua encomenda, entraremos em contacto para combinar o pagamento pelos meios efetivamente disponíveis nesse momento. A fatura é emitida após confirmação do pagamento.",
     },
 ]
 
@@ -2405,10 +2569,11 @@ async def admin_put_shipping_rates(payload: ShippingRatesIn, admin: dict = Depen
 
 # ------------ Legal pages (Bloco D) ------------
 
-LEGAL_SLUGS = ("privacidade", "termos", "ral")
+LEGAL_SLUGS = ("privacidade", "termos", "cookies", "ral")
 LEGAL_TITLES = {
     "privacidade": "Política de Privacidade",
     "termos": "Termos e Condições",
+    "cookies": "Política de Cookies",
     "ral": "Resolução Alternativa de Litígios",
 }
 
@@ -2502,6 +2667,13 @@ async def create_order(payload: OrderCreateIn):
     if not summary["lines"]:
         raise HTTPException(400, "Carrinho vazio ou livros indisponíveis")
 
+    if payload.terms_accepted is not True:
+        raise HTTPException(400, "É necessário aceitar os Termos e Condições para concluir a encomenda.")
+
+    lamination_requested = any(bool(line.get("lamination")) for line in summary["lines"])
+    if lamination_requested and payload.lamination_early_start_ack is not True:
+        raise HTTPException(400, "Confirme a autorização para início antecipado do serviço de plastificação.")
+
     # Bloco C: se pediu fatura com NIF, valida NIF PT + exige nome fiscal
     if payload.wants_invoice:
         if not validate_pt_nif(payload.nif or ""):
@@ -2533,11 +2705,21 @@ async def create_order(payload: OrderCreateIn):
     stock_adjustments = await _reserve_stock(summary["lines"])
 
     total_with_shipping = round(summary["total"] + shipping_cost, 2)
-    order_no = f"TS-{int(now_utc().timestamp())}"
+    order_no = await _new_unique_order_no()
+    access_token = _new_order_access_token()
+    access_token_hash = _hash_order_access_token(access_token)
+    access_token_expires_at = _order_access_expires_at()
 
     customer_match = await db.users.find_one(
         {"email": payload.customer_email.lower(), "role": "customer"}, {"_id": 0, "password_hash": 0}
     )
+
+    terms_page = await db.legal_pages.find_one({"slug": "termos"}, {"_id": 0, "updated_at": 1}) or {}
+    privacy_page = await db.legal_pages.find_one({"slug": "privacidade"}, {"_id": 0, "updated_at": 1}) or {}
+    terms_version = terms_page.get("updated_at") or "unknown_terms_version"
+    privacy_notice_version = privacy_page.get("updated_at") or "unknown_privacy_version"
+    now_iso = iso(now_utc())
+    lamination_ack_at = now_iso if lamination_requested and payload.lamination_early_start_ack else None
 
     doc = {
         "id": gen_id(),
@@ -2576,24 +2758,85 @@ async def create_order(payload: OrderCreateIn):
         "payment_provider": "ifthenpay_mocked",
         "invoice_status": "not_issued",
         "stock_adjustments": stock_adjustments,
-        "created_at": iso(now_utc()),
+        "terms_accepted": True,
+        "terms_accepted_at": now_iso,
+        "terms_version": terms_version,
+        "privacy_notice_version": privacy_notice_version,
+        "lamination_early_start_ack": bool(lamination_requested and payload.lamination_early_start_ack),
+        "lamination_ack_at": lamination_ack_at,
+        "lamination_ack_version": 1 if lamination_ack_at else None,
+        "access_token_hash": access_token_hash,
+        "access_token_expires_at": iso(access_token_expires_at),
+        "created_at": now_iso,
     }
     await db.orders.insert_one(doc)
-    doc.pop("_id", None)
 
     if summary.get("promo"):
         await db.partners.update_one({"promo_code": summary["promo"]["code"]}, {"$inc": {"usage_count": 1}})
 
     # MOCKED payment + invoice hook
     logger.info(f"[MOCKED IFTHENPAY] Order {order_no} created, total={total_with_shipping}€")
-    return doc
+    return JSONResponse(
+        content={
+            "order": _order_confirmation_payload(doc),
+            "access_token": access_token,
+        },
+        headers={"Cache-Control": "no-store"},
+    )
+
+@api.post("/orders/track")
+async def track_order(payload: OrderTrackIn, request: Request):
+    normalized_order_no = _normalize_order_no(payload.order_no)
+    normalized_email = payload.email.strip().lower()
+    origin_hint = _request_origin_hint(request)
+
+    # Primary bucket: order_no + request origin. Varying the email must not
+    # create fresh buckets for repeated brute-force attempts.
+    await _check_order_access_rate_limit(
+        scope="order_tracking",
+        key_parts=[normalized_order_no, origin_hint],
+        max_attempts=ORDER_TRACK_LIMIT_MAX_ATTEMPTS,
+        window_seconds=ORDER_TRACK_LIMIT_WINDOW_SECONDS,
+    )
+    # Secondary guardrail: global attempts per origin across all order numbers.
+    await _check_order_access_rate_limit(
+        scope="order_tracking_origin",
+        key_parts=[origin_hint],
+        max_attempts=ORDER_TRACK_GLOBAL_LIMIT_MAX_ATTEMPTS,
+        window_seconds=ORDER_TRACK_GLOBAL_LIMIT_WINDOW_SECONDS,
+    )
+
+    o = await db.orders.find_one({"order_no": normalized_order_no}, {"_id": 0})
+    if not o:
+        raise _public_order_track_error()
+
+    order_email = str((o.get("customer") or {}).get("email") or "").strip().lower()
+    if not order_email or not hmac.compare_digest(order_email, normalized_email):
+        raise _public_order_track_error()
+
+    return JSONResponse(content=_order_tracking_payload(o), headers={"Cache-Control": "no-store"})
+
 
 @api.get("/orders/{order_no}")
-async def get_order(order_no: str):
-    o = await db.orders.find_one({"order_no": order_no}, {"_id": 0})
+async def get_order(order_no: str, request: Request):
+    normalized_order_no = _normalize_order_no(order_no)
+    origin_hint = _request_origin_hint(request)
+    await _check_order_access_rate_limit(
+        scope="order_confirmation",
+        key_parts=[normalized_order_no, origin_hint],
+        max_attempts=ORDER_CONFIRM_LIMIT_MAX_ATTEMPTS,
+        window_seconds=ORDER_CONFIRM_LIMIT_WINDOW_SECONDS,
+    )
+
+    o = await db.orders.find_one({"order_no": normalized_order_no}, {"_id": 0})
     if not o:
-        raise HTTPException(404, "Encomenda não encontrada")
-    return o
+        raise _public_order_access_error()
+
+    token = request.headers.get(ORDER_ACCESS_TOKEN_HEADER)
+    if not _is_valid_order_access_token(o, token):
+        raise _public_order_access_error()
+
+    return JSONResponse(content=_order_confirmation_payload(o), headers={"Cache-Control": "no-store"})
 
 @api.get("/admin/orders")
 async def admin_list_orders(admin: dict = Depends(require_admin), status: Optional[str] = None, archived: str = "false"):
@@ -2777,7 +3020,7 @@ async def admin_voucher_pdf(vid: str, admin: dict = Depends(require_admin)):
         raise HTTPException(404, "PDF não encontrado para este voucher")
     path = VOUCHERS_DIR / voucher["pdf_storage_path"]
     if not path.exists():
-        raise HTTPException(404, "Ficheiro já não existe (pode ter sido removido por retenção RGPD)")
+        raise HTTPException(404, "Ficheiro já não existe (pode ter sido removido por política de retenção)")
     return FileResponse(path, media_type="application/pdf", filename=f"voucher-{vid}.pdf")
 
 @api.put("/admin/vouchers/{vid}/status")
@@ -2828,7 +3071,7 @@ async def admin_unarchive_vouchers(payload: ArchiveIn, admin: dict = Depends(req
     return {"unarchived": result.modified_count}
 
 async def _purge_old_voucher_pdfs():
-    """RGPD: there is no cron infra in this environment, so this sweep runs
+    """There is no cron infra in this environment, so this sweep runs
     once per backend startup instead of daily. For a long-running production
     deployment, wire this into a real scheduler (e.g. APScheduler/Celery
     beat) so it also runs between restarts."""
@@ -3018,6 +3261,28 @@ async def ensure_indexes():
     await db.categories.create_index("name", unique=True)
     await db.partners.create_index("promo_code", unique=True)
     await db.voucher_submissions.create_index([("identifier", 1), ("at", 1)])
+    await db.orders.create_index("order_no", name="order_no_lookup_idx")
+
+    # Create a unique index only when historical data has no duplicates.
+    duplicate_cursor = db.orders.aggregate([
+        {"$group": {"_id": "$order_no", "count": {"$sum": 1}}},
+        {"$match": {"_id": {"$ne": None}, "count": {"$gt": 1}}},
+        {"$limit": 1},
+    ])
+    duplicates = await duplicate_cursor.to_list(length=1)
+    if duplicates:
+        logger.warning("[orders] Duplicados históricos em order_no detetados; índice unique não foi criado.")
+    else:
+        try:
+            await db.orders.create_index("order_no", unique=True, name="order_no_unique_if_safe")
+        except Exception as e:
+            logger.warning(f"[orders] Não foi possível criar índice unique para order_no: {e}")
+
+    await db.order_access_rate_limits.create_index(
+        [("scope", 1), ("identifier_hash", 1), ("created_at_dt", 1)],
+        name="order_access_rate_lookup_idx",
+    )
+    await db.order_access_rate_limits.create_index("expires_at", expireAfterSeconds=0, name="order_access_rate_ttl")
 
 async def seed_admins():
     admins = [
@@ -3353,7 +3618,7 @@ async def seo_sitemap(request: Request):
     # Static public pages
     static_paths = ["/", "/catalogo", "/parceiros", "/vouchers", "/como-funciona-voucher",
                     "/sobre", "/faq", "/contactos", "/seguir-encomenda",
-                    "/legal/privacidade", "/legal/termos", "/legal/ral"]
+                    "/legal/privacidade", "/legal/termos", "/legal/cookies", "/legal/ral"]
     today = now_utc().date().isoformat()
     urls = [f"<url><loc>{base}{p}</loc><lastmod>{today}</lastmod><changefreq>weekly</changefreq><priority>{'1.0' if p=='/' else '0.7'}</priority></url>" for p in static_paths]
     # All books

@@ -144,7 +144,7 @@ export default function AdminLegal() {
       <div className="mb-6">
         <div className="text-[10px] tracking-[0.2em] uppercase text-slate-500 font-semibold">Legal</div>
         <h1 className="font-display text-3xl font-medium text-slate-900">Páginas Legais</h1>
-        <p className="text-sm text-slate-600 mt-1">Edite o conteúdo das páginas de Privacidade, Termos e RAL. As alterações ficam visíveis publicamente em <code className="bg-slate-100 px-1.5 py-0.5 rounded text-xs">/legal/&#123;slug&#125;</code>.</p>
+        <p className="text-sm text-slate-600 mt-1">Edite o conteúdo das páginas de Privacidade, Termos, Cookies e RAL. As alterações ficam visíveis publicamente em <code className="bg-slate-100 px-1.5 py-0.5 rounded text-xs">/legal/&#123;slug&#125;</code>.</p>
       </div>
 
       {loading ? (

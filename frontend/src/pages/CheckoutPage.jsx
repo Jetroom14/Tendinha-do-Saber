@@ -45,6 +45,7 @@ export default function CheckoutPage() {
     wants_invoice: false,
     nif: "",
     fiscal_name: "",
+    lamination_early_start_ack: false,
   });
   const [postcodeCheck, setPostcodeCheck] = useState(null);
   const [shippingZones, setShippingZones] = useState([]);   // Bloco B
@@ -73,6 +74,7 @@ export default function CheckoutPage() {
   const selectedZone = shippingZones.find((z) => z.name === form.concelho);
   const shippingCost = selectedZone ? Number(selectedZone.rate || 0) : 0;
   const grandTotal = (summary?.total || 0) + shippingCost;
+  const hasLaminationItems = items.some((item) => Boolean(item.lamination));
 
   const submit = async (e) => {
     e.preventDefault();
@@ -82,6 +84,10 @@ export default function CheckoutPage() {
     }
     if (!form.accept_terms) {
       toast.error("Aceite os termos para continuar");
+      return;
+    }
+    if (hasLaminationItems && !form.lamination_early_start_ack) {
+      toast.error("Tem de autorizar o início antecipado da plastificação para os manuais selecionados.");
       return;
     }
     // Bloco C: validação NIF quando fatura pedida
@@ -109,13 +115,23 @@ export default function CheckoutPage() {
         address: form.address,
         postal_code: form.postal_code,
         notes: form.notes,
+        terms_accepted: form.accept_terms,
+        lamination_early_start_ack: hasLaminationItems ? form.lamination_early_start_ack : false,
         wants_invoice: form.wants_invoice,
         nif: form.wants_invoice ? form.nif.replace(/\D/g, "") : null,
         fiscal_name: form.wants_invoice ? form.fiscal_name.trim() : null,
       });
-      toast.success(`Encomenda ${data.order_no} criada!`);
+      const createdOrder = data?.order;
+      const accessToken = data?.access_token;
+      if (!createdOrder?.order_no || !accessToken) {
+        throw new Error("Resposta inválida ao criar encomenda");
+      }
+
+      sessionStorage.setItem(`ts_order_access_${createdOrder.order_no}`, accessToken);
+
+      toast.success(`Encomenda ${createdOrder.order_no} criada!`);
       clear();
-      navigate(`/encomenda/${data.order_no}`);
+      navigate(`/encomenda/${createdOrder.order_no}`, { state: { order: createdOrder } });
     } catch (err) {
       toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Erro ao criar encomenda");
     } finally { setSubmitting(false); }
@@ -260,6 +276,18 @@ export default function CheckoutPage() {
             <Checkbox required checked={form.accept_terms} onCheckedChange={(v) => setForm({...form, accept_terms: !!v})} data-testid="checkout-terms"/>
             <span>Li e aceito a <a href="/legal/privacidade" className="text-[#5A8F1E] hover:underline" target="_blank" rel="noreferrer">Política de Privacidade</a> e os <a href="/legal/termos" className="text-[#5A8F1E] hover:underline" target="_blank" rel="noreferrer">Termos & Condições</a>.</span>
           </label>
+          {hasLaminationItems && (
+            <label className="flex items-start gap-2 text-sm text-[#1A202C]" data-testid="checkout-lamination-ack">
+              <Checkbox
+                required
+                checked={form.lamination_early_start_ack}
+                onCheckedChange={(v) => setForm({...form, lamination_early_start_ack: !!v})}
+              />
+              <span>
+                Solicitei plastificação e autorizo o início antecipado desta prestação de serviço após confirmação da encomenda.
+              </span>
+            </label>
+          )}
         </div>
 
         <aside className="lg:col-span-5">
@@ -288,7 +316,7 @@ export default function CheckoutPage() {
               </div>
             </dl>
             <Button type="submit" disabled={submitting} className="w-full mt-6 h-12 bg-[#E07A1F] hover:bg-[#B85F0E] text-white" data-testid="place-order-btn">
-              {submitting ? "A processar..." : "Confirmar encomenda"}
+              {submitting ? "A processar..." : "Confirmar encomenda com obrigação de pagar"}
             </Button>
           </div>
         </aside>
