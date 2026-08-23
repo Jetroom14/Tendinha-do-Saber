@@ -58,6 +58,16 @@ IFTHENPAY_MBWAY_CALLBACK_KEY = os.environ.get("IFTHENPAY_MBWAY_CALLBACK_KEY", ""
 IFTHENPAY_PAYSHOP_CALLBACK_KEY = os.environ.get("IFTHENPAY_PAYSHOP_CALLBACK_KEY", "").strip()
 IFTHENPAY_REFERENCE_EXPIRY_DAYS = os.environ.get("IFTHENPAY_REFERENCE_EXPIRY_DAYS", "3").strip()
 IFTHENPAY_TIMEOUT = httpx.Timeout(15.0, connect=10.0)
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
+RESEND_FROM_EMAIL = os.environ.get(
+    "RESEND_FROM_EMAIL",
+    "Tendinha do Saber <encomendas@tendinhadosaber.pt>",
+).strip()
+RESEND_REPLY_TO = os.environ.get(
+    "RESEND_REPLY_TO",
+    "tendinhadosaber@gmail.com",
+).strip()
+RESEND_API_URL = "https://api.resend.com/emails"
 _PAYMENT_ORDER_ID_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 # Private, non-public storage for MEGA voucher PDFs. NEVER place this under
@@ -305,8 +315,270 @@ def _parse_provider_payment_datetime(value: Any) -> Optional[str]:
 
 
 async def _send_contract_confirmation_if_available(order: dict) -> str:
-    return "not_configured"
+    import html as html_lib
 
+    if not RESEND_API_KEY:
+        return "not_configured"
+
+    customer = order.get("customer") or {}
+    delivery = order.get("delivery") or {}
+    payment = order.get("payment") or {}
+    totals = order.get("totals") or {}
+    items = order.get("items") or []
+
+    recipient = str(customer.get("email") or "").strip().lower()
+    if not recipient:
+        logger.warning("[email] confirmation skipped: order without customer email")
+        return "missing_recipient"
+
+    order_no = str(order.get("order_no") or "").strip()
+    if not order_no:
+        logger.warning("[email] confirmation skipped: order without order number")
+        return "missing_order_no"
+
+    def esc(value: Any) -> str:
+        return html_lib.escape(str(value if value is not None else ""), quote=True)
+
+    def money(value: Any) -> str:
+        try:
+            return f"{_money_string(value)} €"
+        except (InvalidOperation, TypeError, ValueError):
+            return "—"
+
+    payment_method_label = {
+        "multibanco": "Multibanco",
+        "mbway": "MB WAY",
+        "payshop": "Payshop",
+    }.get(str(payment.get("method") or "").lower(), "Pagamento eletrónico")
+
+    delivery_method_label = (
+        "Entrega ao domicílio (distrito de Aveiro)"
+        if delivery.get("method") == "hand_delivery"
+        else "Envio"
+    )
+
+    address_parts = [
+        str(delivery.get("address") or "").strip(),
+        str(delivery.get("postal_code") or "").strip(),
+        str(delivery.get("concelho") or "").strip(),
+    ]
+    delivery_address = ", ".join(part for part in address_parts if part) or "—"
+
+    item_rows = []
+    text_items = []
+
+    for item in items:
+        qty = int(item.get("qty") or 0)
+        title = str(item.get("title") or "Produto")
+        line_total = money(item.get("line_total"))
+
+        item_rows.append(
+            "<tr>"
+            f"<td style='padding:10px 0;border-bottom:1px solid #E2E8F0;color:#1A202C;'>{qty}× {esc(title)}</td>"
+            f"<td style='padding:10px 0;border-bottom:1px solid #E2E8F0;text-align:right;color:#1A202C;white-space:nowrap;'>{esc(line_total)}</td>"
+            "</tr>"
+        )
+
+        text_items.append(f"- {qty}× {title}: {line_total}")
+
+    terms_html = str(order.get("terms_content_html") or "").strip()
+    terms_version = str(order.get("terms_version") or "").strip()
+
+    if not terms_html and terms_version:
+        terms_doc = await db.legal_pages.find_one(
+            {"slug": "termos"},
+            {"_id": 0, "content_html": 1, "updated_at": 1},
+        ) or {}
+
+        if str(terms_doc.get("updated_at") or "") == terms_version:
+            terms_html = str(terms_doc.get("content_html") or "").strip()
+
+    if terms_html:
+        terms_section = f"""
+          <div style="margin-top:28px;padding-top:20px;border-top:1px solid #E2E8F0;">
+            <h2 style="margin:0 0 12px;font-size:18px;color:#1A202C;">Termos e Condições aceites</h2>
+            <div style="font-size:13px;line-height:1.65;color:#4A5568;">
+              {terms_html}
+            </div>
+          </div>
+        """
+    else:
+        terms_section = """
+          <div style="margin-top:28px;padding-top:20px;border-top:1px solid #E2E8F0;">
+            <p style="margin:0;font-size:13px;line-height:1.6;color:#4A5568;">
+              A versão dos Termos e Condições aceite na compra encontra-se registada na encomenda.
+            </p>
+          </div>
+        """
+
+    total = money(totals.get("total"))
+    shipping = money(totals.get("shipping_cost"))
+
+    email_html = f"""<!doctype html>
+<html lang="pt">
+  <body style="margin:0;padding:0;background:#F7F7F4;font-family:Arial,Helvetica,sans-serif;color:#1A202C;">
+    <div style="max-width:680px;margin:0 auto;padding:32px 16px;">
+      <div style="background:#ffffff;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;">
+
+        <div style="padding:28px 32px;background:#F5F8EC;border-bottom:1px solid #E2E8F0;">
+          <div style="font-size:22px;font-weight:700;">Tendinha do Saber</div>
+          <div style="margin-top:4px;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:#4A5568;">
+            Manuais Escolares · Aveiro
+          </div>
+        </div>
+
+        <div style="padding:32px;">
+          <h1 style="margin:0 0 10px;font-size:26px;line-height:1.25;">
+            Pagamento confirmado — encomenda aceite
+          </h1>
+
+          <p style="margin:0 0 26px;line-height:1.6;color:#4A5568;">
+            Recebemos a confirmação do pagamento da sua encomenda.
+          </p>
+
+          <div style="padding:16px;background:#F7F7F4;border-radius:8px;margin-bottom:24px;">
+            <div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#4A5568;">
+              N.º de encomenda
+            </div>
+            <div style="margin-top:4px;font-family:monospace;font-size:16px;">
+              {esc(order_no)}
+            </div>
+          </div>
+
+          <h2 style="margin:0 0 10px;font-size:18px;">Resumo da encomenda</h2>
+
+          <table role="presentation" style="width:100%;border-collapse:collapse;font-size:14px;">
+            {''.join(item_rows)}
+
+            <tr>
+              <td style="padding:12px 0 4px;color:#4A5568;">Entrega</td>
+              <td style="padding:12px 0 4px;text-align:right;color:#1A202C;">
+                {esc(shipping)}
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:8px 0 0;font-weight:700;font-size:16px;">Total pago</td>
+              <td style="padding:8px 0 0;text-align:right;font-weight:700;font-size:16px;">
+                {esc(total)}
+              </td>
+            </tr>
+          </table>
+
+          <div style="margin-top:28px;padding-top:20px;border-top:1px solid #E2E8F0;">
+            <h2 style="margin:0 0 12px;font-size:18px;">Pagamento e entrega</h2>
+
+            <p style="margin:5px 0;color:#4A5568;">
+              <strong style="color:#1A202C;">Método de pagamento:</strong>
+              {esc(payment_method_label)}
+            </p>
+
+            <p style="margin:5px 0;color:#4A5568;">
+              <strong style="color:#1A202C;">Entrega:</strong>
+              {esc(delivery_method_label)}
+            </p>
+
+            <p style="margin:5px 0;color:#4A5568;">
+              <strong style="color:#1A202C;">Morada:</strong>
+              {esc(delivery_address)}
+            </p>
+          </div>
+
+          {terms_section}
+
+          <div style="margin-top:28px;padding-top:20px;border-top:1px solid #E2E8F0;font-size:12px;line-height:1.7;color:#4A5568;">
+            <strong style="color:#1A202C;">Vendedor:</strong>
+            Francisco Neves Tendinha · NIF 270 127 712<br>
+            Rua Vasco da Gama, 122, 3830-225 Ílhavo, Portugal<br>
+            tendinhadosaber@gmail.com · +351 961 194 491
+          </div>
+        </div>
+      </div>
+
+      <p style="margin:18px 0 0;text-align:center;font-size:12px;color:#718096;">
+        Este email confirma a aceitação da encomenda após confirmação do pagamento.
+      </p>
+    </div>
+  </body>
+</html>"""
+
+    email_text = "\n".join([
+        "Tendinha do Saber",
+        "Pagamento confirmado — encomenda aceite",
+        "",
+        f"N.º de encomenda: {order_no}",
+        "",
+        "Produtos:",
+        *text_items,
+        "",
+        f"Entrega: {shipping}",
+        f"Total pago: {total}",
+        f"Método de pagamento: {payment_method_label}",
+        f"Método de entrega: {delivery_method_label}",
+        f"Morada: {delivery_address}",
+        "",
+        "Vendedor: Francisco Neves Tendinha",
+        "NIF: 270 127 712",
+        "Rua Vasco da Gama, 122, 3830-225 Ílhavo, Portugal",
+        "tendinhadosaber@gmail.com",
+        "+351 961 194 491",
+    ])
+
+    payload = {
+        "from": RESEND_FROM_EMAIL,
+        "to": [recipient],
+        "subject": f"Pagamento confirmado — encomenda {order_no}",
+        "reply_to": RESEND_REPLY_TO,
+        "html": email_html,
+        "text": email_text,
+    }
+
+    headers = {
+        "Authorization": f"Bearer {RESEND_API_KEY}",
+        "Content-Type": "application/json",
+        "Idempotency-Key": f"contract-confirmation-{order_no}",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client_http:
+            response = await client_http.post(
+                RESEND_API_URL,
+                headers=headers,
+                json=payload,
+            )
+    except (httpx.TimeoutException, httpx.HTTPError):
+        logger.exception("[email] Resend request failed order=%s", order_no)
+        return "send_failed"
+
+    if response.status_code >= 400:
+        logger.warning(
+            "[email] Resend rejected confirmation order=%s HTTP=%s",
+            order_no,
+            response.status_code,
+        )
+        return "send_failed"
+
+    try:
+        response_data = response.json()
+    except ValueError:
+        logger.warning("[email] Resend returned invalid JSON order=%s", order_no)
+        return "send_failed"
+
+    email_id = str(response_data.get("id") or "").strip()
+
+    if not email_id:
+        logger.warning("[email] Resend response missing email id order=%s", order_no)
+        return "send_failed"
+
+    await db.orders.update_one(
+        {"order_no": order_no},
+        {"$set": {
+            "confirmation_email_id": email_id,
+            "confirmation_email_sent_at": iso(now_utc()),
+        }},
+    )
+
+    return "sent"
 
 class IfthenpayError(Exception):
     def __init__(self, public_message: str, provider_status: Optional[str] = None, http_status: Optional[int] = None, ambiguous: bool = False):
@@ -3537,7 +3809,10 @@ async def create_order(payload: OrderCreateIn, request: Request):
         {"email": payload.customer_email.lower(), "role": "customer"}, {"_id": 0, "password_hash": 0}
     )
 
-    terms_page = await db.legal_pages.find_one({"slug": "termos"}, {"_id": 0, "updated_at": 1}) or {}
+    terms_page = await db.legal_pages.find_one(
+        {"slug": "termos"},
+        {"_id": 0, "updated_at": 1, "content_html": 1},
+    ) or {}
     privacy_page = await db.legal_pages.find_one({"slug": "privacidade"}, {"_id": 0, "updated_at": 1}) or {}
     terms_version = terms_page.get("updated_at") or "unknown_terms_version"
     privacy_notice_version = privacy_page.get("updated_at") or "unknown_privacy_version"
@@ -3585,6 +3860,7 @@ async def create_order(payload: OrderCreateIn, request: Request):
         "terms_accepted": True,
         "terms_accepted_at": now_iso,
         "terms_version": terms_version,
+        "terms_content_html": terms_page.get("content_html") or "",
         "privacy_notice_version": privacy_notice_version,
         "lamination_early_start_ack": bool(lamination_requested and payload.lamination_early_start_ack),
         "lamination_ack_at": lamination_ack_at,
