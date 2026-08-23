@@ -27,8 +27,11 @@ export default function OrderConfirmationPage() {
         setOrder(r.data);
         setFallback(false);
       })
-      .catch(() => {
-        setFallback(true);
+      .catch((err) => {
+        const status = err?.response?.status;
+        if (status === 401 || status === 404) {
+          setFallback(true);
+        }
       });
   }, [orderNo]);
 
@@ -55,7 +58,7 @@ export default function OrderConfirmationPage() {
   }, [orderNo, location.state, refreshOrder]);
 
   useEffect(() => {
-    if (!order || order.payment?.method !== "mbway" || order.payment?.status !== "pending") {
+    if (!order || order.payment?.method !== "mbway" || !["pending", "unknown"].includes(order.payment?.status)) {
       return undefined;
     }
     let active = true;
@@ -63,11 +66,11 @@ export default function OrderConfirmationPage() {
     const interval = setInterval(() => {
       attempts += 1;
       refreshOrder().finally(() => {
-        if (!active || attempts >= 60) {
+        if (!active || attempts >= 20) {
           clearInterval(interval);
         }
       });
-    }, 5000);
+    }, 15000);
     return () => {
       active = false;
       clearInterval(interval);
@@ -93,6 +96,7 @@ export default function OrderConfirmationPage() {
   const payment = order.payment || {};
   const paymentPending = order.payment_status === "pending" || payment.status === "pending";
   const paymentPaid = order.payment_status === "paid" || payment.status === "paid";
+  const paymentUnknown = order.payment_status === "unknown" || payment.status === "unknown";
 
   const copyReference = async () => {
     if (!payment.reference) return;
@@ -108,12 +112,12 @@ export default function OrderConfirmationPage() {
       <div className="text-center mb-10">
         <CheckCircle2 className={`w-14 h-14 mx-auto mb-4 ${paymentPaid ? "text-[#2F855A]" : "text-[#E07A1F]"}`} strokeWidth={1.5}/>
         <h1 className="font-display text-3xl md:text-4xl font-medium mb-3">{paymentPaid ? "Pagamento confirmado — encomenda aceite" : "Pedido de encomenda recebido"}</h1>
-        <p className="text-[#4A5568]">{paymentPaid ? "O pagamento foi confirmado e a encomenda foi aceite." : "A encomenda será aceite quando o pagamento for confirmado."}</p>
+        <p className="text-[#4A5568]">{paymentPaid ? "O pagamento foi confirmado e a encomenda foi aceite." : paymentUnknown ? "Estado do pagamento em verificação. Não repita o pagamento. Estamos a aguardar confirmação do operador." : "A encomenda será aceite quando o pagamento for confirmado."}</p>
       </div>
       <div className="bg-white border border-[#E2E8F0] rounded-md p-6">
         <div className="grid grid-cols-2 gap-4 text-sm mb-5">
           <div><div className="text-[10px] uppercase tracking-wider text-[#4A5568]">Nº de Encomenda</div><div className="font-mono text-[#1A202C]" data-testid="order-no">{order.order_no}</div></div>
-          <div><div className="text-[10px] uppercase tracking-wider text-[#4A5568]">Estado</div><div className="text-[#1A202C]">{paymentPaid ? "Pago" : paymentPending ? "Pagamento pendente" : order.payment_status}</div></div>
+          <div><div className="text-[10px] uppercase tracking-wider text-[#4A5568]">Estado</div><div className="text-[#1A202C]">{paymentPaid ? "Pago" : paymentUnknown ? "Estado do pagamento em verificação" : paymentPending ? "Pagamento pendente" : order.payment_status}</div></div>
           <div><div className="text-[10px] uppercase tracking-wider text-[#4A5568]">Entrega</div><div className="text-[#1A202C]">{order.delivery.method === "hand_delivery" ? "Entrega ao domicílio (Aveiro)" : "Envio"}</div></div>
           <div><div className="text-[10px] uppercase tracking-wider text-[#4A5568]">Total</div><div className="font-display text-xl text-[#1A202C]">{order.totals.total.toFixed(2)}€</div></div>
         </div>
@@ -142,11 +146,11 @@ export default function OrderConfirmationPage() {
               {payment.reference && <Button type="button" variant="outline" className="mt-3" onClick={copyReference}>Copiar referência</Button>}
             </div>
           )}
-          {payment.method === "mbway" && paymentPending && (
+          {payment.method === "mbway" && (paymentPending || paymentUnknown) && (
             <div data-testid="payment-mbway-block">
               <div className="text-[10px] uppercase tracking-wider text-[#4A5568] mb-2">MB WAY</div>
-              <p className="text-[#1A202C]">Pedido enviado para o MB WAY.</p>
-              <p className="text-[#4A5568] mt-1">Abra a aplicação MB WAY e confirme o pagamento.</p>
+              <p className="text-[#1A202C]">{paymentUnknown ? "Estado do pagamento em verificação" : "Pedido enviado para o MB WAY."}</p>
+              <p className="text-[#4A5568] mt-1">{paymentUnknown ? "Não repita o pagamento. Estamos a aguardar confirmação do operador." : "Abra a aplicação MB WAY e confirme o pagamento."}</p>
               <p className="text-sm text-[#4A5568] mt-2">Número: {payment.mobile_masked || "***"}</p>
               <Button type="button" variant="outline" className="mt-3" onClick={refreshOrder}>Atualizar estado</Button>
             </div>

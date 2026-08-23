@@ -119,6 +119,11 @@ class IfthenpayIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.original_find_book_by_key = server._find_book_by_key
         self.original_mb_callback = server.IFTHENPAY_MB_CALLBACK_KEY
         self.original_backoffice = server.IFTHENPAY_BACKOFFICE_KEY
+        self.original_new_order_no = server._new_unique_order_no
+        self.original_new_payment_order_id = server._new_unique_payment_order_id
+        self.original_order_token = server._new_order_access_token
+        self.original_order_token_hash = server._hash_order_access_token
+        self.original_order_token_expiry = server._order_access_expires_at
 
     def tearDown(self):
         server.db = self.original_db
@@ -127,6 +132,11 @@ class IfthenpayIntegrationTests(unittest.IsolatedAsyncioTestCase):
         server._find_book_by_key = self.original_find_book_by_key
         server.IFTHENPAY_MB_CALLBACK_KEY = self.original_mb_callback
         server.IFTHENPAY_BACKOFFICE_KEY = self.original_backoffice
+        server._new_unique_order_no = self.original_new_order_no
+        server._new_unique_payment_order_id = self.original_new_payment_order_id
+        server._new_order_access_token = self.original_order_token
+        server._hash_order_access_token = self.original_order_token_hash
+        server._order_access_expires_at = self.original_order_token_expiry
 
     async def test_normalize_mbway_phone_formats(self):
         self.assertEqual(server._normalize_mbway_phone("912345678"), "351#912345678")
@@ -272,7 +282,7 @@ class IfthenpayIntegrationTests(unittest.IsolatedAsyncioTestCase):
 
         order = await orders.find_one({"order_no": "TS-1"})
         first = await server._mark_order_paid(order, callback_received_at=server.iso(server.now_utc()), provider_payment_datetime="2026-08-22 10:00:00")
-        self.assertTrue(first)
+        self.assertEqual(first, "paid")
         order_after = await orders.find_one({"order_no": "TS-1"})
         self.assertEqual(order_after["payment_status"], "paid")
         self.assertEqual(order_after["invoice_status"], "pending_issue")
@@ -280,7 +290,7 @@ class IfthenpayIntegrationTests(unittest.IsolatedAsyncioTestCase):
         partner_after = await partners.find_one({"promo_code": "PROMO10"})
         self.assertEqual(partner_after["usage_count"], 1)
         second = await server._mark_order_paid(order_after, callback_received_at=server.iso(server.now_utc()), provider_payment_datetime="2026-08-22 10:00:00")
-        self.assertFalse(second)
+        self.assertEqual(second, "already_paid")
         partner_after_dup = await partners.find_one({"promo_code": "PROMO10"})
         self.assertEqual(partner_after_dup["usage_count"], 1)
 
