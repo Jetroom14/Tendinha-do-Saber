@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -53,10 +53,13 @@ export default function CheckoutPage() {
   const [postcodeCheck, setPostcodeCheck] = useState(null);
   const [shippingZones, setShippingZones] = useState([]);   // Bloco B
   const [submitting, setSubmitting] = useState(false);
+  const orderCreatedRef = useRef(false);
 
   useEffect(() => {
-    if (items.length === 0) navigate("/carrinho");
-  }, [items, navigate]);
+  if (items.length === 0 && !orderCreatedRef.current) {
+    navigate("/carrinho");
+  }
+}, [items, navigate]);
 
   // Bloco B: carregar lista de concelhos + custo por concelho
   useEffect(() => {
@@ -145,6 +148,7 @@ export default function CheckoutPage() {
       sessionStorage.setItem(`ts_order_access_${createdOrder.order_no}`, accessToken);
 
       toast.success(`Pedido ${createdOrder.order_no} criado.`);
+      orderCreatedRef.current = true;
       clear();
       navigate(`/encomenda/${createdOrder.order_no}`, { state: { order: createdOrder } });
     } catch (err) {
