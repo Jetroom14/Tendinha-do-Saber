@@ -2798,14 +2798,37 @@ async def _ifthenpay_create_multibanco(client_http: httpx.AsyncClient, *, order_
         data = response.json()
     except ValueError as exc:
         raise IfthenpayError("Não foi possível gerar a referência Multibanco.", ambiguous=True) from exc
-    status = str(_provider_value(data, "Status", "status") or "")
+        status = str(_provider_value(data, "Status", "status") or "")
+
     if status != "0":
-        raise IfthenpayError("Não foi possível gerar a referência Multibanco.", provider_status=status, http_status=response.status_code)
-    provider_amount = _money_decimal(_provider_value(data, "Amount", "amount") or amount)
+        raise IfthenpayError(
+            "Não foi possível gerar a referência Multibanco.",
+            provider_status=status,
+            http_status=response.status_code,
+        )
+
+    try:
+        provider_amount = _money_decimal(
+            _provider_value(data, "Amount", "amount") or amount
+        )
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise IfthenpayError(
+            "Não foi possível confirmar a criação da referência Multibanco.",
+            provider_status=status,
+            http_status=response.status_code,
+            ambiguous=True,
+        ) from exc
+
     entity = str(_provider_value(data, "Entity", "entity") or "").strip()
     reference = str(_provider_value(data, "Reference", "reference") or "").strip()
+
     if provider_amount != _money_decimal(amount) or not entity or not reference:
-        raise IfthenpayError("Não foi possível gerar a referência Multibanco.", provider_status=status, http_status=response.status_code)
+        raise IfthenpayError(
+            "Não foi possível confirmar a criação da referência Multibanco.",
+            provider_status=status,
+            http_status=response.status_code,
+            ambiguous=True,
+        )
     logger.info(f"[ifthenpay] Multibanco created order={order_id}")
     return {
         "provider_status": status,
@@ -2839,11 +2862,35 @@ async def _ifthenpay_create_mbway(client_http: httpx.AsyncClient, *, order_id: s
         data = response.json()
     except ValueError as exc:
         raise IfthenpayError("Não foi possível enviar o pedido MB WAY.", ambiguous=True) from exc
-    status = str(_provider_value(data, "Status", "status") or "")
+        status = str(_provider_value(data, "Status", "status") or "")
     request_id = str(_provider_value(data, "RequestId", "requestId") or "").strip()
-    provider_amount = _money_decimal(_provider_value(data, "Amount", "amount") or amount)
-    if status != "000" or not request_id or provider_amount != _money_decimal(amount):
-        raise IfthenpayError("Não foi possível enviar o pedido MB WAY.", provider_status=status, http_status=response.status_code)
+
+    if status != "000":
+        raise IfthenpayError(
+            "Não foi possível enviar o pedido MB WAY.",
+            provider_status=status,
+            http_status=response.status_code,
+        )
+
+    try:
+        provider_amount = _money_decimal(
+            _provider_value(data, "Amount", "amount") or amount
+        )
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise IfthenpayError(
+            "Não foi possível confirmar o pedido MB WAY.",
+            provider_status=status,
+            http_status=response.status_code,
+            ambiguous=True,
+        ) from exc
+
+    if not request_id or provider_amount != _money_decimal(amount):
+        raise IfthenpayError(
+            "Não foi possível confirmar o pedido MB WAY.",
+            provider_status=status,
+            http_status=response.status_code,
+            ambiguous=True,
+        )
     logger.info(f"[ifthenpay] MBWAY created order={order_id}")
     return {
         "provider_status": status,
@@ -2891,11 +2938,35 @@ async def _ifthenpay_create_payshop(client_http: httpx.AsyncClient, *, order_id:
         data = response.json()
     except ValueError as exc:
         raise IfthenpayError("Não foi possível gerar a referência Payshop.", ambiguous=True) from exc
-    code = str(_provider_value(data, "Code", "code", "Status", "status") or "")
+        code = str(_provider_value(data, "Code", "code", "Status", "status") or "")
     reference = str(_provider_value(data, "Reference", "reference") or "").strip()
-    provider_amount = _money_decimal(_provider_value(data, "Amount", "amount", "valor") or amount)
-    if code != "0" or not reference or provider_amount != _money_decimal(amount):
-        raise IfthenpayError("Não foi possível gerar a referência Payshop.", provider_status=code, http_status=response.status_code)
+
+    if code != "0":
+        raise IfthenpayError(
+            "Não foi possível gerar a referência Payshop.",
+            provider_status=code,
+            http_status=response.status_code,
+        )
+
+    try:
+        provider_amount = _money_decimal(
+            _provider_value(data, "Amount", "amount", "valor") or amount
+        )
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise IfthenpayError(
+            "Não foi possível confirmar a criação da referência Payshop.",
+            provider_status=code,
+            http_status=response.status_code,
+            ambiguous=True,
+        ) from exc
+
+    if not reference or provider_amount != _money_decimal(amount):
+        raise IfthenpayError(
+            "Não foi possível confirmar a criação da referência Payshop.",
+            provider_status=code,
+            http_status=response.status_code,
+            ambiguous=True,
+        )
     logger.info(f"[ifthenpay] Payshop created order={order_id}")
     return {
         "provider_status": code,
@@ -3030,9 +3101,21 @@ async def _mark_order_paid(order: dict, *, callback_received_at: str, provider_p
 def _ifthenpay_payment_methods_payload() -> dict:
     return {
         "methods": [
-            {"id": "multibanco", "label": "Multibanco", "enabled": bool(IFTHENPAY_MB_KEY)},
-            {"id": "mbway", "label": "MB WAY", "enabled": bool(IFTHENPAY_MBWAY_KEY)},
-            {"id": "payshop", "label": "Payshop", "enabled": bool(IFTHENPAY_PAYSHOP_KEY)},
+            {
+                "id": "multibanco",
+                "label": "Multibanco",
+                "enabled": _payment_method_enabled("multibanco"),
+            },
+            {
+                "id": "mbway",
+                "label": "MB WAY",
+                "enabled": _payment_method_enabled("mbway"),
+            },
+            {
+                "id": "payshop",
+                "label": "Payshop",
+                "enabled": _payment_method_enabled("payshop"),
+            },
         ]
     }
 
