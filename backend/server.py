@@ -2798,7 +2798,7 @@ async def _ifthenpay_create_multibanco(client_http: httpx.AsyncClient, *, order_
         data = response.json()
     except ValueError as exc:
         raise IfthenpayError("Não foi possível gerar a referência Multibanco.", ambiguous=True) from exc
-        status = str(_provider_value(data, "Status", "status") or "")
+    status = str(_provider_value(data, "Status", "status") or "")
 
     if status != "0":
         raise IfthenpayError(
@@ -2862,7 +2862,7 @@ async def _ifthenpay_create_mbway(client_http: httpx.AsyncClient, *, order_id: s
         data = response.json()
     except ValueError as exc:
         raise IfthenpayError("Não foi possível enviar o pedido MB WAY.", ambiguous=True) from exc
-        status = str(_provider_value(data, "Status", "status") or "")
+    status = str(_provider_value(data, "Status", "status") or "")
     request_id = str(_provider_value(data, "RequestId", "requestId") or "").strip()
 
     if status != "000":
@@ -2938,7 +2938,7 @@ async def _ifthenpay_create_payshop(client_http: httpx.AsyncClient, *, order_id:
         data = response.json()
     except ValueError as exc:
         raise IfthenpayError("Não foi possível gerar a referência Payshop.", ambiguous=True) from exc
-        code = str(_provider_value(data, "Code", "code", "Status", "status") or "")
+    code = str(_provider_value(data, "Code", "code", "Status", "status") or "")
     reference = str(_provider_value(data, "Reference", "reference") or "").strip()
 
     if code != "0":
