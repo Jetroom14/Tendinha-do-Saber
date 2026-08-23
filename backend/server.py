@@ -18,9 +18,11 @@ import hashlib
 import hmac
 import mimetypes
 from datetime import datetime, timezone, timedelta
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import List, Optional, Dict, Any, Annotated
 
 import bcrypt
+import httpx
 import jwt
 import pandas as pd
 from io import BytesIO
@@ -47,6 +49,16 @@ ISBNDB_BASE_URL = "https://api2.isbndb.com"
 ISBNDB_MIN_INTERVAL = 1.05
 _ISBNDB_LOCK = asyncio.Lock()
 _ISBNDB_LAST_REQUEST_AT = 0.0
+IFTHENPAY_BACKOFFICE_KEY = os.environ.get("IFTHENPAY_BACKOFFICE_KEY", "").strip()
+IFTHENPAY_MB_KEY = os.environ.get("IFTHENPAY_MB_KEY", "").strip()
+IFTHENPAY_MBWAY_KEY = os.environ.get("IFTHENPAY_MBWAY_KEY", "").strip()
+IFTHENPAY_PAYSHOP_KEY = os.environ.get("IFTHENPAY_PAYSHOP_KEY", "").strip()
+IFTHENPAY_MB_CALLBACK_KEY = os.environ.get("IFTHENPAY_MB_CALLBACK_KEY", "").strip()
+IFTHENPAY_MBWAY_CALLBACK_KEY = os.environ.get("IFTHENPAY_MBWAY_CALLBACK_KEY", "").strip()
+IFTHENPAY_PAYSHOP_CALLBACK_KEY = os.environ.get("IFTHENPAY_PAYSHOP_CALLBACK_KEY", "").strip()
+IFTHENPAY_REFERENCE_EXPIRY_DAYS = os.environ.get("IFTHENPAY_REFERENCE_EXPIRY_DAYS", "3").strip()
+IFTHENPAY_TIMEOUT = httpx.Timeout(15.0, connect=10.0)
+_PAYMENT_ORDER_ID_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 # Private, non-public storage for MEGA voucher PDFs. NEVER place this under
 # frontend/public or mount it as a FastAPI StaticFiles route — it must only
@@ -198,6 +210,112 @@ def _hash_identifier(value: str) -> str:
     return hashlib.sha256((value or "").encode("utf-8")).hexdigest()
 
 
+def _money_decimal(value: Any) -> Decimal:
+    if isinstance(value, Decimal):
+        dec = value
+    elif isinstance(value, int):
+        dec = Decimal(value)
+    elif isinstance(value, float):
+        dec = Decimal(str(value))
+    else:
+        raw = str(value or "0").strip().replace(",", ".")
+        dec = Decimal(raw)
+    return dec.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def _money_string(value: Any) -> str:
+    return format(_money_decimal(value), ".2f")
+
+
+async def _new_unique_payment_order_id(max_attempts: int = 20) -> str:
+    for _ in range(max_attempts):
+        candidate = "T" + "".join(secrets.choice(_PAYMENT_ORDER_ID_ALPHABET) for _ in range(12))
+        exists = await db.orders.find_one({"payment.order_id": candidate}, {"_id": 1})
+        if not exists:
+            return candidate
+    raise HTTPException(500, "Não foi possível gerar identificador interno de pagamento")
+
+
+def _payment_method_enabled(method: str) -> bool:
+    return {
+        "multibanco": bool(IFTHENPAY_MB_KEY),
+        "mbway": bool(IFTHENPAY_MBWAY_KEY),
+        "payshop": bool(IFTHENPAY_PAYSHOP_KEY),
+    }.get(method, False)
+
+
+def _validate_payment_method(method: str) -> str:
+    normalized = (method or "").strip().lower()
+    if normalized not in {"multibanco", "mbway", "payshop"}:
+        raise HTTPException(400, "Método de pagamento inválido.")
+    if not _payment_method_enabled(normalized):
+        raise HTTPException(400, "Método de pagamento indisponível.")
+    return normalized
+
+
+def _normalize_mbway_phone(phone: str) -> str:
+    raw = re.sub(r"[^0-9+]", "", phone or "")
+    if not raw:
+        raise HTTPException(400, "Número de telemóvel inválido para pagamento MB WAY.")
+    if raw.startswith("+"):
+        digits = raw[1:]
+    else:
+        digits = raw
+    if digits.startswith("00351"):
+        digits = digits[5:]
+    elif digits.startswith("351"):
+        digits = digits[3:]
+    if not digits.isdigit() or len(digits) != 9 or digits[0] != "9":
+        raise HTTPException(400, "Número de telemóvel inválido para pagamento MB WAY.")
+    return f"351#{digits}"
+
+
+def _mask_phone(phone: str) -> str:
+    digits = re.sub(r"\D", "", phone or "")
+    if len(digits) < 3:
+        return "***"
+    return f"*** *** {digits[-3:]}"
+
+
+def _ifthenpay_expiry_days() -> int:
+    try:
+        days = int(IFTHENPAY_REFERENCE_EXPIRY_DAYS or "3")
+    except ValueError:
+        days = 3
+    return max(1, min(days, 30))
+
+
+def _provider_value(payload: Any, *names: str) -> Any:
+    if not isinstance(payload, dict):
+        return None
+    for name in names:
+        if name in payload and payload[name] not in (None, ""):
+            return payload[name]
+    lowered = {str(k).lower(): v for k, v in payload.items()}
+    for name in names:
+        value = lowered.get(name.lower())
+        if value not in (None, ""):
+            return value
+    return None
+
+
+def _parse_provider_payment_datetime(value: Any) -> Optional[str]:
+    text = (str(value or "").strip())
+    return text or None
+
+
+async def _send_contract_confirmation_if_available(order: dict) -> str:
+    return "not_configured"
+
+
+class IfthenpayError(Exception):
+    def __init__(self, public_message: str, provider_status: Optional[str] = None, http_status: Optional[int] = None):
+        super().__init__(public_message)
+        self.public_message = public_message
+        self.provider_status = provider_status
+        self.http_status = http_status
+
+
 def _public_order_access_error() -> HTTPException:
     return HTTPException(404, "Encomenda não encontrada ou acesso inválido")
 
@@ -231,9 +349,11 @@ def _is_valid_order_access_token(order: dict, provided_token: Optional[str]) -> 
 
 
 def _order_confirmation_payload(order: dict) -> dict:
+    payment = order.get("payment") or {}
     return {
         "order_no": order.get("order_no"),
         "status": order.get("status"),
+        "payment_status": order.get("payment_status"),
         "created_at": order.get("created_at"),
         "items": [
             {
@@ -256,6 +376,16 @@ def _order_confirmation_payload(order: dict) -> dict:
         "delivery": {
             "method": (order.get("delivery") or {}).get("method"),
             "concelho": (order.get("delivery") or {}).get("concelho"),
+        },
+        "payment": {
+            "method": payment.get("method"),
+            "status": payment.get("status") or order.get("payment_status"),
+            "amount": payment.get("amount"),
+            "entity": payment.get("entity"),
+            "reference": payment.get("reference"),
+            "expires_at": payment.get("expires_at"),
+            "paid_at": payment.get("paid_at"),
+            "mobile_masked": _mask_phone(payment.get("mobile_number") or (order.get("customer") or {}).get("phone") or "") if payment.get("method") == "mbway" else None,
         },
         "customer": {
             "phone": (order.get("customer") or {}).get("phone"),
@@ -483,6 +613,8 @@ class PromoValidateIn(BaseModel):
 class OrderCreateIn(BaseModel):
     items: List[CartItem]
     promo_code: Optional[str] = None
+    payment_method: str
+    mbway_phone: Optional[str] = None
     customer_name: str
     customer_email: EmailStr
     customer_phone: str
@@ -2494,7 +2626,11 @@ async def _compute_cart(items: List[CartItem], promo_code: Optional[str], bags_q
             subtotal_manuals += line_price
         lamination_total += line_lam
         lines.append({
+            "book_id": book["id"],
+            "item_key": it.isbn13,
             "isbn13": book["isbn13"],
+            "pe_code": book.get("pe_code"),
+            "slug": book.get("slug"),
             "title": book["title"],
             "image_url": book.get("image_url", ""),
             "qty": it.qty,
@@ -2553,25 +2689,294 @@ async def _reserve_stock(lines: List[dict]) -> List[dict]:
     failure, or stock restored if the order is later cancelled)."""
     reserved: List[dict] = []
     for line in lines:
-        book = await db.books.find_one({"isbn13": line["isbn13"]}, {"_id": 0})
+        book = await db.books.find_one({"id": line["book_id"]}, {"_id": 0})
         if not book or book.get("status") == "Unavailable":
             await _restore_stock(reserved)
-            raise HTTPException(400, f"'{line.get('title', line['isbn13'])}' já não está disponível.")
+            raise HTTPException(400, f"'{line.get('title', line.get('item_key', 'livro'))}' já não está disponível.")
         if book.get("status") == "Available":
             res = await db.books.update_one(
-                {"isbn13": line["isbn13"], "stock_qty": {"$gte": line["qty"]}},
+                {"id": line["book_id"], "stock_qty": {"$gte": line["qty"]}},
                 {"$inc": {"stock_qty": -line["qty"]}},
             )
             if res.matched_count == 0:
                 await _restore_stock(reserved)
                 raise HTTPException(409, f"Já não há stock suficiente de '{book.get('title')}'.")
-            reserved.append({"isbn13": line["isbn13"], "qty": line["qty"]})
+            reserved.append({"book_id": line["book_id"], "isbn13": line.get("isbn13"), "qty": line["qty"]})
         # status == PreOrder: nothing physical to reserve, always allowed.
     return reserved
 
 async def _restore_stock(adjustments: List[dict]):
     for adj in adjustments:
-        await db.books.update_one({"isbn13": adj["isbn13"]}, {"$inc": {"stock_qty": adj["qty"]}})
+        book_id = adj.get("book_id")
+        qty = int(adj.get("qty") or 0)
+        if qty <= 0:
+            continue
+        if book_id:
+            await db.books.update_one({"id": book_id}, {"$inc": {"stock_qty": qty}})
+            continue
+        if adj.get("isbn13"):
+            await db.books.update_one({"isbn13": adj["isbn13"]}, {"$inc": {"stock_qty": qty}})
+
+
+async def _restore_order_stock_if_needed(order_no: str):
+    order = await db.orders.find_one({"order_no": order_no}, {"_id": 0})
+    if not order or order.get("stock_restored_at"):
+        return False
+    await _restore_stock(order.get("stock_adjustments", []))
+    await db.orders.update_one(
+        {"order_no": order_no, "stock_restored_at": {"$exists": False}},
+        {"$set": {"stock_restored_at": iso(now_utc())}},
+    )
+    return True
+
+
+async def _count_promo_if_needed(order: dict):
+    promo = order.get("promo") or {}
+    promo_code = (promo.get("code") or "").strip().upper()
+    if not promo_code:
+        return False
+    now_iso = iso(now_utc())
+    res = await db.orders.update_one(
+        {"order_no": order.get("order_no"), "promo_counted_at": {"$exists": False}},
+        {"$set": {"promo_counted_at": now_iso}},
+    )
+    if res.modified_count == 0:
+        return False
+    await db.partners.update_one({"promo_code": promo_code}, {"$inc": {"usage_count": 1}})
+    return True
+
+
+async def _ifthenpay_create_multibanco(client_http: httpx.AsyncClient, *, order_id: str, amount: Decimal, description: str, client_name: str, client_email: str, client_phone: str, sandbox: bool = False) -> dict:
+    body = {
+        "mbKey": IFTHENPAY_MB_KEY,
+        "orderId": order_id,
+        "amount": _money_string(amount),
+        "description": description[:100],
+        "clientName": client_name[:100],
+        "clientEmail": client_email[:120],
+        "clientPhone": client_phone[:30],
+        "expiryDays": _ifthenpay_expiry_days(),
+    }
+    url = "https://api.ifthenpay.com/multibanco/reference/sandbox" if sandbox else "https://api.ifthenpay.com/multibanco/reference/init"
+    try:
+        response = await client_http.post(url, json=body)
+    except (httpx.TimeoutException, httpx.HTTPError) as exc:
+        raise IfthenpayError("Não foi possível gerar a referência Multibanco.") from exc
+    if response.status_code >= 400:
+        logger.warning(f"[ifthenpay] payment creation failed order={order_id} HTTP={response.status_code}")
+        raise IfthenpayError("Não foi possível gerar a referência Multibanco.", http_status=response.status_code)
+    try:
+        data = response.json()
+    except ValueError as exc:
+        raise IfthenpayError("Não foi possível gerar a referência Multibanco.") from exc
+    status = str(_provider_value(data, "Status", "status") or "")
+    if status != "0":
+        raise IfthenpayError("Não foi possível gerar a referência Multibanco.", provider_status=status, http_status=response.status_code)
+    provider_amount = _money_decimal(_provider_value(data, "Amount", "amount") or amount)
+    entity = str(_provider_value(data, "Entity", "entity") or "").strip()
+    reference = str(_provider_value(data, "Reference", "reference") or "").strip()
+    if provider_amount != _money_decimal(amount) or not entity or not reference:
+        raise IfthenpayError("Não foi possível gerar a referência Multibanco.", provider_status=status, http_status=response.status_code)
+    logger.info(f"[ifthenpay] Multibanco created order={order_id}")
+    return {
+        "provider_status": status,
+        "amount": _money_string(provider_amount),
+        "entity": entity,
+        "reference": reference,
+        "request_id": str(_provider_value(data, "RequestId", "requestId") or "").strip() or None,
+        "expires_at": str(_provider_value(data, "ExpiryDate", "expiryDate") or "").strip() or None,
+    }
+
+
+async def _ifthenpay_create_mbway(client_http: httpx.AsyncClient, *, order_id: str, amount: Decimal, mobile_number: str, email: str, description: str) -> dict:
+    body = {
+        "mbWayKey": IFTHENPAY_MBWAY_KEY,
+        "orderId": order_id,
+        "amount": _money_string(amount),
+        "mobileNumber": mobile_number,
+        "email": email[:120],
+        "description": description[:100],
+    }
+    try:
+        response = await client_http.post("https://api.ifthenpay.com/spg/payment/mbway", json=body)
+    except (httpx.TimeoutException, httpx.HTTPError) as exc:
+        raise IfthenpayError("Não foi possível enviar o pedido MB WAY.") from exc
+    if response.status_code >= 400:
+        logger.warning(f"[ifthenpay] payment creation failed order={order_id} HTTP={response.status_code}")
+        raise IfthenpayError("Não foi possível enviar o pedido MB WAY.", http_status=response.status_code)
+    try:
+        data = response.json()
+    except ValueError as exc:
+        raise IfthenpayError("Não foi possível enviar o pedido MB WAY.") from exc
+    status = str(_provider_value(data, "Status", "status") or "")
+    request_id = str(_provider_value(data, "RequestId", "requestId") or "").strip()
+    provider_amount = _money_decimal(_provider_value(data, "Amount", "amount") or amount)
+    if status != "000" or not request_id or provider_amount != _money_decimal(amount):
+        raise IfthenpayError("Não foi possível enviar o pedido MB WAY.", provider_status=status, http_status=response.status_code)
+    logger.info(f"[ifthenpay] MBWAY created order={order_id}")
+    return {
+        "provider_status": status,
+        "amount": _money_string(provider_amount),
+        "request_id": request_id,
+        "mobile_number": mobile_number,
+    }
+
+
+async def _ifthenpay_mbway_status(client_http: httpx.AsyncClient, *, order_id: str, request_id: Optional[str]) -> dict:
+    params = {"mbWayKey": IFTHENPAY_MBWAY_KEY, "orderId": order_id}
+    if request_id:
+        params["requestId"] = request_id
+    response = await client_http.get("https://api.ifthenpay.com/spg/payment/mbway/status", params=params)
+    response.raise_for_status()
+    return response.json()
+
+
+async def _ifthenpay_create_payshop(client_http: httpx.AsyncClient, *, order_id: str, amount: Decimal, expiry_date: str) -> dict:
+    body = {
+        "payshopkey": IFTHENPAY_PAYSHOP_KEY,
+        "id": order_id,
+        "valor": _money_string(amount),
+        "validade": expiry_date,
+    }
+    try:
+        response = await client_http.post("https://ifthenpay.com/api/payshop/reference/", json=body)
+    except (httpx.TimeoutException, httpx.HTTPError) as exc:
+        raise IfthenpayError("Não foi possível gerar a referência Payshop.") from exc
+    if response.status_code >= 400:
+        logger.warning(f"[ifthenpay] payment creation failed order={order_id} HTTP={response.status_code}")
+        raise IfthenpayError("Não foi possível gerar a referência Payshop.", http_status=response.status_code)
+    try:
+        data = response.json()
+    except ValueError as exc:
+        raise IfthenpayError("Não foi possível gerar a referência Payshop.") from exc
+    code = str(_provider_value(data, "Code", "code", "Status", "status") or "")
+    reference = str(_provider_value(data, "Reference", "reference") or "").strip()
+    provider_amount = _money_decimal(_provider_value(data, "Amount", "amount", "valor") or amount)
+    if code != "0" or not reference or provider_amount != _money_decimal(amount):
+        raise IfthenpayError("Não foi possível gerar a referência Payshop.", provider_status=code, http_status=response.status_code)
+    logger.info(f"[ifthenpay] Payshop created order={order_id}")
+    return {
+        "provider_status": code,
+        "amount": _money_string(provider_amount),
+        "reference": reference,
+        "request_id": str(_provider_value(data, "RequestId", "requestId") or "").strip() or None,
+        "expires_at": expiry_date,
+    }
+
+
+async def _create_ifthenpay_payment(order: dict, method: str, mbway_phone: Optional[str] = None, sandbox_multibanco: bool = False) -> dict:
+    amount = _money_decimal((order.get("totals") or {}).get("total") or "0")
+    description = f"Encomenda {order.get('order_no')}"
+    async with httpx.AsyncClient(timeout=IFTHENPAY_TIMEOUT, headers={"Accept": "application/json", "Content-Type": "application/json"}) as client_http:
+        if method == "multibanco":
+            return await _ifthenpay_create_multibanco(
+                client_http,
+                order_id=order["payment"]["order_id"],
+                amount=amount,
+                description=description,
+                client_name=((order.get("customer") or {}).get("name") or "")[:100],
+                client_email=((order.get("customer") or {}).get("email") or "")[:120],
+                client_phone=((order.get("customer") or {}).get("phone") or "")[:30],
+                sandbox=sandbox_multibanco,
+            )
+        if method == "mbway":
+            normalized_phone = _normalize_mbway_phone(mbway_phone or "")
+            return await _ifthenpay_create_mbway(
+                client_http,
+                order_id=order["payment"]["order_id"],
+                amount=amount,
+                mobile_number=normalized_phone,
+                email=((order.get("customer") or {}).get("email") or "")[:120],
+                description=description,
+            )
+        if method == "payshop":
+            expiry_date = (now_utc() + timedelta(days=_ifthenpay_expiry_days())).strftime("%Y%m%d")
+            return await _ifthenpay_create_payshop(
+                client_http,
+                order_id=order["payment"]["order_id"],
+                amount=amount,
+                expiry_date=expiry_date,
+            )
+    raise HTTPException(400, "Método de pagamento inválido.")
+
+
+def _order_is_cancelled(order: dict) -> bool:
+    return str(order.get("status") or "").lower().startswith("cancel")
+
+
+def _validate_ifthenpay_callback(order: dict, *, method: str, order_id: str, amount: Any, request_id: Optional[str] = None, entity: Optional[str] = None, reference: Optional[str] = None):
+    payment = order.get("payment") or {}
+    if order.get("payment_provider") != "ifthenpay":
+        raise HTTPException(400, "Invalid callback")
+    if payment.get("provider") != "ifthenpay":
+        raise HTTPException(400, "Invalid callback")
+    if payment.get("method") != method:
+        raise HTTPException(400, "Invalid callback")
+    if payment.get("order_id") != order_id:
+        raise HTTPException(400, "Invalid callback")
+    if _order_is_cancelled(order):
+        raise HTTPException(400, "Invalid callback")
+    callback_amount = _money_decimal(amount)
+    if callback_amount != _money_decimal(payment.get("amount") or "0"):
+        raise HTTPException(400, "Invalid callback")
+    if callback_amount != _money_decimal((order.get("totals") or {}).get("total") or "0"):
+        raise HTTPException(400, "Invalid callback")
+    stored_request_id = (payment.get("request_id") or "").strip()
+    if stored_request_id and request_id and stored_request_id != str(request_id).strip():
+        raise HTTPException(400, "Invalid callback")
+    if method == "multibanco":
+        if str(payment.get("entity") or "").strip() != str(entity or "").strip():
+            raise HTTPException(400, "Invalid callback")
+        if str(payment.get("reference") or "").strip() != str(reference or "").strip():
+            raise HTTPException(400, "Invalid callback")
+    if method == "payshop":
+        if str(payment.get("reference") or "").strip() != str(reference or "").strip():
+            raise HTTPException(400, "Invalid callback")
+
+
+async def _mark_order_paid(order: dict, *, callback_received_at: str, provider_payment_datetime: Optional[str]) -> bool:
+    now_iso = iso(now_utc())
+    update = {
+        "status": "paid",
+        "payment_status": "paid",
+        "invoice_status": "pending_issue",
+        "contract_status": "accepted",
+        "contract_accepted_at": now_iso,
+        "payment.status": "paid",
+        "payment.paid_at": now_iso,
+        "payment.callback_received_at": callback_received_at,
+        "updated_at": now_iso,
+    }
+    if provider_payment_datetime:
+        update["payment.provider_payment_datetime"] = provider_payment_datetime
+    res = await db.orders.update_one(
+        {"order_no": order.get("order_no"), "payment_status": {"$ne": "paid"}},
+        {"$set": update},
+    )
+    if res.modified_count == 0:
+        return False
+    refreshed = await db.orders.find_one({"order_no": order.get("order_no")}, {"_id": 0}) or order
+    await _count_promo_if_needed(refreshed)
+    email_status = await _send_contract_confirmation_if_available(refreshed)
+    await db.orders.update_one({"order_no": order.get("order_no")}, {"$set": {"confirmation_email_status": email_status}})
+    await log_action(
+        "system",
+        "payment_confirmed",
+        "order",
+        order.get("order_no"),
+        {"method": ((refreshed.get("payment") or {}).get("method")), "payment_order_id": ((refreshed.get("payment") or {}).get("order_id"))},
+    )
+    return True
+
+
+def _ifthenpay_payment_methods_payload() -> dict:
+    return {
+        "methods": [
+            {"id": "multibanco", "label": "Multibanco", "enabled": bool(IFTHENPAY_MB_KEY)},
+            {"id": "mbway", "label": "MB WAY", "enabled": bool(IFTHENPAY_MBWAY_KEY)},
+            {"id": "payshop", "label": "Payshop", "enabled": bool(IFTHENPAY_PAYSHOP_KEY)},
+        ]
+    }
 
 # Bloco B: Concelhos do distrito de Aveiro (canónicos, ordem alfabética).
 # Esta lista é a fonte-de-verdade para o dropdown do checkout e para o
@@ -2667,6 +3072,11 @@ async def public_shipping_zones():
     return {
         "concelhos": [{"name": c, "rate": rates[c]} for c in AVEIRO_CONCELHOS],
     }
+
+
+@api.get("/payments/methods")
+async def public_payment_methods():
+    return _ifthenpay_payment_methods_payload()
 
 
 @api.get("/admin/shipping-rates")
@@ -2805,6 +3215,11 @@ async def create_order(payload: OrderCreateIn):
     if payload.terms_accepted is not True:
         raise HTTPException(400, "É necessário aceitar os Termos e Condições para concluir a encomenda.")
 
+    payment_method = _validate_payment_method(payload.payment_method)
+    mbway_phone = payload.mbway_phone or payload.customer_phone
+    if payment_method == "mbway":
+        _normalize_mbway_phone(mbway_phone)
+
     lamination_requested = any(bool(line.get("lamination")) for line in summary["lines"])
     if lamination_requested and payload.lamination_early_start_ack is not True:
         raise HTTPException(400, "Confirme a autorização para início antecipado do serviço de plastificação.")
@@ -2841,6 +3256,7 @@ async def create_order(payload: OrderCreateIn):
 
     total_with_shipping = round(summary["total"] + shipping_cost, 2)
     order_no = await _new_unique_order_no()
+    payment_order_id = await _new_unique_payment_order_id()
     access_token = _new_order_access_token()
     access_token_hash = _hash_order_access_token(access_token)
     access_token_expires_at = _order_access_expires_at()
@@ -2890,8 +3306,9 @@ async def create_order(payload: OrderCreateIn):
         "bags_qty": max(0, int(payload.bags_qty or 0)),
         "status": "pending_payment",
         "payment_status": "pending",
-        "payment_provider": "ifthenpay_mocked",
+        "payment_provider": "ifthenpay",
         "invoice_status": "not_issued",
+        "contract_status": "pending",
         "stock_adjustments": stock_adjustments,
         "terms_accepted": True,
         "terms_accepted_at": now_iso,
@@ -2902,15 +3319,67 @@ async def create_order(payload: OrderCreateIn):
         "lamination_ack_version": 1 if lamination_ack_at else None,
         "access_token_hash": access_token_hash,
         "access_token_expires_at": iso(access_token_expires_at),
+        "confirmation_email_status": None,
+        "payment": {
+            "provider": "ifthenpay",
+            "method": payment_method,
+            "order_id": payment_order_id,
+            "status": "initializing",
+            "amount": _money_string(total_with_shipping),
+            "request_id": None,
+            "entity": None,
+            "reference": None,
+            "expires_at": None,
+            "provider_status": None,
+            "mobile_number": _normalize_mbway_phone(mbway_phone) if payment_method == "mbway" else None,
+            "created_at": now_iso,
+            "paid_at": None,
+            "callback_received_at": None,
+            "provider_payment_datetime": None,
+        },
         "created_at": now_iso,
     }
     await db.orders.insert_one(doc)
 
-    if summary.get("promo"):
-        await db.partners.update_one({"promo_code": summary["promo"]["code"]}, {"$inc": {"usage_count": 1}})
+    try:
+        payment_data = await _create_ifthenpay_payment(doc, payment_method, mbway_phone=mbway_phone)
+        payment_update = {
+            "payment.status": "pending",
+            "payment.provider_status": payment_data.get("provider_status"),
+            "payment.request_id": payment_data.get("request_id"),
+            "payment.entity": payment_data.get("entity"),
+            "payment.reference": payment_data.get("reference"),
+            "payment.expires_at": payment_data.get("expires_at"),
+            "payment.amount": payment_data.get("amount"),
+            "updated_at": iso(now_utc()),
+        }
+        if payment_data.get("mobile_number"):
+            payment_update["payment.mobile_number"] = payment_data.get("mobile_number")
+        await db.orders.update_one({"order_no": order_no}, {"$set": payment_update})
+        doc["payment"].update({
+            "status": "pending",
+            "provider_status": payment_data.get("provider_status"),
+            "request_id": payment_data.get("request_id"),
+            "entity": payment_data.get("entity"),
+            "reference": payment_data.get("reference"),
+            "expires_at": payment_data.get("expires_at"),
+            "amount": payment_data.get("amount"),
+            "mobile_number": payment_data.get("mobile_number") or doc["payment"].get("mobile_number"),
+        })
+    except IfthenpayError as exc:
+        await _restore_order_stock_if_needed(order_no)
+        await db.orders.update_one(
+            {"order_no": order_no},
+            {"$set": {
+                "status": "payment_error",
+                "payment_status": "failed",
+                "payment.status": "failed",
+                "payment.provider_status": exc.provider_status,
+                "updated_at": iso(now_utc()),
+            }},
+        )
+        raise HTTPException(502, exc.public_message)
 
-    # MOCKED payment + invoice hook
-    logger.info(f"[MOCKED IFTHENPAY] Order {order_no} created, total={total_with_shipping}€")
     return JSONResponse(
         content={
             "order": _order_confirmation_payload(doc),
@@ -2989,17 +3458,153 @@ async def admin_update_order(order_no: str, status: str = Form(...), admin: dict
     order = await db.orders.find_one({"order_no": order_no})
     if not order:
         raise HTTPException(404, "Encomenda não encontrada")
+    if order.get("payment_provider") == "ifthenpay" and order.get("payment_status") != "paid" and status == "paid":
+        raise HTTPException(409, "O pagamento Ifthenpay ainda não foi confirmado.")
     was_cancelled = (order.get("status") or "").lower().startswith("cancel")
     will_cancel = status.lower().startswith("cancel")
     if will_cancel and not was_cancelled:
-        await _restore_stock(order.get("stock_adjustments", []))
+        if order.get("payment_status") != "paid":
+            await _restore_order_stock_if_needed(order_no)
 
     await db.orders.update_one({"order_no": order_no}, {"$set": {"status": status, "updated_at": iso(now_utc())}})
     await log_action(admin["id"], "update_status", "order", order_no, {"status": status})
-    if status == "paid":
-        logger.info(f"[MOCKED INVOICEXPRESS] Fatura-Recibo gerada para {order_no}")
-        await db.orders.update_one({"order_no": order_no}, {"$set": {"invoice_status": "issued", "payment_status": "paid"}})
     return {"ok": True}
+
+
+@api.get("/payments/ifthenpay/callback/multibanco")
+async def ifthenpay_multibanco_callback(
+    key: str,
+    orderId: str,
+    amount: str,
+    requestId: Optional[str] = None,
+    entity: Optional[str] = None,
+    reference: Optional[str] = None,
+    payment_datetime: Optional[str] = None,
+):
+    if not hmac.compare_digest(key or "", IFTHENPAY_MB_CALLBACK_KEY or ""):
+        raise HTTPException(403, "Invalid callback")
+    order = await db.orders.find_one({"payment.order_id": orderId}, {"_id": 0})
+    if not order:
+        raise HTTPException(404, "Invalid callback")
+    _validate_ifthenpay_callback(order, method="multibanco", order_id=orderId, amount=amount, request_id=requestId, entity=entity, reference=reference)
+    await _mark_order_paid(order, callback_received_at=iso(now_utc()), provider_payment_datetime=_parse_provider_payment_datetime(payment_datetime))
+    return {"ok": True}
+
+
+@api.get("/payments/ifthenpay/callback/mbway")
+async def ifthenpay_mbway_callback(
+    key: str,
+    orderId: str,
+    amount: str,
+    requestId: Optional[str] = None,
+    payment_datetime: Optional[str] = None,
+):
+    if not hmac.compare_digest(key or "", IFTHENPAY_MBWAY_CALLBACK_KEY or ""):
+        raise HTTPException(403, "Invalid callback")
+    order = await db.orders.find_one({"payment.order_id": orderId}, {"_id": 0})
+    if not order:
+        raise HTTPException(404, "Invalid callback")
+    _validate_ifthenpay_callback(order, method="mbway", order_id=orderId, amount=amount, request_id=requestId)
+    await _mark_order_paid(order, callback_received_at=iso(now_utc()), provider_payment_datetime=_parse_provider_payment_datetime(payment_datetime))
+    return {"ok": True}
+
+
+@api.get("/payments/ifthenpay/callback/payshop")
+async def ifthenpay_payshop_callback(
+    anti_phishing_key: str,
+    order_id: str,
+    reference: str,
+    amount: str,
+    payment_datetime: Optional[str] = None,
+):
+    if not hmac.compare_digest(anti_phishing_key or "", IFTHENPAY_PAYSHOP_CALLBACK_KEY or ""):
+        raise HTTPException(403, "Invalid callback")
+    order = await db.orders.find_one({"payment.order_id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(404, "Invalid callback")
+    _validate_ifthenpay_callback(order, method="payshop", order_id=order_id, amount=amount, reference=reference)
+    await _mark_order_paid(order, callback_received_at=iso(now_utc()), provider_payment_datetime=_parse_provider_payment_datetime(payment_datetime))
+    return {"ok": True}
+
+
+async def _ifthenpay_read_payments(order: dict) -> Any:
+    payment = order.get("payment") or {}
+    body = {
+        "boKey": IFTHENPAY_BACKOFFICE_KEY,
+        "orderId": payment.get("order_id"),
+        "method": payment.get("method"),
+    }
+    if payment.get("request_id"):
+        body["requestId"] = payment.get("request_id")
+    if payment.get("reference"):
+        body["reference"] = payment.get("reference")
+    if payment.get("entity"):
+        body["entity"] = payment.get("entity")
+    async with httpx.AsyncClient(timeout=IFTHENPAY_TIMEOUT, headers={"Accept": "application/json", "Content-Type": "application/json"}) as client_http:
+        response = await client_http.post("https://api.ifthenpay.com/v2/payments/read", json=body)
+        response.raise_for_status()
+        return response.json()
+
+
+def _ifthenpay_find_reconcile_candidate(payload: Any, order: dict) -> Optional[dict]:
+    payment = order.get("payment") or {}
+    if isinstance(payload, list):
+        candidates = [x for x in payload if isinstance(x, dict)]
+    elif isinstance(payload, dict) and isinstance(payload.get("payments"), list):
+        candidates = [x for x in payload.get("payments") if isinstance(x, dict)]
+    elif isinstance(payload, dict) and isinstance(payload.get("data"), list):
+        candidates = [x for x in payload.get("data") if isinstance(x, dict)]
+    elif isinstance(payload, dict):
+        candidates = [payload]
+    else:
+        candidates = []
+    matches = []
+    for item in candidates:
+        item_order_id = str(_provider_value(item, "orderId", "order_id") or "").strip()
+        if item_order_id != str(payment.get("order_id") or "").strip():
+            continue
+        item_reference = str(_provider_value(item, "reference", "Reference") or "").strip()
+        stored_reference = str(payment.get("reference") or "").strip()
+        if stored_reference and item_reference and item_reference != stored_reference:
+            continue
+        item_request_id = str(_provider_value(item, "requestId", "RequestId") or "").strip()
+        stored_request_id = str(payment.get("request_id") or "").strip()
+        if stored_request_id and item_request_id and item_request_id != stored_request_id:
+            continue
+        try:
+            item_amount = _money_decimal(_provider_value(item, "amount", "Amount", "valor"))
+        except (InvalidOperation, TypeError):
+            return None
+        if item_amount != _money_decimal(payment.get("amount") or "0"):
+            continue
+        matches.append(item)
+    if len(matches) != 1:
+        return None
+    return matches[0]
+
+
+@api.post("/admin/orders/{order_no}/reconcile-payment")
+async def admin_reconcile_payment(order_no: str, admin: dict = Depends(require_manager)):
+    if not IFTHENPAY_BACKOFFICE_KEY:
+        raise HTTPException(503, "Backoffice Ifthenpay não configurado.")
+    order = await db.orders.find_one({"order_no": order_no}, {"_id": 0})
+    if not order:
+        raise HTTPException(404, "Encomenda não encontrada")
+    if order.get("payment_provider") != "ifthenpay":
+        raise HTTPException(400, "Encomenda sem pagamento Ifthenpay.")
+    try:
+        payload = await _ifthenpay_read_payments(order)
+    except Exception:
+        raise HTTPException(502, "Não foi possível reconciliar o pagamento.")
+    candidate = _ifthenpay_find_reconcile_candidate(payload, order)
+    if not candidate:
+        return {"ok": False, "message": "Pagamento encontrado mas valor não pôde ser validado automaticamente."}
+    await _mark_order_paid(
+        order,
+        callback_received_at=iso(now_utc()),
+        provider_payment_datetime=_parse_provider_payment_datetime(_provider_value(candidate, "payment_datetime", "paymentDate", "paidAt")),
+    )
+    return {"ok": True, "message": "Pagamento reconciliado com sucesso."}
 
 class ArchiveIn(BaseModel):
     ids: List[str]
@@ -3412,6 +4017,15 @@ async def ensure_indexes():
             await db.orders.create_index("order_no", unique=True, name="order_no_unique_if_safe")
         except Exception as e:
             logger.warning(f"[orders] Não foi possível criar índice unique para order_no: {e}")
+    try:
+        await db.orders.create_index(
+            "payment.order_id",
+            unique=True,
+            partialFilterExpression={"payment.order_id": {"$type": "string", "$gt": ""}},
+            name="payment_order_id_unique_when_present",
+        )
+    except Exception as e:
+        logger.warning(f"[orders] Não foi possível criar índice unique para payment.order_id: {e}")
 
     await db.order_access_rate_limits.create_index(
         [("scope", 1), ("identifier_hash", 1), ("created_at_dt", 1)],

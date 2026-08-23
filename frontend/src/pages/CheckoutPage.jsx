@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import SEO from "@/components/SEO";
 import { toast } from "sonner";
-import { Truck, Check, AlertTriangle, CreditCard, MapPin, FileText } from "lucide-react";
+import { Truck, Check, AlertTriangle, MapPin, FileText } from "lucide-react";
 
 // Bloco C: validação NIF PT (algoritmo oficial do dígito de controlo).
 // 1º dígito válido: 1,2,3 (singulares), 5 (empresas), 6 (adm. pública),
@@ -32,10 +32,13 @@ export default function CheckoutPage() {
   const { items, summary, promoCode, clear, bagsQty } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [paymentMethods, setPaymentMethods] = useState([]);
   const [form, setForm] = useState({
     name: user?.name || "",
     email: user?.email || "",
     phone: "",
+    payment_method: "",
+    mbway_phone: "",
     concelho: "",
     address: "",
     postal_code: "",
@@ -58,6 +61,12 @@ export default function CheckoutPage() {
   // Bloco B: carregar lista de concelhos + custo por concelho
   useEffect(() => {
     api.get("/shipping/zones").then((r) => setShippingZones(r.data.concelhos || [])).catch(() => {});
+    api.get("/payments/methods")
+      .then((r) => {
+        const enabled = (r.data?.methods || []).filter((m) => m.enabled);
+        setPaymentMethods(enabled);
+      })
+      .catch(() => setPaymentMethods([]));
   }, []);
 
   useEffect(() => {
@@ -78,6 +87,10 @@ export default function CheckoutPage() {
 
   const submit = async (e) => {
     e.preventDefault();
+    if (!form.payment_method) {
+      toast.error("Escolha o método de pagamento.");
+      return;
+    }
     if (!form.concelho) {
       toast.error("Escolha o concelho de entrega.");
       return;
@@ -107,6 +120,8 @@ export default function CheckoutPage() {
         items,
         promo_code: promoCode || null,
         bags_qty: bagsQty,
+        payment_method: form.payment_method,
+        mbway_phone: form.payment_method === "mbway" ? (form.mbway_phone || form.phone) : null,
         customer_name: form.name,
         customer_email: form.email,
         customer_phone: form.phone,
@@ -129,11 +144,11 @@ export default function CheckoutPage() {
 
       sessionStorage.setItem(`ts_order_access_${createdOrder.order_no}`, accessToken);
 
-      toast.success(`Encomenda ${createdOrder.order_no} criada!`);
+      toast.success(`Pedido ${createdOrder.order_no} criado.`);
       clear();
       navigate(`/encomenda/${createdOrder.order_no}`, { state: { order: createdOrder } });
     } catch (err) {
-      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Erro ao criar encomenda");
+      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Não foi possível iniciar o pagamento. Tente novamente.");
     } finally { setSubmitting(false); }
   };
 
@@ -262,14 +277,47 @@ export default function CheckoutPage() {
             <Textarea value={form.notes} onChange={handle("notes")} placeholder="Hora preferida de entrega, escola, ano do aluno..." data-testid="checkout-notes"/>
           </section>
 
-          <section className="bg-[#F5F8EC] border border-[#E2E8F0] rounded-md p-5 flex items-start gap-3" data-testid="payment-mock-notice">
-            <CreditCard className="w-5 h-5 text-[#5A8F1E] mt-0.5" strokeWidth={1.5}/>
-            <div>
-              <div className="font-display font-medium text-sm">Pagamento</div>
-              <p className="text-sm text-[#4A5568] mt-1">
-                Será contactado pela Tendinha do Saber para efetuar o pagamento. A fatura-recibo é emitida após confirmação.
-              </p>
+          <section className="bg-white border border-[#E2E8F0] rounded-md p-6" data-testid="payment-methods-section">
+            <h2 className="font-display text-lg font-medium mb-4">Escolha o método de pagamento</h2>
+            <div className="space-y-3">
+              {paymentMethods.map((method) => (
+                <label key={method.id} className={`block border rounded-md p-4 cursor-pointer transition-colors ${form.payment_method === method.id ? "border-[#5A8F1E] bg-[#F5F8EC]" : "border-[#E2E8F0] bg-white"}`}>
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="radio"
+                      name="payment_method"
+                      value={method.id}
+                      checked={form.payment_method === method.id}
+                      onChange={() => setForm((cur) => ({ ...cur, payment_method: method.id, mbway_phone: method.id === "mbway" ? (cur.mbway_phone || cur.phone) : "" }))}
+                      className="mt-1"
+                      data-testid={`payment-method-${method.id}`}
+                    />
+                    <div>
+                      <div className="font-display font-medium text-sm text-[#1A202C]">{method.label}</div>
+                      <p className="text-sm text-[#4A5568] mt-1">
+                        {method.id === "multibanco" && "Receba uma entidade e referência para pagar no Multibanco ou homebanking."}
+                        {method.id === "mbway" && "Receba um pedido de pagamento na aplicação MB WAY."}
+                        {method.id === "payshop" && "Receba uma referência para pagar num agente Payshop."}
+                      </p>
+                    </div>
+                  </div>
+                </label>
+              ))}
+              {paymentMethods.length === 0 && (
+                <p className="text-sm text-[#9B2C2C]" data-testid="payment-methods-empty">Nenhum método de pagamento está disponível neste momento.</p>
+              )}
             </div>
+            {form.payment_method === "mbway" && (
+              <div className="mt-4" data-testid="mbway-phone-field">
+                <Label className="text-xs uppercase tracking-wider text-[#4A5568] mb-1.5 block">Número associado ao MB WAY</Label>
+                <Input
+                  value={form.mbway_phone || form.phone}
+                  onChange={(e) => setForm({ ...form, mbway_phone: e.target.value })}
+                  placeholder="Ex: 912345678"
+                />
+                <p className="text-xs text-[#4A5568] mt-1.5">Será enviado um pedido de pagamento para este número.</p>
+              </div>
+            )}
           </section>
 
           <label className="flex items-start gap-2 text-sm text-[#1A202C]">

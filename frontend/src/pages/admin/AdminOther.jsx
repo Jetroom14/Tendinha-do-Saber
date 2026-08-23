@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import api from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -193,7 +193,7 @@ export function AdminVouchers() {
   const [loading, setLoading] = useState(true);
   const [archiving, setArchiving] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const qs = new URLSearchParams();
@@ -206,8 +206,8 @@ export function AdminVouchers() {
     } catch {
       toast.error("Erro ao carregar vouchers");
     } finally { setLoading(false); }
-  };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [filter, archiveView]);
+  }, [archiveView, filter]);
+  useEffect(() => { load(); }, [load]);
 
   const toggleSelect = (id) => {
     const newSel = new Set(selected);
@@ -316,7 +316,7 @@ export function AdminOrders() {
   const [archiving, setArchiving] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const qs = new URLSearchParams();
@@ -328,8 +328,8 @@ export function AdminOrders() {
     } catch {
       toast.error("Erro ao carregar encomendas");
     } finally { setLoading(false); }
-  };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [filter, archiveView]);
+  }, [archiveView, filter]);
+  useEffect(() => { load(); }, [load]);
 
   const updateStatus = async (orderNo, status) => {
     const fd = new FormData(); fd.append("status", status);
@@ -339,6 +339,17 @@ export function AdminOrders() {
       load();
     } catch {
       toast.error("Erro ao atualizar encomenda");
+    }
+  };
+
+  const reconcilePayment = async (orderNo) => {
+    try {
+      const { data } = await api.post(`/admin/orders/${orderNo}/reconcile-payment`);
+      if (data?.ok) toast.success(data.message || "Pagamento reconciliado");
+      else toast.warning(data?.message || "Pagamento não pôde ser validado automaticamente");
+      load();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Erro ao reconciliar pagamento");
     }
   };
 
@@ -494,13 +505,27 @@ export function AdminOrders() {
                       <SelectTrigger className="h-8 w-40 inline-flex" data-testid={`order-status-${o.order_no}`}><SelectValue/></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="pending_payment">Aguarda Pagamento</SelectItem>
-                        <SelectItem value="paid">Paga</SelectItem>
+                        {!(o.payment_provider === "ifthenpay" && o.payment_status !== "paid") && <SelectItem value="paid">Paga</SelectItem>}
                         <SelectItem value="preparing">Em Preparação</SelectItem>
                         <SelectItem value="ready">Pronta</SelectItem>
                         <SelectItem value="delivered">Entregue</SelectItem>
                         <SelectItem value="cancelled">Cancelada</SelectItem>
                       </SelectContent>
                     </Select>
+                    <div className="mt-2 text-left text-xs text-slate-500 space-y-1 min-w-[220px]">
+                      <div>Método: <span className="font-medium text-slate-700">{o.payment?.method || "—"}</span></div>
+                      <div>Pagamento: <span className="font-medium text-slate-700">{o.payment_status || o.payment?.status || "—"}</span></div>
+                      {o.payment?.entity && <div>Entidade: <span className="font-mono text-slate-700">{o.payment.entity}</span></div>}
+                      {o.payment?.reference && <div>Referência: <span className="font-mono text-slate-700">{o.payment.reference}</span></div>}
+                      {o.payment?.order_id && <div>Payment Order ID: <span className="font-mono text-slate-700">{o.payment.order_id}</span></div>}
+                      {o.payment?.request_id && <div>Request ID: <span className="font-mono text-slate-700">{o.payment.request_id}</span></div>}
+                      {o.payment?.paid_at && <div>Pago em: <span className="text-slate-700">{new Date(o.payment.paid_at).toLocaleString("pt-PT")}</span></div>}
+                      {o.payment_provider === "ifthenpay" && o.payment_status !== "paid" && (
+                        <Button type="button" size="sm" variant="outline" className="mt-2" onClick={() => reconcilePayment(o.order_no)} data-testid={`order-reconcile-${o.order_no}`}>
+                          Reconciliar pagamento
+                        </Button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
