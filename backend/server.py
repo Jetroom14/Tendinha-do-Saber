@@ -2916,7 +2916,124 @@ async def _ifthenpay_mbway_status(client_http: httpx.AsyncClient, *, request_id:
         return response.json()
     except ValueError as exc:
         raise IfthenpayError("Não foi possível consultar o estado MB WAY.", ambiguous=True) from exc
+_MBWAY_TERMINAL_FAILURE_CODES = {
+    "020",  # recusado/cancelado pelo utilizador
+    "048",  # cancelado pelo comerciante
+    "100",  # operação não concluída
+    "101",  # expirado
+    "104",  # operação não permitida
+    "122",  # recusado
+    "125",  # recusado
+}
 
+
+async def _refresh_mbway_payment_status(order: dict) -> dict:
+    payment = order.get("payment") or {}
+
+    if (
+        order.get("payment_provider") != "ifthenpay"
+        or payment.get("method") != "mbway"
+        or order.get("payment_status") == "paid"
+        or str(order.get("status") or "").lower().startswith("cancel")
+        or payment.get("status") not in {"pending", "unknown"}
+    ):
+        return order
+
+    try:
+        async with httpx.AsyncClient(
+            timeout=IFTHENPAY_TIMEOUT,
+            headers={"Accept": "application/json"},
+        ) as client_http:
+            data = await _ifthenpay_mbway_status(
+                client_http,
+                request_id=payment.get("request_id"),
+            )
+    except IfthenpayError:
+        # Erro/timeout ao consultar a Ifthenpay:
+        # nunca assumir pagamento falhado nem libertar stock.
+        return order
+
+    provider_status = str(
+        _provider_value(data, "Status", "status") or ""
+    ).strip()
+
+    provider_message = str(
+        _provider_value(data, "Message", "message") or ""
+    ).strip()
+
+    message_lower = provider_message.lower()
+
+    # No endpoint de estado, 000 + Success significa pagamento concluído.
+    # Evitamos marcar pago se o operador ainda devolver "Pending".
+    if provider_status == "000" and "pending" not in message_lower:
+        await _mark_order_paid(
+            order,
+            callback_received_at=iso(now_utc()),
+            provider_payment_datetime=_parse_provider_payment_datetime(
+                _provider_value(
+                    data,
+                    "UpdateAt",
+                    "updatedAt",
+                    "updated_at",
+                )
+            ),
+        )
+
+    elif provider_status in _MBWAY_TERMINAL_FAILURE_CODES:
+        now_iso = iso(now_utc())
+
+        result = await db.orders.update_one(
+            {
+                "order_no": order.get("order_no"),
+                "payment_status": {"$ne": "paid"},
+                "status": order.get("status"),
+            },
+            {
+                "$set": {
+                    "status": "cancelled",
+                    "payment_status": "failed",
+                    "payment.status": "failed",
+                    "payment.provider_status": provider_status,
+                    "payment.provider_message": provider_message,
+                    "updated_at": now_iso,
+                }
+            },
+        )
+
+        if result.modified_count:
+            await _restore_order_stock_if_needed(order.get("order_no"))
+
+            await log_action(
+                "system",
+                "payment_failed",
+                "order",
+                order.get("order_no"),
+                {
+                    "method": "mbway",
+                    "provider_status": provider_status,
+                },
+            )
+
+    elif provider_status:
+        # Estado ainda não terminal ou desconhecido:
+        # guardamos a resposta, mas não assumimos falha.
+        await db.orders.update_one(
+            {"order_no": order.get("order_no")},
+            {
+                "$set": {
+                    "payment.provider_status": provider_status,
+                    "payment.provider_message": provider_message,
+                    "updated_at": iso(now_utc()),
+                }
+            },
+        )
+
+    refreshed = await db.orders.find_one(
+        {"order_no": order.get("order_no")},
+        {"_id": 0},
+    )
+
+    return refreshed or order
 
 async def _ifthenpay_create_payshop(client_http: httpx.AsyncClient, *, order_id: str, amount: Decimal, expiry_date: str) -> dict:
     body = {
@@ -3617,8 +3734,13 @@ async def get_order(order_no: str, request: Request):
     token = request.headers.get(ORDER_ACCESS_TOKEN_HEADER)
     if not _is_valid_order_access_token(o, token):
         raise _public_order_access_error()
-
-    return JSONResponse(content=_order_confirmation_payload(o), headers={"Cache-Control": "no-store"})
+    payment = o.get("payment") or {}
+    if (
+        payment.get("method") == "mbway"
+        and o.get("payment_status") in {"pending", "unknown"}
+    ):
+        o = await _refresh_mbway_payment_status(o)
+        return JSONResponse(content=_order_confirmation_payload(o), headers={"Cache-Control": "no-store"})
 
 @api.get("/admin/orders")
 async def admin_list_orders(admin: dict = Depends(require_admin), status: Optional[str] = None, archived: str = "false"):
