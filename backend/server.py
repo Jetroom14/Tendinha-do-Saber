@@ -3558,23 +3558,26 @@ async def admin_update_order(order_no: str, status: str = Form(...), admin: dict
     was_cancelled = (order.get("status") or "").lower().startswith("cancel")
     will_cancel = status.lower().startswith("cancel")
     if will_cancel and not was_cancelled:
-        if order.get("payment_status") != "paid":
-            cancel_res = await db.orders.update_one(
-                {
-                    "order_no": order_no,
-                    "payment_status": {"$ne": "paid"},
-                    "status": order.get("status"),
-                },
-                {"$set": {"status": status, "updated_at": iso(now_utc())}},
-            )
-            if cancel_res.modified_count == 0:
-                latest = await db.orders.find_one({"order_no": order_no}, {"_id": 0}) or {}
-                if latest.get("payment_status") == "paid":
-                    raise HTTPException(409, "Pagamento já confirmado; cancelamento requer revisão manual.")
-                return {"ok": True}
-            await _restore_order_stock_if_needed(order_no)
-            await log_action(admin["id"], "update_status", "order", order_no, {"status": status})
+        # Cancelamento atómico: o filtro Mongo é a fonte de verdade. Se o
+        # callback ganhou a corrida (mesmo entre esta função e o find_one
+        # acima), o `payment_status != "paid"` do filtro impede a mudança e
+        # devolvemos 409 — sem mutar nada.
+        cancel_res = await db.orders.update_one(
+            {
+                "order_no": order_no,
+                "payment_status": {"$ne": "paid"},
+                "status": order.get("status"),
+            },
+            {"$set": {"status": status, "updated_at": iso(now_utc())}},
+        )
+        if cancel_res.modified_count == 0:
+            latest = await db.orders.find_one({"order_no": order_no}, {"_id": 0}) or {}
+            if latest.get("payment_status") == "paid":
+                raise HTTPException(409, "Pagamento já confirmado; cancelamento requer revisão manual.")
             return {"ok": True}
+        await _restore_order_stock_if_needed(order_no)
+        await log_action(admin["id"], "update_status", "order", order_no, {"status": status})
+        return {"ok": True}
 
     await db.orders.update_one({"order_no": order_no}, {"$set": {"status": status, "updated_at": iso(now_utc())}})
     await log_action(admin["id"], "update_status", "order", order_no, {"status": status})

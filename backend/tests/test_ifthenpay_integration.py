@@ -372,6 +372,20 @@ class IfthenpayIntegrationTests(unittest.IsolatedAsyncioTestCase):
             await server.admin_update_order("TS-5", status="paid", admin={"id": "admin-1"})
         self.assertEqual(ctx.exception.status_code, 409)
 
+    async def test_admin_cancel_after_callback_paid_is_blocked(self):
+        """Race — callback venceu primeiro: cancel admin tem de dar 409 sem mutar."""
+        orders = FakeCollection([{
+            "order_no": "TS-CB1", "status": "paid",
+            "payment_provider": "ifthenpay", "payment_status": "paid",
+        }])
+        server.db = SimpleNamespace(orders=orders)
+        with self.assertRaises(HTTPException) as ctx:
+            await server.admin_update_order("TS-CB1", status="cancelled", admin={"id": "admin-1"})
+        self.assertEqual(ctx.exception.status_code, 409)
+        after = await orders.find_one({"order_no": "TS-CB1"})
+        self.assertEqual(after["status"], "paid")
+        self.assertEqual(after["payment_status"], "paid")
+
     async def test_reconciliation_safe(self):
         order = {
             "order_no": "TS-6",
