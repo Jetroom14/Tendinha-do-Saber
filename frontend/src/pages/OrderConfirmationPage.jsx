@@ -97,8 +97,16 @@ export default function OrderConfirmationPage() {
   const paymentPending = order.payment_status === "pending" || payment.status === "pending";
   const paymentPaid = order.payment_status === "paid" || payment.status === "paid";
   const paymentUnknown = order.payment_status === "unknown" || payment.status === "unknown";
-const paymentFailed = order.payment_status === "failed" || payment.status === "failed";
-  const copyReference = async () => {
+  const paymentFailed = order.payment_status === "failed" || payment.status === "failed";
+
+  const formatExpiryDate = (value) => {
+    const text = String(value || "").trim();
+    if (/^\d{8}$/.test(text)) {
+      return `${text.slice(6, 8)}/${text.slice(4, 6)}/${text.slice(0, 4)}`;
+    }
+    return text || "—";
+  }; 
+   const copyReference = async () => {
     if (!payment.reference) return;
     try {
       await navigator.clipboard.writeText(String(payment.reference));
@@ -172,8 +180,7 @@ const paymentFailed = order.payment_status === "failed" || payment.status === "f
                 <div><div className="text-[#4A5568]">Entidade</div><div className="font-mono text-[#1A202C]">{payment.entity || "—"}</div></div>
                 <div><div className="text-[#4A5568]">Referência</div><div className="font-mono text-[#1A202C]">{payment.reference || "—"}</div></div>
                 <div><div className="text-[#4A5568]">Valor</div><div className="text-[#1A202C]">{payment.amount || "—"}€</div></div>
-                <div><div className="text-[#4A5568]">Validade</div><div className="text-[#1A202C]">{payment.expires_at || "—"}</div></div>
-              </div>
+                <div><div className="text-[#4A5568]">Validade</div><div className="text-[#1A202C]">{formatExpiryDate(payment.expires_at)}</div></div>              </div>
               {payment.reference && <Button type="button" variant="outline" className="mt-3" onClick={copyReference}>Copiar referência</Button>}
             </div>
           )}
@@ -183,8 +190,7 @@ const paymentFailed = order.payment_status === "failed" || payment.status === "f
               <div className="grid sm:grid-cols-2 gap-3 text-sm">
                 <div><div className="text-[#4A5568]">Referência</div><div className="font-mono text-[#1A202C]">{payment.reference || "—"}</div></div>
                 <div><div className="text-[#4A5568]">Valor</div><div className="text-[#1A202C]">{payment.amount || "—"}€</div></div>
-                <div><div className="text-[#4A5568]">Validade</div><div className="text-[#1A202C]">{payment.expires_at || "—"}</div></div>
-              </div>
+                <div><div className="text-[#4A5568]">Validade</div><div className="text-[#1A202C]">{formatExpiryDate(payment.expires_at)}</div></div>              </div>
               {payment.reference && <Button type="button" variant="outline" className="mt-3" onClick={copyReference}>Copiar referência</Button>}
             </div>
           )}
