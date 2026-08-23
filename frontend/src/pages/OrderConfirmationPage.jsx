@@ -107,17 +107,61 @@ const paymentFailed = order.payment_status === "failed" || payment.status === "f
     }
   };
 
-  return (
+    return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16" data-testid="order-confirmation">
       <div className="text-center mb-10">
-        <CheckCircle2 className={`w-14 h-14 mx-auto mb-4 ${paymentPaid ? "text-[#2F855A]" : "text-[#E07A1F]"}`} strokeWidth={1.5}/>
-<h1 className="font-display text-3xl md:text-4xl font-medium mb-3">{paymentPaid ? "Pagamento confirmado — encomenda aceite" : paymentFailed ? "Pagamento não concluído" : "Pedido de encomenda recebido"}</h1>        <p className="text-[#4A5568]">{paymentPaid ? "O pagamento foi confirmado e a encomenda foi aceite." : paymentUnknown ? "Estado do pagamento em verificação. Não repita o pagamento. Estamos a aguardar confirmação do operador." : "A encomenda será aceite quando o pagamento for confirmado."}</p>
-<p className="text-[#4A5568]">{paymentPaid ? "O pagamento foi confirmado e a encomenda foi aceite." : paymentFailed ? "O pagamento não foi concluído. A encomenda não foi aceite." : paymentUnknown ? "Estado do pagamento em verificação. Não repita o pagamento. Estamos a aguardar confirmação do operador." : "A encomenda será aceite quando o pagamento for confirmado."}</p>      </div>
+        <CheckCircle2
+          className={`w-14 h-14 mx-auto mb-4 ${paymentPaid ? "text-[#2F855A]" : "text-[#E07A1F]"}`}
+          strokeWidth={1.5}
+        />
+        <h1 className="font-display text-3xl md:text-4xl font-medium mb-3">
+          {paymentPaid
+            ? "Pagamento confirmado — encomenda aceite"
+            : paymentFailed
+              ? "Pagamento não concluído"
+              : "Pedido de encomenda recebido"}
+        </h1>
+        <p className="text-[#4A5568]">
+          {paymentPaid
+            ? "O pagamento foi confirmado e a encomenda foi aceite."
+            : paymentFailed
+              ? "O pagamento não foi concluído. A encomenda não foi aceite."
+              : paymentUnknown
+                ? "Estado do pagamento em verificação. Não repita o pagamento. Estamos a aguardar confirmação do operador."
+                : "A encomenda será aceite quando o pagamento for confirmado."}
+        </p>
+      </div>
+
       <div className="bg-white border border-[#E2E8F0] rounded-md p-6">
         <div className="grid grid-cols-2 gap-4 text-sm mb-5">
-          <div><div className="text-[10px] uppercase tracking-wider text-[#4A5568]">Nº de Encomenda</div><div className="font-mono text-[#1A202C]" data-testid="order-no">{order.order_no}</div></div>
-          <div><div className="text-[10px] uppercase tracking-wider text-[#4A5568]">Estado</div><div className="text-[#1A202C]">{paymentPaid ? "Pago" : paymentFailed ? "Pagamento recusado" : paymentUnknown ? "Estado do pagamento em verificação" : paymentPending ? "Pagamento pendente" : order.payment_status}</div></div>          <div><div className="text-[10px] uppercase tracking-wider text-[#4A5568]">Entrega</div><div className="text-[#1A202C]">{order.delivery.method === "hand_delivery" ? "Entrega ao domicílio (Aveiro)" : "Envio"}</div></div>
-          <div><div className="text-[10px] uppercase tracking-wider text-[#4A5568]">Total</div><div className="font-display text-xl text-[#1A202C]">{order.totals.total.toFixed(2)}€</div></div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-[#4A5568]">Nº de Encomenda</div>
+            <div className="font-mono text-[#1A202C]" data-testid="order-no">{order.order_no}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-[#4A5568]">Estado</div>
+            <div className="text-[#1A202C]">
+              {paymentPaid
+                ? "Pago"
+                : paymentFailed
+                  ? "Pagamento recusado"
+                  : paymentUnknown
+                    ? "Estado do pagamento em verificação"
+                    : paymentPending
+                      ? "Pagamento pendente"
+                      : order.payment_status}
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-[#4A5568]">Entrega</div>
+            <div className="text-[#1A202C]">
+              {order.delivery.method === "hand_delivery" ? "Entrega ao domicílio (Aveiro)" : "Envio"}
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-[#4A5568]">Total</div>
+            <div className="font-display text-xl text-[#1A202C]">{order.totals.total.toFixed(2)}€</div>
+          </div>
         </div>
 
         <div className="border-t border-[#E2E8F0] pt-4 pb-4 space-y-3">
