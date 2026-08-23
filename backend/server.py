@@ -3740,7 +3740,7 @@ async def get_order(order_no: str, request: Request):
         and o.get("payment_status") in {"pending", "unknown"}
     ):
         o = await _refresh_mbway_payment_status(o)
-        return JSONResponse(content=_order_confirmation_payload(o), headers={"Cache-Control": "no-store"})
+    return JSONResponse(content=_order_confirmation_payload(o), headers={"Cache-Control": "no-store"})
 
 @api.get("/admin/orders")
 async def admin_list_orders(admin: dict = Depends(require_admin), status: Optional[str] = None, archived: str = "false"):
