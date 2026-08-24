@@ -68,6 +68,7 @@ RESEND_REPLY_TO = os.environ.get(
     "tendinhadosaber@gmail.com",
 ).strip()
 RESEND_API_URL = "https://api.resend.com/emails"
+RESEND_LOGO_URL = os.environ.get("RESEND_LOGO_URL", "").strip()
 _PAYMENT_ORDER_ID_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 # Private, non-public storage for MEGA voucher PDFs. NEVER place this under
@@ -414,15 +415,22 @@ async def _send_contract_confirmation_if_available(order: dict) -> str:
     total = money(totals.get("total"))
     shipping = money(totals.get("shipping_cost"))
 
-    email_html = f"""<!doctype html>
-<html lang="pt">
+    logo_html = (
+        f'<img src="{esc(RESEND_LOGO_URL)}" alt="Tendinha do Saber" '
+        'width="120" style="display:block;width:120px;max-width:100%;'
+        'height:auto;margin:0 auto 14px;">'
+        if RESEND_LOGO_URL
+        else ""
+    )
+
+    email_html = f"""<!doctype html><html lang="pt">
   <body style="margin:0;padding:0;background:#F7F7F4;font-family:Arial,Helvetica,sans-serif;color:#1A202C;">
     <div style="max-width:680px;margin:0 auto;padding:32px 16px;">
       <div style="background:#ffffff;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;">
 
-        <div style="padding:28px 32px;background:#F5F8EC;border-bottom:1px solid #E2E8F0;">
-          <div style="font-size:22px;font-weight:700;">Tendinha do Saber</div>
-          <div style="margin-top:4px;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:#4A5568;">
+<div style="padding:28px 32px;background:#F5F8EC;border-bottom:1px solid #E2E8F0;text-align:center;">
+  {logo_html}
+  <div style="font-size:22px;font-weight:700;">Tendinha do Saber</div>          <div style="margin-top:4px;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:#4A5568;">
             Manuais Escolares · Aveiro
           </div>
         </div>
