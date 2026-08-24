@@ -416,13 +416,12 @@ async def _send_contract_confirmation_if_available(order: dict) -> str:
     shipping = money(totals.get("shipping_cost"))
 
     logo_html = (
-        f'<img src="{esc(RESEND_LOGO_URL)}" alt="Tendinha do Saber" '
+        '<img src="cid:tendinha-logo" alt="Tendinha do Saber" '
         'width="120" style="display:block;width:120px;max-width:100%;'
         'height:auto;margin:0 auto 14px;">'
         if RESEND_LOGO_URL
         else ""
     )
-
     email_html = f"""<!doctype html><html lang="pt">
   <body style="margin:0;padding:0;background:#F7F7F4;font-family:Arial,Helvetica,sans-serif;color:#1A202C;">
     <div style="max-width:680px;margin:0 auto;padding:32px 16px;">
@@ -540,6 +539,15 @@ async def _send_contract_confirmation_if_available(order: dict) -> str:
         "html": email_html,
         "text": email_text,
     }
+    if RESEND_LOGO_URL:
+        payload["attachments"] = [
+            {
+                "path": RESEND_LOGO_URL,
+                "filename": "logo-tendinha.png",
+                "content_type": "image/png",
+                "content_id": "tendinha-logo",
+            }
+        ]
 
     headers = {
         "Authorization": f"Bearer {RESEND_API_KEY}",
