@@ -25,7 +25,7 @@ export function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20 gap-6">
           <Link to="/" className="flex items-center gap-2.5 shrink-0" data-testid="logo-link">
-            <img src="/logo.svg" alt="Tendinha do Saber" className="w-11 h-11 object-contain" />
+            <img src="/branding/logo-email.png" alt="Tendinha do Saber" className="w-11 h-11 object-contain" />
             <div className="leading-tight">
               <div className="font-display font-semibold text-[15px] text-[#1A202C]">Tendinha do Saber</div>
               <div className="text-[10px] uppercase tracking-[0.18em] text-[#4A5568]">Manuais Escolares · Aveiro</div>
@@ -108,7 +108,7 @@ export function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 grid grid-cols-1 md:grid-cols-4 gap-10">
         <div>
           <div className="flex items-center gap-2.5 mb-4">
-            <img src="/logo.svg" alt="Tendinha do Saber" className="w-11 h-11 object-contain bg-white rounded p-1" />
+            <img src="/branding/logo-email.png" alt="Tendinha do Saber" className="w-11 h-11 object-contain bg-white rounded p-1" />
             <div>
               <div className="font-display font-semibold">Tendinha do Saber</div>
               <div className="text-[10px] uppercase tracking-[0.18em] text-[#A0AEC0]">Manuais · Aveiro</div>

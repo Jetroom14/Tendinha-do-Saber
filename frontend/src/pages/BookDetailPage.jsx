@@ -44,7 +44,7 @@ export default function BookDetailPage() {
   const canBuy = book.status !== "Unavailable";
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12" data-testid="book-detail-page">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-12" data-testid="book-detail-page">
       <SEO
         title={`${book.title} · ${book.subject || ""}`.trim()}
         path={`/livro/${book.isbn13}`}
@@ -53,13 +53,13 @@ export default function BookDetailPage() {
         type="product"
         jsonLd={buildBookJsonLd(book)}
       />
-      <Link to="/catalogo" className="inline-flex items-center gap-1.5 text-sm text-[#4A5568] hover:text-[#5A8F1E] mb-8" data-testid="back-to-catalog">
+      <Link to="/catalogo" className="inline-flex items-center gap-1.5 text-sm text-[#4A5568] hover:text-[#5A8F1E] mb-5 md:mb-8" data-testid="back-to-catalog">
         <ArrowLeft className="w-4 h-4" strokeWidth={1.5}/> Voltar ao catálogo
       </Link>
 
-      <div className="grid md:grid-cols-12 gap-12">
+      <div className="grid md:grid-cols-12 gap-8 md:gap-12">
         <div className="md:col-span-5">
-          <div className="sticky top-28 bg-[#F5F8EC] rounded-md aspect-[3/4] overflow-hidden border border-[#E2E8F0]" data-testid="book-cover-img">
+          <div className="w-[82%] max-w-[330px] mx-auto md:sticky md:top-28 md:w-[85%] md:max-w-none md:mx-0 bg-[#F5F8EC] rounded-md aspect-[3/4] overflow-hidden border border-[#E2E8F0]" data-testid="book-cover-img">
             <CoverImage book={book} className="w-full h-full object-cover" />
           </div>
         </div>

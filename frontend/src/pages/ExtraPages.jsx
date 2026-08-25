@@ -3,21 +3,121 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useEffect } from "react";
 import api from "@/lib/api";
+import SEO from "@/components/SEO";
 import { Input } from "@/components/ui/input";
 import { Search, BookOpen, FileText, Upload, Truck, Shield, Sparkles, ArrowLeft, Phone, Mail } from "lucide-react";
 
 export function AboutPage() {
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16" data-testid="about-page">
-      <div className="text-[10px] tracking-[0.2em] uppercase text-[#4A5568] font-semibold mb-2">Sobre nós</div>
-      <h1 className="font-display text-4xl md:text-5xl font-medium mb-6">A Tendinha do Saber</h1>
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16" data-testid="about-page">
+      <SEO
+        title="Livraria em Aveiro e Ílhavo | Manuais Escolares"
+        path="/sobre"
+        description="Livraria de manuais escolares em Aveiro e Ílhavo. Encontre livros do 1.º ciclo, ensino básico e secundário, cadernos de atividades, vouchers MEGA e entrega no distrito de Aveiro."
+      />
+
+      <div className="text-[10px] tracking-[0.2em] uppercase text-[#4A5568] font-semibold mb-2">
+        Sobre nós
+      </div>
+
+      <h1 className="font-display text-4xl md:text-5xl font-medium mb-6 leading-tight">
+        Livraria de manuais escolares em Aveiro e Ílhavo
+      </h1>
+
       <p className="font-serif italic text-xl text-[#1A202C] mb-10 leading-relaxed">
-        "O catálogo completo de manuais de uma grande livraria, com o cuidado de quem conhece cada família pelo nome."
+        Uma livraria local, próxima das famílias e preparada para tornar mais simples a compra dos livros de cada ano letivo.
       </p>
-      <div className="prose max-w-none space-y-5 text-[#1A202C] leading-relaxed">
-        <p>Há mais de uma década que a Tendinha do Saber acompanha as famílias do distrito de Aveiro no início de cada ano letivo. Cresceu com a confiança dos pais, professores e alunos — e hoje continua dedicada à mesma missão: <strong>tornar simples a vida escolar das famílias</strong>.</p>
-        <p>Trabalhamos diretamente com as principais editoras nacionais para garantir manuais e cadernos de fichas oficiais, ao preço de capa, com o serviço opcional de plastificação que dá outra vida aos livros — para que durem o ano inteiro e ainda sirvam o(a) irmã(o) seguinte.</p>
-        <p>Acreditamos numa livraria local, próxima e digital. Por isso construímos este espaço online, onde pode encontrar a lista completa da sua escola em poucos cliques, submeter o seu voucher MEGA, e escolher a entrega ao domicílio no distrito de Aveiro, com custo dependente do concelho.</p>
+
+      <div className="space-y-10 text-[#1A202C] leading-relaxed">
+
+        <section className="space-y-4">
+          <p>
+            A <strong>Tendinha do Saber</strong> é uma livraria dedicada a
+            <strong> manuais escolares, livros escolares e cadernos de atividades no distrito de Aveiro</strong>.
+            O nosso objetivo é facilitar a preparação do ano letivo, permitindo encontrar e encomendar
+            os livros necessários de forma simples e com acompanhamento próximo.
+          </p>
+
+          <p>
+            No nosso catálogo encontra manuais e cadernos para o
+            <strong> ensino primário (1.º ciclo), 2.º ciclo, 3.º ciclo do ensino básico e ensino secundário</strong>,
+            das principais editoras escolares nacionais.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="font-display text-2xl font-medium mb-4">
+            Manuais escolares sem complicações
+          </h2>
+
+          <div className="space-y-4">
+            <p>
+              Pode procurar diretamente por título ou ISBN, ou selecionar o ano de escolaridade,
+              concelho e escola para consultar os manuais associados. Assim, encontrar os
+              <strong> livros escolares adotados</strong> torna-se muito mais rápido.
+            </p>
+
+            <p>
+              Para além dos manuais escolares, disponibilizamos
+              <strong> cadernos de atividades</strong>, serviço opcional de plastificação para os
+              livros elegíveis e possibilidade de submissão de <strong>vouchers MEGA</strong>.
+            </p>
+          </div>
+        </section>
+
+        <section>
+          <h2 className="font-display text-2xl font-medium mb-4">
+            Entregas em Aveiro, Ílhavo e em todo o distrito
+          </h2>
+
+          <div className="space-y-4">
+            <p>
+              Fazemos <strong>entregas ao domicílio em todo o distrito de Aveiro</strong>,
+              com o respetivo valor apresentado de acordo com o concelho de entrega.
+            </p>
+
+            <p>
+              Temos uma ligação especialmente próxima a <strong>Aveiro e Ílhavo</strong>,
+              o que nos permite assegurar um acompanhamento muito próximo e, sempre que a
+              disponibilidade dos livros o permita, preparar entregas particularmente ágeis nesta zona.
+            </p>
+          </div>
+        </section>
+
+        <section>
+          <h2 className="font-display text-2xl font-medium mb-4">
+            Uma livraria local com a comodidade de comprar online
+          </h2>
+
+          <div className="space-y-4">
+            <p>
+              A Tendinha do Saber junta a proximidade de uma
+              <strong> livraria em Aveiro</strong> à facilidade de uma loja online:
+              pode escolher os livros, indicar a morada de entrega, selecionar os serviços pretendidos
+              e concluir o pagamento diretamente no site.
+            </p>
+
+            <p>
+              Queremos que comprar <strong>manuais escolares em Aveiro e Ílhavo</strong>
+              seja um processo simples, claro e confortável — desde a procura dos livros até à entrega.
+            </p>
+          </div>
+        </section>
+
+        <div className="flex flex-wrap gap-3 pt-2">
+          <Link to="/catalogo">
+            <Button className="bg-[#5A8F1E] hover:bg-[#3E6E11] text-white">
+              Ver catálogo de livros
+            </Button>
+          </Link>
+
+          <Link to="/vouchers">
+            <Button variant="outline">
+              Submeter voucher MEGA
+            </Button>
+          </Link>
+        </div>
+
       </div>
     </div>
   );
