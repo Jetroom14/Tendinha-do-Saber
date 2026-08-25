@@ -1180,6 +1180,523 @@ async def get_book(key: str):
         raise HTTPException(404, "Livro não encontrado")
     return book
 
+
+# ---------- SAFE BULK BOOK PATCH ----------
+# Endpoint deliberadamente restrito para atualizações em massa do catálogo.
+# NUNCA passa pelo BookIn completo e NUNCA toca em slug, preço, título,
+# stock, year, synopsis, features, related_book_id, etc.
+class SafeBookCatalogPatchOperation(BaseModel):
+    id: str
+
+    # Estado que o cliente espera encontrar antes da escrita.
+    # Serve como optimistic concurrency / CAS.
+    expected_isbn13: Optional[str] = ""
+    expected_pe_code: Optional[str] = None
+    expected_image_url: Optional[str] = ""
+
+    # Estado final pretendido.
+    isbn13: str
+    pe_code: Optional[str] = None
+    image_url: str
+
+
+class SafeBookCatalogBulkPatchIn(BaseModel):
+    operations: List[SafeBookCatalogPatchOperation]
+    dry_run: bool = True
+
+
+def _safe_patch_pe(value: Any) -> Optional[str]:
+    value = str(value or "").strip()
+    return value or None
+
+
+def _safe_patch_image(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _safe_patch_expected_filter(op: dict) -> dict:
+    """Filtro CAS que também tolera campos antigos ausentes/null quando
+    o estado esperado normalizado é vazio."""
+    clauses: List[dict] = [{"id": op["id"]}]
+
+    if op["expected_isbn13"]:
+        clauses.append({"isbn13": op["expected_isbn13"]})
+    else:
+        clauses.append({
+            "$or": [
+                {"isbn13": ""},
+                {"isbn13": None},
+                {"isbn13": {"$exists": False}},
+            ]
+        })
+
+    if op["expected_pe_code"] is None:
+        # Em Mongo, igualdade a None também casa com campo inexistente.
+        clauses.append({"pe_code": None})
+    else:
+        clauses.append({"pe_code": op["expected_pe_code"]})
+
+    if op["expected_image_url"]:
+        clauses.append({"image_url": op["expected_image_url"]})
+    else:
+        clauses.append({
+            "$or": [
+                {"image_url": ""},
+                {"image_url": None},
+                {"image_url": {"$exists": False}},
+            ]
+        })
+
+    return {"$and": clauses}
+
+
+@api.post("/admin/books/bulk-safe-patch")
+async def admin_books_bulk_safe_patch(
+    payload: SafeBookCatalogBulkPatchIn,
+    admin: dict = Depends(require_manager),
+):
+    """Patch em massa extremamente restrito.
+
+    Só pode alterar:
+      - isbn13
+      - pe_code
+      - image_url
+
+    Fluxo:
+      1. normaliza e valida todo o payload;
+      2. confirma que todos os IDs continuam no estado esperado;
+      3. confirma unicidade final de ISBN e PE;
+      4. rejeita colisões transitórias para permitir escrita sequencial segura;
+      5. em dry_run=True não escreve absolutamente nada;
+      6. em apply usa CAS por documento e rollback automático em caso de falha.
+    """
+    if not payload.operations:
+        raise HTTPException(400, "A lista de operações está vazia.")
+
+    if len(payload.operations) > 1000:
+        raise HTTPException(400, "Máximo de 1000 operações por pedido.")
+
+    normalized: List[dict] = []
+    seen_ids = set()
+
+    for index, raw in enumerate(payload.operations):
+        book_id = (raw.id or "").strip()
+
+        if not book_id:
+            raise HTTPException(
+                400,
+                f"Operação {index + 1}: id vazio.",
+            )
+
+        if book_id in seen_ids:
+            raise HTTPException(
+                400,
+                f"ID repetido no payload: {book_id}",
+            )
+
+        seen_ids.add(book_id)
+
+        expected_isbn = strip_isbn(raw.expected_isbn13 or "")
+        expected_pe = _safe_patch_pe(raw.expected_pe_code)
+        expected_image = _safe_patch_image(raw.expected_image_url)
+
+        new_isbn = strip_isbn(raw.isbn13 or "")
+        new_pe = _safe_patch_pe(raw.pe_code)
+        new_image = _safe_patch_image(raw.image_url)
+
+        # Neste endpoint de migração, todos os produtos finais têm ISBN.
+        if len(new_isbn) != 13 or not new_isbn.isdigit():
+            raise HTTPException(
+                400,
+                f"{book_id}: ISBN final inválido.",
+            )
+
+        if expected_isbn and (
+            len(expected_isbn) != 13
+            or not expected_isbn.isdigit()
+        ):
+            raise HTTPException(
+                400,
+                f"{book_id}: ISBN esperado inválido.",
+            )
+
+        # As operações que chegam aqui são precisamente os produtos
+        # que vão receber capa; não aceitamos URL vazia nem protocolos estranhos.
+        if not (
+            new_image.startswith("https://")
+            or new_image.startswith("http://")
+        ):
+            raise HTTPException(
+                400,
+                f"{book_id}: image_url final inválido.",
+            )
+
+        normalized.append({
+            "id": book_id,
+            "expected_isbn13": expected_isbn,
+            "expected_pe_code": expected_pe,
+            "expected_image_url": expected_image,
+            "isbn13": new_isbn,
+            "pe_code": new_pe,
+            "image_url": new_image,
+        })
+
+    # Ler o catálogo inteiro uma vez. São ~842 documentos e permite validar
+    # o estado FINAL como um todo, em vez de depender apenas dos índices.
+    all_books: List[dict] = []
+
+    async for book in db.books.find(
+        {},
+        {
+            "_id": 0,
+            "id": 1,
+            "isbn13": 1,
+            "pe_code": 1,
+            "image_url": 1,
+        },
+    ):
+        all_books.append(book)
+
+    books_by_id = {
+        str(book.get("id") or "").strip(): book
+        for book in all_books
+    }
+
+    missing_ids = [
+        op["id"]
+        for op in normalized
+        if op["id"] not in books_by_id
+    ]
+
+    if missing_ids:
+        raise HTTPException(
+            409,
+            detail={
+                "message": "Há produtos que já não existem.",
+                "ids": missing_ids[:50],
+            },
+        )
+
+    # --------------------------------------------------------
+    # 1) Confirmar que a produção não mudou desde o snapshot.
+    # --------------------------------------------------------
+    drift = []
+
+    for op in normalized:
+        current = books_by_id[op["id"]]
+
+        current_isbn = strip_isbn(
+            str(current.get("isbn13") or "")
+        )
+        current_pe = _safe_patch_pe(current.get("pe_code"))
+        current_image = _safe_patch_image(
+            current.get("image_url")
+        )
+
+        if (
+            current_isbn != op["expected_isbn13"]
+            or current_pe != op["expected_pe_code"]
+            or current_image != op["expected_image_url"]
+        ):
+            drift.append({
+                "id": op["id"],
+                "expected": {
+                    "isbn13": op["expected_isbn13"],
+                    "pe_code": op["expected_pe_code"],
+                    "image_url": op["expected_image_url"],
+                },
+                "current": {
+                    "isbn13": current_isbn,
+                    "pe_code": current_pe,
+                    "image_url": current_image,
+                },
+            })
+
+    if drift:
+        raise HTTPException(
+            409,
+            detail={
+                "message": (
+                    "A produção mudou desde o snapshot. "
+                    "Nenhuma escrita foi feita."
+                ),
+                "conflicts": drift[:50],
+                "conflict_count": len(drift),
+            },
+        )
+
+    proposed_by_id = {
+        op["id"]: op
+        for op in normalized
+    }
+
+    # --------------------------------------------------------
+    # 2) Validar unicidade FINAL de ISBN e PE.
+    # --------------------------------------------------------
+    final_isbn_owners: Dict[str, List[str]] = {}
+    final_pe_owners: Dict[str, List[str]] = {}
+
+    current_isbn_owner: Dict[str, str] = {}
+    current_pe_owner: Dict[str, str] = {}
+
+    for book in all_books:
+        book_id = str(book.get("id") or "").strip()
+
+        current_isbn = strip_isbn(
+            str(book.get("isbn13") or "")
+        )
+        current_pe = _safe_patch_pe(book.get("pe_code"))
+
+        if current_isbn:
+            current_isbn_owner[current_isbn] = book_id
+        if current_pe:
+            current_pe_owner[current_pe] = book_id
+
+        if book_id in proposed_by_id:
+            op = proposed_by_id[book_id]
+            final_isbn = op["isbn13"]
+            final_pe = op["pe_code"]
+        else:
+            final_isbn = current_isbn
+            final_pe = current_pe
+
+        if final_isbn:
+            final_isbn_owners.setdefault(
+                final_isbn, []
+            ).append(book_id)
+
+        if final_pe:
+            final_pe_owners.setdefault(
+                final_pe, []
+            ).append(book_id)
+
+    isbn_collisions = {
+        value: owners
+        for value, owners in final_isbn_owners.items()
+        if len(owners) > 1
+    }
+
+    pe_collisions = {
+        value: owners
+        for value, owners in final_pe_owners.items()
+        if len(owners) > 1
+    }
+
+    if isbn_collisions or pe_collisions:
+        raise HTTPException(
+            409,
+            detail={
+                "message": (
+                    "O estado final criaria identificadores duplicados. "
+                    "Nenhuma escrita foi feita."
+                ),
+                "isbn_collisions": isbn_collisions,
+                "pe_collisions": pe_collisions,
+            },
+        )
+
+    # --------------------------------------------------------
+    # 3) Proibir swaps/transições que possam bater num índice
+    #    único durante uma escrita sequencial.
+    # --------------------------------------------------------
+    transitional_conflicts = []
+
+    for op in normalized:
+        if op["isbn13"] != op["expected_isbn13"]:
+            owner = current_isbn_owner.get(op["isbn13"])
+
+            if owner and owner != op["id"]:
+                transitional_conflicts.append({
+                    "id": op["id"],
+                    "field": "isbn13",
+                    "value": op["isbn13"],
+                    "current_owner": owner,
+                })
+
+        if op["pe_code"] != op["expected_pe_code"]:
+            if op["pe_code"]:
+                owner = current_pe_owner.get(op["pe_code"])
+
+                if owner and owner != op["id"]:
+                    transitional_conflicts.append({
+                        "id": op["id"],
+                        "field": "pe_code",
+                        "value": op["pe_code"],
+                        "current_owner": owner,
+                    })
+
+    if transitional_conflicts:
+        raise HTTPException(
+            409,
+            detail={
+                "message": (
+                    "Existem colisões transitórias. "
+                    "Nenhuma escrita foi feita."
+                ),
+                "conflicts": transitional_conflicts[:50],
+                "conflict_count": len(transitional_conflicts),
+            },
+        )
+
+    # --------------------------------------------------------
+    # 4) Calcular exatamente o que mudaria.
+    # --------------------------------------------------------
+    field_counts = {
+        "isbn13": 0,
+        "pe_code": 0,
+        "image_url": 0,
+    }
+
+    prepared = []
+
+    for op in normalized:
+        changes = {}
+
+        if op["isbn13"] != op["expected_isbn13"]:
+            changes["isbn13"] = op["isbn13"]
+            field_counts["isbn13"] += 1
+
+        if op["pe_code"] != op["expected_pe_code"]:
+            changes["pe_code"] = op["pe_code"]
+            field_counts["pe_code"] += 1
+
+        if op["image_url"] != op["expected_image_url"]:
+            changes["image_url"] = op["image_url"]
+            field_counts["image_url"] += 1
+
+        if changes:
+            prepared.append({
+                "operation": op,
+                "changes": changes,
+                "current_raw": books_by_id[op["id"]],
+            })
+
+    result_summary = {
+        "requested": len(normalized),
+        "would_update": len(prepared),
+        "field_counts": field_counts,
+        "catalog_size": len(all_books),
+    }
+
+    if payload.dry_run:
+        return {
+            "ok": True,
+            "dry_run": True,
+            **result_summary,
+        }
+
+    # --------------------------------------------------------
+    # 5) APPLY — CAS sequencial + rollback automático.
+    # --------------------------------------------------------
+    applied = []
+
+    try:
+        for item in prepared:
+            op = item["operation"]
+            changes = item["changes"]
+            current_raw = item["current_raw"]
+
+            set_values = {}
+            unset_values = {}
+
+            for field, new_value in changes.items():
+                if field == "pe_code" and new_value is None:
+                    unset_values[field] = ""
+                else:
+                    set_values[field] = new_value
+
+            update_doc = {}
+
+            if set_values:
+                update_doc["$set"] = set_values
+
+            if unset_values:
+                update_doc["$unset"] = unset_values
+
+            res = await db.books.update_one(
+                _safe_patch_expected_filter(op),
+                update_doc,
+            )
+
+            if res.matched_count != 1:
+                raise RuntimeError(
+                    f"CAS falhou para {op['id']}"
+                )
+
+            # Guardar informação suficiente para restaurar exatamente
+            # os campos alterados, incluindo ausência original do campo.
+            restore_set = {}
+            restore_unset = {}
+
+            for field in changes:
+                if field in current_raw:
+                    restore_set[field] = current_raw.get(field)
+                else:
+                    restore_unset[field] = ""
+
+            applied.append({
+                "id": op["id"],
+                "changes": changes,
+                "restore_set": restore_set,
+                "restore_unset": restore_unset,
+            })
+
+    except Exception as exc:
+        rollback_failures = []
+
+        for item in reversed(applied):
+            rollback_update = {}
+
+            if item["restore_set"]:
+                rollback_update["$set"] = item["restore_set"]
+
+            if item["restore_unset"]:
+                rollback_update["$unset"] = item["restore_unset"]
+
+            try:
+                rollback_res = await db.books.update_one(
+                    {"id": item["id"]},
+                    rollback_update,
+                )
+
+                if rollback_res.matched_count != 1:
+                    rollback_failures.append(item["id"])
+
+            except Exception:
+                rollback_failures.append(item["id"])
+
+        raise HTTPException(
+            500,
+            detail={
+                "message": (
+                    "A atualização falhou. "
+                    "Foi executado rollback dos produtos já alterados."
+                ),
+                "error": str(exc),
+                "applied_before_failure": len(applied),
+                "rollback_failures": rollback_failures,
+            },
+        )
+
+    await log_action(
+        admin["id"],
+        "bulk_safe_patch",
+        "books",
+        None,
+        {
+            "updated": len(applied),
+            "field_counts": field_counts,
+        },
+    )
+
+    return {
+        "ok": True,
+        "dry_run": False,
+        "updated": len(applied),
+        **result_summary,
+    }
+
+
 @api.post("/admin/books")
 async def create_book(payload: BookIn, admin: dict = Depends(require_admin)):
     isbn = strip_isbn(payload.isbn13 or "")
