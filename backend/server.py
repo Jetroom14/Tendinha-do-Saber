@@ -77,6 +77,7 @@ _PAYMENT_ORDER_ID_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 VOUCHERS_DIR = ROOT_DIR / "private_storage" / "vouchers"
 VOUCHERS_DIR.mkdir(parents=True, exist_ok=True)
 VOUCHER_MAX_BYTES = 8 * 1024 * 1024  # 8MB
+ADMIN_IMPORT_MAX_BYTES = 20 * 1024 * 1024  # 20MB
 VOUCHER_RETENTION_DAYS = 365  # Current technical retention window for voucher PDFs.
 ORDER_ACCESS_TOKEN_TTL_HOURS = 24
 ORDER_ACCESS_TOKEN_HEADER = "X-Order-Access-Token"
@@ -762,6 +763,8 @@ async def get_current_user(request: Request) -> dict:
         user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0})
         if not user:
             raise HTTPException(401, "Utilizador não encontrado")
+        if user.get("is_blocked"):
+            raise HTTPException(403, "Esta conta foi bloqueada. Contacte a Tendinha do Saber para mais informações.")
         return user
     except jwt.ExpiredSignatureError:
         raise HTTPException(401, "Sessão expirada")
@@ -785,7 +788,10 @@ async def get_current_user_optional(request: Request) -> Optional[dict]:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         if payload.get("type") != "access":
             return None
-        return await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0})
+        user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0})
+        if not user or user.get("is_blocked"):
+            return None
+        return user
     except jwt.PyJWTError:
         return None
 
@@ -1903,12 +1909,23 @@ def _classify_import_rows(df) -> List[dict]:
     return rows
 
 
+
+async def _read_admin_import(file: UploadFile) -> bytes:
+    """Lê uploads de importação com limite de memória."""
+    content = await file.read(ADMIN_IMPORT_MAX_BYTES + 1)
+    if len(content) > ADMIN_IMPORT_MAX_BYTES:
+        raise HTTPException(
+            400,
+            f"Ficheiro demasiado grande (máx. {ADMIN_IMPORT_MAX_BYTES // (1024 * 1024)}MB).",
+        )
+    return content
+
 @api.post("/admin/books/import/preview")
 async def import_books_preview(file: UploadFile = File(...), admin: dict = Depends(require_admin)):
     """PHASE 1 — dry run. Parses and validates the Excel, reports how many
     rows would be created / updated / rejected, and returns the validated
     payload (base64) to be sent back to /commit. The database is NOT touched."""
-    content = await file.read()
+    content = await _read_admin_import(file)
     df = _normalize_import_df(content)
     classified = _classify_import_rows(df)
 
@@ -2119,7 +2136,7 @@ async def import_book_links(file: UploadFile = File(...), admin: dict = Depends(
     Colunas: Código PE (caderno) | Caderno | Ano | Disciplina | ISBN (manual) | Manual | Confianca
     Repetível — corrida nova atualiza (não duplica).
     """
-    content = await file.read()
+    content = await _read_admin_import(file)
     try:
         # Tentar folha "Ligacoes"; se não existir, usa a primeira
         try:
@@ -2288,7 +2305,7 @@ async def import_adoptions(
     ano letivo (delete_many restrito ao ano) — não toca noutros anos guardados."""
     if not school_year or "/" not in school_year:
         raise HTTPException(400, "Indique o ano letivo no formato AAAA/AAAA, ex: 2026/2027")
-    content = await file.read()
+    content = await _read_admin_import(file)
     try:
         df = pd.read_excel(BytesIO(content))
     except Exception as e:
@@ -2313,17 +2330,13 @@ async def import_adoptions(
         if s.endswith(".0") and s[:-2].isdigit(): s = s[:-2]
         return s
 
-    # 1) Apagar SÓ este ano letivo (nunca toca noutros)
-    prev = await db.school_adoptions.count_documents({"school_year": school_year})
-    if prev > 0:
-        await db.school_adoptions.delete_many({"school_year": school_year})
-
-    # 2) Reunir catálogo pelo ISBN uma vez para performance
+    # 1) Preparar TODOS os novos registos antes de tocar nos dados atuais.
+    # Mongo standalone não suporta transactions, por isso validamos primeiro
+    # e mantemos uma cópia dos dados anteriores para rollback em caso de falha.
     known_isbns = set(await db.books.distinct("isbn13", {"isbn13": {"$type": "string", "$gt": ""}}))
 
-    # 3) Inserir por lotes (mantém memória controlada e não bloqueia loop)
     BATCH = 1000
-    docs: List[dict] = []
+    new_docs: List[dict] = []
     total = 0
     matched = 0
     missing: dict = {}  # isbn -> title (para reporte)
@@ -2336,10 +2349,10 @@ async def import_adoptions(
         in_catalog = isbn in known_isbns
         if in_catalog:
             matched += 1
-        else:
-            if isbn not in missing:
-                missing[isbn] = title
-        docs.append({
+        elif isbn not in missing:
+            missing[isbn] = title
+
+        new_docs.append({
             "school_year": school_year,
             "concelho": clean(row.get("concelho", "")),
             "agrupamento": clean(row.get("agrupamento", "")),
@@ -2353,11 +2366,46 @@ async def import_adoptions(
             "in_catalog": in_catalog,
         })
         total += 1
-        if len(docs) >= BATCH:
-            await db.school_adoptions.insert_many(docs)
-            docs = []
-    if docs:
-        await db.school_adoptions.insert_many(docs)
+
+    if not new_docs:
+        raise HTTPException(
+            400,
+            "O ficheiro não contém nenhuma adoção válida com ISBN de 13 dígitos. Os dados atuais não foram alterados.",
+        )
+
+    # 2) Guardar o estado anterior antes da substituição.
+    previous_docs = await db.school_adoptions.find(
+        {"school_year": school_year}
+    ).to_list(length=None)
+    prev = len(previous_docs)
+
+    # 3) Substituir o ano. Se qualquer inserção falhar, restaurar o estado anterior.
+    try:
+        if prev:
+            await db.school_adoptions.delete_many({"school_year": school_year})
+
+        for start in range(0, len(new_docs), BATCH):
+            await db.school_adoptions.insert_many(new_docs[start:start + BATCH])
+
+    except Exception:
+        logger.exception("Falha ao importar adoções de %s; a restaurar dados anteriores", school_year)
+
+        try:
+            await db.school_adoptions.delete_many({"school_year": school_year})
+            if previous_docs:
+                for start in range(0, len(previous_docs), BATCH):
+                    await db.school_adoptions.insert_many(previous_docs[start:start + BATCH])
+        except Exception:
+            logger.critical(
+                "Falha no rollback das adoções de %s",
+                school_year,
+                exc_info=True,
+            )
+
+        raise HTTPException(
+            500,
+            "Falha ao importar as adoções. Foi tentada a reposição automática dos dados anteriores.",
+        )
 
     # 4) Se este é o único ano com dados, activa-o
     settings = await db.settings.find_one({"id": "global"}, {"_id": 0, "adoptions_active_year": 1}) or {}
@@ -2502,7 +2550,7 @@ async def adoptions_books(concelho: str, escola: str, grade: str):
 async def import_schools(file: UploadFile = File(...), admin: dict = Depends(require_super_admin)):
     """Importa escolas e anos a partir de um ficheiro Excel.
     Espera as colunas Escola, Município e Anos."""
-    content = await file.read()
+    content = await _read_admin_import(file)
     try:
         df = pd.read_excel(BytesIO(content))
     except Exception as e:
@@ -2576,7 +2624,7 @@ async def import_schools(file: UploadFile = File(...), admin: dict = Depends(req
 async def import_books(file: UploadFile = File(...), admin: dict = Depends(require_admin)):
     """Legacy one-shot import kept for backward compatibility. Now also
     enforces the 'never import invalid rows' rule (price <= 0 are skipped)."""
-    content = await file.read()
+    content = await _read_admin_import(file)
     df = _normalize_import_df(content)
     classified = _classify_import_rows(df)
 
@@ -3052,7 +3100,7 @@ async def import_school_books(file: UploadFile = File(...), admin: dict = Depend
     (Municipality) | Escola (School) | Disciplina (Subject) | Ano (Grade
     Level). Municípios and Escolas are found-or-created by name so this can
     run standalone even before any school exists yet."""
-    content = await file.read()
+    content = await _read_admin_import(file)
     try:
         df = pd.read_excel(BytesIO(content))
     except Exception as e:
@@ -5190,11 +5238,6 @@ async def seed_admins():
                 "created_at": iso(now_utc()),
             })
             logger.info(f"Seeded {a['role']}: {a['email']}")
-        elif not verify_password(a["password"], existing["password_hash"]):
-            await db.users.update_one(
-                {"email": a["email"].lower()},
-                {"$set": {"password_hash": hash_password(a["password"]), "role": a["role"], "name": a["name"]}},
-            )
 
 def _grade_to_label(s: str) -> str:
     s = str(s or "").strip()
@@ -5521,10 +5564,20 @@ async def seo_sitemap(request: Request):
 # ---------- Register router ----------
 app.include_router(api)
 
+cors_raw = os.environ.get("CORS_ORIGINS", "").strip()
+if not cors_raw or cors_raw == "*":
+    cors_origins = [
+        "https://tendinhadosaber.pt",
+        "https://www.tendinhadosaber.pt",
+        "https://aveiro-books.preview.emergentagent.com",
+    ]
+else:
+    cors_origins = [origin.strip() for origin in cors_raw.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
+    allow_origins=cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

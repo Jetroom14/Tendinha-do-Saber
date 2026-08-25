@@ -24,7 +24,8 @@ export default function CatalogPage() {
   const [schools, setSchools] = useState([]);
   const [availability, setAvailability] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [q, setQ] = useState(params.get("q") || "");
+  const urlQ = params.get("q") || "";
+  const [q, setQ] = useState(urlQ);
   const { add } = useCart();
 
   const subject = params.get("subject") || "all";
@@ -62,21 +63,34 @@ export default function CatalogPage() {
 
   const fetchBooks = useCallback(async () => {
     setLoading(true);
-    const qs = new URLSearchParams();
-    if (q) qs.set("q", q);
-    if (subject !== "all") qs.set("subject", subject);
-    if (type !== "all") qs.set("type", type);
-    if (municipalityName) qs.set("concelho", municipalityName);
-    if (schoolName) qs.set("school_name", schoolName);
-    if (grade) qs.set("grade_level", grade);
-    qs.set("limit", String(PAGE_SIZE));
-    qs.set("page", String(page));
-    const { data } = await api.get(`/books?${qs.toString()}`);
-    setBooks(data.items || []);
-    setTotal(data.total ?? 0);
-    setPages(data.pages ?? 1);
-    setLoading(false);
-  }, [grade, municipalityName, page, q, schoolName, subject, type]);
+    try {
+      const qs = new URLSearchParams();
+      if (urlQ) qs.set("q", urlQ);
+      if (subject !== "all") qs.set("subject", subject);
+      if (type !== "all") qs.set("type", type);
+      if (municipalityName) qs.set("concelho", municipalityName);
+      if (schoolName) qs.set("school_name", schoolName);
+      if (grade) qs.set("grade_level", grade);
+      qs.set("limit", String(PAGE_SIZE));
+      qs.set("page", String(page));
+
+      const { data } = await api.get(`/books?${qs.toString()}`);
+      setBooks(data.items || []);
+      setTotal(data.total ?? 0);
+      setPages(data.pages ?? 1);
+    } catch {
+      setBooks([]);
+      setTotal(0);
+      setPages(1);
+      toast.error("Não foi possível carregar o catálogo.");
+    } finally {
+      setLoading(false);
+    }
+  }, [grade, municipalityName, page, schoolName, subject, type, urlQ]);
+
+  useEffect(() => {
+    setQ(urlQ);
+  }, [urlQ]);
 
   useEffect(() => {
     api.get("/books/subjects").then((r) => setSubjects(r.data.filter(Boolean)));

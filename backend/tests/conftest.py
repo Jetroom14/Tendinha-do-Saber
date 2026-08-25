@@ -13,9 +13,9 @@ BASE_URL = os.environ.get("TEST_BASE_URL", os.environ.get("REACT_APP_BACKEND_URL
 
 # Never hardcode credentials in versioned tests.
 SUPER_EMAIL = os.environ.get("TEST_SUPER_ADMIN_EMAIL", "")
-SUPER_PASSWORD = os.environ.get("TEST_SUPER_ADMIN_PASSWORD", "")
+SUPER_PASSWORD = os.environ["TEST_SUPER_ADMIN_PASSWORD"]
 ADMIN_EMAIL = os.environ.get("TEST_ADMIN_EMAIL", "")
-ADMIN_PASSWORD = os.environ.get("TEST_ADMIN_PASSWORD", "")
+ADMIN_PASSWORD = os.environ["TEST_ADMIN_PASSWORD"]
 
 
 @pytest.fixture(scope="session")

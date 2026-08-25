@@ -90,3 +90,10 @@ frontend/node_modules/.cache/default-development/0.pack
 
 # Local audit / migration files
 /tmp/
+
+# Private runtime uploads — never commit
+/backend/private_storage/
+
+# Generated test reports — may contain credentials
+/test_reports/*.json
+/test_reports/pytest/*.xml

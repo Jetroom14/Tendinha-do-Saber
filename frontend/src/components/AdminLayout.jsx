@@ -54,7 +54,7 @@ export default function AdminLayout() {
   }, [user, loading, navigate]);
 
   if (loading) return <div className="min-h-screen grid place-items-center text-slate-400" data-testid="admin-loading">A carregar...</div>;
-  if (!user) return null;
+  if (!user || !["staff", "admin", "super_admin"].includes(user.role)) return null;
 
   const closeMobile = () => setMobileOpen(false);
 

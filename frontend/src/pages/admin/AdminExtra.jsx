@@ -422,9 +422,7 @@ export function AdminReports() {
 
 /* ============================ CONTENT / CMS ============================ */
 const CONTENT_FIELDS = [
-  { key: "hero_title", label: "Hero — Título", type: "textarea" },
   { key: "hero_subtitle", label: "Hero — Subtítulo", type: "textarea" },
-  { key: "about_us", label: "Sobre Nós", type: "textarea", rows: 5 },
   { key: "footer_text", label: "Rodapé — Frase", type: "textarea" },
   { key: "partners_cta", label: "Parceiros — Chamada", type: "text" },
   { key: "promotions_label", label: "Promoções — Título", type: "text" },
@@ -487,7 +485,7 @@ export function AdminContent() {
       </div>
 
       <div className="mt-4 text-xs text-slate-500 flex items-center gap-1.5">
-        <ExternalLink className="w-3.5 h-3.5"/> As páginas legais (Privacidade, Termos, RAL) e a página "Sobre" detalhada continuam a ser geridas em <Link to="/admin/brand" className="text-[#5A8F1E] hover:underline">Website</Link>.
+        <ExternalLink className="w-3.5 h-3.5"/> A identidade visual e outras definições do website são geridas em <Link to="/admin/brand" className="text-[#5A8F1E] hover:underline">Website</Link>. As páginas legais têm uma área própria no menu.
       </div>
     </div>
   );
