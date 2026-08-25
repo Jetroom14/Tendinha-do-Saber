@@ -18,9 +18,9 @@ export default function PartnersPage() {
       <p className="text-[#4A5568] mb-12 max-w-2xl">
         Trabalhamos com clubes, associações de pais e municípios da região de Aveiro. Se é membro de um dos nossos parceiros, peça-lhes o <strong>código exclusivo</strong> para aplicar no carrinho.
       </p>
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+      <div className="flex flex-wrap justify-center gap-6 mb-10">
         {partners.map((p) => (
-          <div key={p.id} className="bg-white border border-[#E2E8F0] rounded-md overflow-hidden hover:border-[#5A8F1E] transition-colors h-full flex flex-col" data-testid={`partner-card-${p.id}`}>
+          <div key={p.id} className="w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] bg-white border border-[#E2E8F0] rounded-md overflow-hidden hover:border-[#5A8F1E] transition-colors h-full flex flex-col" data-testid={`partner-card-${p.id}`}>
             <div className="h-40 bg-[#F5F8EC] flex items-center justify-center p-6">
               <PartnerLogo partner={p} className="max-h-24 max-w-[80%] object-contain"/>
             </div>

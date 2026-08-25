@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import api, { formatApiErrorDetail } from "@/lib/api";
-import { getAuthToken, setAuthToken, removeAuthToken } from "@/lib/storage";
+import { clearLegacyAuthToken } from "@/lib/storage";
 
 const AuthCtx = createContext(null);
 
@@ -9,29 +9,24 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    const token = getAuthToken();
-    if (!token) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
     try {
       const { data } = await api.get("/auth/me");
       setUser(data);
     } catch {
-      removeAuthToken();
       setUser(null);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    clearLegacyAuthToken();
+    refresh();
+  }, [refresh]);
 
   const login = async (email, password, keepSession = false) => {
     try {
-      const { data } = await api.post("/auth/login", { email, password });
-      setAuthToken(data.token, keepSession);
+      const { data } = await api.post("/auth/login", { email, password, keep_session: keepSession });
       setUser(data.user);
       return { ok: true, user: data.user };
     } catch (e) {
@@ -42,7 +37,6 @@ export function AuthProvider({ children }) {
   const register = async (name, email, password) => {
     try {
       const { data } = await api.post("/auth/register", { name, email, password });
-      setAuthToken(data.token, true);
       setUser(data.user);
       return { ok: true, user: data.user };
     } catch (e) {
@@ -50,9 +44,12 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const logout = () => {
-    removeAuthToken();
-    setUser(null);
+  const logout = async () => {
+    try {
+      await api.post("/auth/logout");
+    } finally {
+      setUser(null);
+    }
   };
 
   return (

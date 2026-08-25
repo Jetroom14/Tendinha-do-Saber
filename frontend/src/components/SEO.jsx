@@ -1,4 +1,5 @@
 import { Helmet } from "react-helmet-async";
+import { getBookKey } from "@/lib/bookKey";
 
 const SITE_NAME = "Tendinha do Saber";
 const DEFAULT_DESCRIPTION = "A casa dos manuais escolares em Aveiro. Manuais, cadernos de fichas e plastificação com entrega em mão na região de Aveiro.";
@@ -79,6 +80,6 @@ export const buildBookJsonLd = (book) => ({
     price: book.price,
     priceCurrency: "EUR",
     availability: book.status === "Available" ? "https://schema.org/InStock" : (book.status === "PreOrder" ? "https://schema.org/PreOrder" : "https://schema.org/OutOfStock"),
-    url: typeof window !== "undefined" ? `${window.location.origin}/livro/${book.isbn13}` : "",
+    url: typeof window !== "undefined" ? `${window.location.origin}/livro/${encodeURIComponent(getBookKey(book))}` : "",
   },
 });

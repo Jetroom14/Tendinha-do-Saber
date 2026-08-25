@@ -20,6 +20,7 @@ import mimetypes
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import List, Optional, Dict, Any, Annotated
+from urllib.parse import quote
 
 import bcrypt
 import httpx
@@ -110,15 +111,40 @@ def verify_password(pw: str, hashed: str) -> bool:
     except Exception:
         return False
 
-def create_access_token(user_id: str, email: str, role: str) -> str:
+def create_access_token(user_id: str, email: str, role: str, session_version: int = 0) -> str:
     payload = {
         "sub": user_id,
         "email": email,
         "role": role,
+        "session_version": int(session_version or 0),
         "exp": now_utc() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MIN),
         "type": "access",
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def _set_auth_cookie(response: JSONResponse, token: str, persistent: bool = False) -> None:
+    kwargs = {
+        "key": "access_token",
+        "value": token,
+        "httponly": True,
+        "secure": True,
+        "samesite": "lax",
+        "path": "/",
+    }
+    if persistent:
+        kwargs["max_age"] = ACCESS_TOKEN_EXPIRE_MIN * 60
+    response.set_cookie(**kwargs)
+
+
+def _clear_auth_cookie(response: JSONResponse) -> None:
+    response.delete_cookie(
+        key="access_token",
+        path="/",
+        secure=True,
+        httponly=True,
+        samesite="lax",
+    )
 
 def strip_isbn(s: str) -> str:
     return re.sub(r"[^0-9Xx]", "", s or "")
@@ -168,14 +194,15 @@ async def _ensure_unique_slug(base: str, exclude_id: Optional[str] = None) -> st
 
 def _book_key_filter(key: str) -> dict:
     """Builds a MongoDB filter that resolves a URL/API key to a single book.
-    The key may be: (a) a 13-digit ISBN, (b) a slug, or (c) a PE code. We do
+    The key may be: (a) a 13-digit ISBN, (b) a slug, (c) a PE code, or
+    (d) the internal book id as a final fallback. We do
     NOT strip_isbn() the key blindly, because slugs contain hyphens/letters
     that would be destroyed. Instead we try each field verbatim, and also
     try the digits-only form for the isbn13 field so hyphenated ISBNs still
     resolve."""
     key = (key or "").strip()
     isbn_clean = strip_isbn(key)
-    ors = [{"slug": key}, {"pe_code": key}]
+    ors = [{"slug": key}, {"pe_code": key}, {"id": key}]
     if isbn_clean:
         ors.append({"isbn13": isbn_clean})
     return {"$or": ors}
@@ -212,10 +239,7 @@ def _order_access_expires_at() -> datetime:
 
 
 def _request_origin_hint(request: Request) -> str:
-    xff = (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
-    x_real_ip = (request.headers.get("X-Real-IP") or "").strip()
-    remote = request.client.host if request.client else ""
-    return xff or x_real_ip or remote or "anon"
+    return request.client.host if request.client and request.client.host else "anon"
 
 
 def _hash_identifier(value: str) -> str:
@@ -765,6 +789,9 @@ async def get_current_user(request: Request) -> dict:
             raise HTTPException(401, "Utilizador não encontrado")
         if user.get("is_blocked"):
             raise HTTPException(403, "Esta conta foi bloqueada. Contacte a Tendinha do Saber para mais informações.")
+        if int(payload.get("session_version", 0)) != int(user.get("session_version", 0)):
+            raise HTTPException(401, "Sessão inválida. Inicie sessão novamente.")
+        user.pop("session_version", None)
         return user
     except jwt.ExpiredSignatureError:
         raise HTTPException(401, "Sessão expirada")
@@ -791,6 +818,9 @@ async def get_current_user_optional(request: Request) -> Optional[dict]:
         user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0})
         if not user or user.get("is_blocked"):
             return None
+        if int(payload.get("session_version", 0)) != int(user.get("session_version", 0)):
+            return None
+        user.pop("session_version", None)
         return user
     except jwt.PyJWTError:
         return None
@@ -833,6 +863,7 @@ class RegisterIn(BaseModel):
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
+    keep_session: bool = False
 
 class FirstLoginIn(BaseModel):
     token: str
@@ -987,11 +1018,15 @@ async def register(payload: RegisterIn):
         "name": payload.name,
         "role": "customer",
         "password_hash": hash_password(payload.password),
+        "session_version": 0,
         "created_at": iso(now_utc()),
     }
     await db.users.insert_one(user)
-    token = create_access_token(user["id"], email, "customer")
-    return {"token": token, "user": {k: v for k, v in user.items() if k not in ("password_hash", "_id")}}
+    token = create_access_token(user["id"], email, "customer", user.get("session_version", 0))
+    safe = {k: v for k, v in user.items() if k not in ("password_hash", "_id", "session_version")}
+    response = JSONResponse(content={"user": safe})
+    _set_auth_cookie(response, token, persistent=True)
+    return response
 
 @api.post("/auth/login")
 async def login(payload: LoginIn, request: Request):
@@ -1025,30 +1060,32 @@ async def login(payload: LoginIn, request: Request):
         raise HTTPException(403, "Primeiro acesso: defina uma nova palavra-passe através do link recebido por email.")
 
     await db.login_attempts.delete_one({"identifier": identifier})
-    token = create_access_token(user["id"], user["email"], user["role"])
-    safe = {k: v for k, v in user.items() if k not in ("_id", "password_hash")}
-    return {"token": token, "user": safe}
+    token = create_access_token(user["id"], user["email"], user["role"], user.get("session_version", 0))
+    safe = {k: v for k, v in user.items() if k not in ("_id", "password_hash", "session_version")}
+    response = JSONResponse(content={"user": safe})
+    _set_auth_cookie(response, token, persistent=payload.keep_session)
+    return response
 
 @api.get("/auth/me")
 async def me(user: dict = Depends(get_current_user)):
     return user
 
+
+@api.post("/auth/logout")
+async def logout():
+    response = JSONResponse(content={"ok": True})
+    _clear_auth_cookie(response)
+    return response
+
 @api.post("/auth/forgot-password")
 async def forgot(payload: ForgotIn):
-    user = await db.users.find_one({"email": payload.email.lower()})
-    # Always success to prevent enumeration
-    if user:
-        token = secrets.token_urlsafe(32)
-        await db.password_reset_tokens.insert_one({
-            "id": gen_id(),
-            "token": token,
-            "user_id": user["id"],
-            "used": False,
-            "expires_at": iso(now_utc() + timedelta(hours=1)),
-        })
-        # MOCKED EMAIL: log link
-        logger.info(f"[MOCKED EMAIL] Password reset for {payload.email}: token={token}")
-    return {"message": "Se o email existir, receberá instruções de recuperação."}
+    # Recovery is intentionally disabled until the public reset-password UI
+    # and real email delivery flow are available. Never generate or log
+    # password-reset tokens for an incomplete recovery flow.
+    raise HTTPException(
+        503,
+        "A recuperação de palavra-passe está temporariamente indisponível.",
+    )
 
 @api.post("/auth/reset-password")
 async def reset(payload: ResetIn):
@@ -1057,7 +1094,10 @@ async def reset(payload: ResetIn):
         raise HTTPException(400, "Token inválido ou expirado")
     await db.users.update_one(
         {"id": rec["user_id"]},
-        {"$set": {"password_hash": hash_password(payload.password), "must_change_password": False}},
+        {
+            "$set": {"password_hash": hash_password(payload.password), "must_change_password": False},
+            "$inc": {"session_version": 1},
+        },
     )
     await db.password_reset_tokens.update_one({"id": rec["id"]}, {"$set": {"used": True}})
     return {"message": "Palavra-passe atualizada com sucesso"}
@@ -1069,23 +1109,45 @@ async def first_login(payload: FirstLoginIn):
         raise HTTPException(400, "Token inválido ou expirado")
     await db.users.update_one(
         {"id": rec["user_id"]},
-        {"$set": {"password_hash": hash_password(payload.password), "must_change_password": False}},
+        {
+            "$set": {"password_hash": hash_password(payload.password), "must_change_password": False},
+            "$inc": {"session_version": 1},
+        },
     )
     await db.password_reset_tokens.update_one({"id": rec["id"]}, {"$set": {"used": True}})
     user = await db.users.find_one({"id": rec["user_id"]}, {"_id": 0, "password_hash": 0})
-    token = create_access_token(user["id"], user["email"], user["role"])
-    return {"token": token, "user": user}
+    token = create_access_token(user["id"], user["email"], user["role"], user.get("session_version", 0))
+    safe = {k: v for k, v in user.items() if k != "session_version"}
+    response = JSONResponse(content={"user": safe})
+    _set_auth_cookie(response, token, persistent=False)
+    return response
 
 @api.post("/auth/change-password")
 async def change_password(payload: ChangePasswordIn, user: dict = Depends(get_current_user)):
     stored = await db.users.find_one({"id": user["id"]})
     if not stored or not verify_password(payload.current_password, stored.get("password_hash", "")):
         raise HTTPException(400, "A password atual está incorreta")
+
+    new_session_version = int(stored.get("session_version", 0)) + 1
     await db.users.update_one(
         {"id": user["id"]},
-        {"$set": {"password_hash": hash_password(payload.new_password)}},
+        {
+            "$set": {
+                "password_hash": hash_password(payload.new_password),
+                "session_version": new_session_version,
+            },
+        },
     )
-    return {"message": "Password atualizada com sucesso"}
+
+    token = create_access_token(
+        stored["id"],
+        stored["email"],
+        stored["role"],
+        new_session_version,
+    )
+    response = JSONResponse(content={"message": "Password atualizada com sucesso"})
+    _set_auth_cookie(response, token, persistent=False)
+    return response
 
 # ---------- Books ----------
 @api.get("/books")
@@ -1133,7 +1195,7 @@ async def list_books(
                 "escola": school_name,
             }
             if grade_level:
-                adoption_filter["grade"] = grade_level
+                adoption_filter["grade"] = {"$in": _grade_query_values(grade_level)}
             adoption_isbns = await db.school_adoptions.distinct("isbn13", adoption_filter)
             filt["isbn13"] = {"$in": adoption_isbns}
     elif school_id:
@@ -1148,7 +1210,7 @@ async def list_books(
                     "escola": school.get("name"),
                 }
                 if grade_level:
-                    adoption_filter["grade"] = grade_level
+                    adoption_filter["grade"] = {"$in": _grade_query_values(grade_level)}
                 adoption_isbns = await db.school_adoptions.distinct("isbn13", adoption_filter)
         if adoption_isbns:
             filt["isbn13"] = {"$in": adoption_isbns}
@@ -2358,7 +2420,7 @@ async def import_adoptions(
             "agrupamento": clean(row.get("agrupamento", "")),
             "codigo_escola": clean(row.get("codigo_escola", "")),
             "escola": clean(row.get("escola", "")),
-            "grade": clean(row.get("grade", "")),
+            "grade": _normalize_grade(clean(row.get("grade", ""))),
             "subject": clean(row.get("disciplina", "")),
             "isbn13": isbn,
             "title": title,
@@ -2462,7 +2524,7 @@ async def adoptions_grades(concelho: str, escola: str):
     def sort_key(g):
         m = re.match(r"(\d+)", g or "")
         return (int(m.group(1)) if m else 999, g or "")
-    grades = sorted([g for g in grades if g], key=sort_key)
+    grades = sorted({_normalize_grade(g) for g in grades if g}, key=sort_key)
     return {"grades": grades, "active_year": year}
 
 
@@ -2491,7 +2553,7 @@ async def adoptions_availability(school_id: str, grade: Optional[str] = None):
         "escola": school.get("name"),
     }
     if grade:
-        filt["grade"] = grade
+        filt["grade"] = {"$in": _grade_query_values(grade)}
     count = await db.school_adoptions.count_documents(filt)
     return {
         "has_adoptions": count > 0,
@@ -2510,7 +2572,7 @@ async def adoptions_books(concelho: str, escola: str, grade: str):
     if not year:
         raise HTTPException(404, "Não há adoções ativas.")
     cursor = db.school_adoptions.find(
-        {"school_year": year, "concelho": concelho, "escola": escola, "grade": grade},
+        {"school_year": year, "concelho": concelho, "escola": escola, "grade": {"$in": _grade_query_values(grade)}},
         {"_id": 0},
     ).sort("subject", 1)
     adoptions: List[dict] = []
@@ -4828,7 +4890,7 @@ async def _check_voucher_rate_limit(identifier: str):
 @api.post("/vouchers")
 async def submit_voucher(payload: VoucherSubmitIn, request: Request, user: Optional[dict] = Depends(get_current_user_optional)):
     """Voucher submission via code (no PDF). For PDF use POST /vouchers/upload."""
-    identifier = (user["email"] if user else request.client.host) or "anon"
+    identifier = user["email"] if user else _request_origin_hint(request)
     await _check_voucher_rate_limit(identifier)
     code_clean = (payload.code or "").upper().strip() or None
     if code_clean and not re.match(r"^ALN\d{24}$", code_clean):
@@ -4881,7 +4943,7 @@ async def upload_voucher(
     """Real, private PDF upload for a MEGA voucher. File is validated,
     renamed to a server-generated UUID, and stored OUTSIDE any publicly
     served directory. Readable only via GET /admin/vouchers/{id}/pdf."""
-    identifier = (user["email"] if user else request.client.host) or "anon"
+    identifier = user["email"] if user else _request_origin_hint(request)
     await _check_voucher_rate_limit(identifier)
 
     if not name or not name.strip():
@@ -5234,6 +5296,7 @@ async def seed_admins():
                 "name": a["name"],
                 "role": a["role"],
                 "password_hash": hash_password(a["password"]),
+                "session_version": 0,
                 "must_change_password": False,
                 "created_at": iso(now_utc()),
             })
@@ -5243,6 +5306,34 @@ def _grade_to_label(s: str) -> str:
     s = str(s or "").strip()
     digits = re.search(r"(\d+)", s)
     return f"{digits.group(1)}.º Ano" if digits else s
+
+def _normalize_grade(s: str) -> str:
+    """Normaliza anos como 10, 10.º ou 10.º Ano para o formato canónico."""
+    raw = str(s or "").strip()
+    if not raw:
+        return ""
+    normalized = _grade_to_label(raw)
+    return normalized if normalized in _GRADES_ALL else raw
+
+
+def _grade_query_values(s: str) -> List[str]:
+    """Aceita simultaneamente o formato canónico e o legado numérico na DB."""
+    raw = str(s or "").strip()
+    normalized = _normalize_grade(raw)
+    values: List[str] = []
+
+    if normalized:
+        values.append(normalized)
+
+    match = re.match(r"^(\d+)\.º Ano$", normalized)
+    if match:
+        values.append(match.group(1))
+
+    if raw and raw not in values:
+        values.append(raw)
+
+    return values
+
 
 def _parse_grade_list(s: str) -> List[str]:
     s = str(s or "").strip()
@@ -5552,9 +5643,16 @@ async def seo_sitemap(request: Request):
                     "/legal/privacidade", "/legal/termos", "/legal/cookies", "/legal/ral"]
     today = now_utc().date().isoformat()
     urls = [f"<url><loc>{base}{p}</loc><lastmod>{today}</lastmod><changefreq>weekly</changefreq><priority>{'1.0' if p=='/' else '0.7'}</priority></url>" for p in static_paths]
-    # All books
-    async for b in db.books.find({"status": {"$ne": "Unavailable"}}, {"isbn13": 1, "_id": 0}):
-        urls.append(f"<url><loc>{base}/livro/{b['isbn13']}</loc><lastmod>{today}</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>")
+    # All books — use the same identifier fallback accepted by the book API.
+    async for b in db.books.find(
+        {"status": {"$ne": "Unavailable"}},
+        {"isbn13": 1, "slug": 1, "pe_code": 1, "id": 1, "_id": 0},
+    ):
+        book_key = b.get("isbn13") or b.get("slug") or b.get("pe_code") or b.get("id")
+        if not book_key:
+            continue
+        encoded_key = quote(str(book_key), safe="")
+        urls.append(f"<url><loc>{base}/livro/{encoded_key}</loc><lastmod>{today}</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>")
     xml = f"""<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">
 {''.join(urls)}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
+import { getBookKey } from "@/lib/bookKey";
 import { BookCard } from "@/components/BookCard";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -140,7 +141,7 @@ export default function CatalogPage() {
   };
 
   const clearAll = () => { setQ(""); setParams(new URLSearchParams()); };
-  const handleAdd = (book) => { add(book.isbn13); toast.success("Adicionado ao carrinho"); };
+  const handleAdd = (book) => { add(book); toast.success("Adicionado ao carrinho"); };
   const activeFilters = ["q", "subject", "type", "grade", "mun", "school"].filter((k) => params.get(k));
 
   return (
@@ -160,32 +161,51 @@ export default function CatalogPage() {
         </form>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <Select value={grade || "all"} onValueChange={(v) => setParam("grade", v === "all" ? "" : v)}>
-            <SelectTrigger className="h-10" data-testid="filter-grade"><SelectValue placeholder={schoolName ? "Ano" : "Escolha escola"}/></SelectTrigger>
+          <Select
+            value={municipalityId ? municipalityId : "all"}
+            onValueChange={(v) => setParam("mun", v === "all" ? "" : v)}
+          >
+            <SelectTrigger className="h-10" data-testid="filter-municipality">
+              <SelectValue placeholder="Concelho"/>
+            </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Qualquer ano</SelectItem>
-              {grades.map((g) => <SelectItem key={g} value={g}>{formatSchoolGrade(g)}</SelectItem>)}
-            </SelectContent>
-          </Select>
-
-          <Select value={(selectedMunicipality?.id || mun) || "all"} onValueChange={(v) => setParam("mun", v === "all" ? "" : v)}>
-            <SelectTrigger className="h-10" data-testid="filter-municipality"><SelectValue placeholder="Concelho"/></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Qualquer concelho</SelectItem>
+              <SelectItem value="all">Concelho</SelectItem>
               {munis.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
             </SelectContent>
           </Select>
 
-          <Select value={(selectedSchool?.id || schoolId) || "all"} onValueChange={(v) => setParam("school", v === "all" ? "" : v)} disabled={!municipalityId}>
-            <SelectTrigger className="h-10" data-testid="filter-school"><SelectValue placeholder={mun ? "Escola" : "Escolha concelho"}/></SelectTrigger>
+          <Select
+            value={municipalityId ? ((selectedSchool?.id || schoolId) || "all") : ""}
+            onValueChange={(v) => setParam("school", v === "all" ? "" : v)}
+            disabled={!municipalityId}
+          >
+            <SelectTrigger className="h-10" data-testid="filter-school">
+              <SelectValue placeholder="Escola"/>
+            </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Qualquer escola</SelectItem>
+              <SelectItem value="all">Escola</SelectItem>
               {schools.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
             </SelectContent>
           </Select>
 
+          <Select
+            value={selectedSchool ? (grade || "all") : ""}
+            onValueChange={(v) => setParam("grade", v === "all" ? "" : v)}
+            disabled={!selectedSchool}
+          >
+            <SelectTrigger className="h-10" data-testid="filter-grade">
+              <SelectValue placeholder="Ano"/>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Ano</SelectItem>
+              {grades.map((g) => <SelectItem key={g} value={g}>{formatSchoolGrade(g)}</SelectItem>)}
+            </SelectContent>
+          </Select>
+
           <Select value={subject} onValueChange={(v) => setParam("subject", v)}>
-            <SelectTrigger className="h-10" data-testid="filter-subject"><SelectValue placeholder="Disciplina"/></SelectTrigger>
+            <SelectTrigger className="h-10" data-testid="filter-subject">
+              <SelectValue placeholder="Disciplina"/>
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Qualquer disciplina</SelectItem>
               {subjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
@@ -193,7 +213,9 @@ export default function CatalogPage() {
           </Select>
 
           <Select value={type} onValueChange={(v) => setParam("type", v)}>
-            <SelectTrigger className="h-10" data-testid="filter-type"><SelectValue placeholder="Tipo"/></SelectTrigger>
+            <SelectTrigger className="h-10" data-testid="filter-type">
+              <SelectValue placeholder="Tipo"/>
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Manuais e Cadernos</SelectItem>
               <SelectItem value="Manual">Apenas Manuais</SelectItem>
@@ -238,7 +260,7 @@ export default function CatalogPage() {
             {pages > 1 && <span className="text-xs">Página {page} de {pages}</span>}
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5" data-testid="catalog-grid">
-            {books.map((b) => <BookCard key={b.isbn13} book={b} onAdd={handleAdd}/>)}
+            {books.map((b) => <BookCard key={getBookKey(b)} book={b} onAdd={handleAdd}/>)}
           </div>
 
           {pages > 1 && (

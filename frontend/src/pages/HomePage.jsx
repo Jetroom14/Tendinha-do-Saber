@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "@/lib/api";
+import { getBookKey } from "@/lib/bookKey";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { BookCard } from "@/components/BookCard";
@@ -62,7 +63,7 @@ export default function HomePage() {
     navigate(`/adopcoes?concelho=${encodeURIComponent(selectedMunicipality.name)}&escola=${encodeURIComponent(selectedSchool.name)}&ano=${encodeURIComponent(grade)}&school_id=${encodeURIComponent(schoolId)}`);
   };
 
-  const handleAdd = (book) => { add(book.isbn13); toast.success("Adicionado ao carrinho"); };
+  const handleAdd = (book) => { add(book); toast.success("Adicionado ao carrinho"); };
 
   return (
     <div data-testid="home-page">
@@ -172,7 +173,7 @@ export default function HomePage() {
           </Link>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-          {featured.map((b) => <BookCard key={b.isbn13} book={b} onAdd={handleAdd}/>)}
+          {featured.map((b) => <BookCard key={getBookKey(b)} book={b} onAdd={handleAdd}/>)}
         </div>
       </section>
 
@@ -185,9 +186,9 @@ export default function HomePage() {
               <h2 className="font-display text-3xl md:text-4xl font-medium text-[#1A202C]">{content?.promotions_label || "Desconto exclusivo para parceiros"}</h2>
               <p className="text-[#4A5568] mt-2 max-w-xl mx-auto">Use o código do seu clube ou associação no carrinho — desconto aplicado apenas aos cadernos de fichas.</p>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+            <div className="flex flex-wrap justify-center gap-5">
               {partners.map((p) => (
-                <div key={p.id} className="bg-white rounded-md p-6 border border-[#E2E8F0] flex flex-col items-center text-center" data-testid={`partner-${p.id}`}>
+                <div key={p.id} className="w-full sm:w-[calc(50%-10px)] md:w-[calc(33.333%-14px)] bg-white rounded-md p-6 border border-[#E2E8F0] flex flex-col items-center text-center" data-testid={`partner-${p.id}`}>
                   {p.logo_url && <PartnerLogo partner={p} className="w-16 h-16 rounded-md object-cover mb-3"/>}
                   <div className="font-display font-medium text-[#1A202C]">{p.name}</div>
                   <div className="text-xs text-[#4A5568] mt-1">{p.description}</div>

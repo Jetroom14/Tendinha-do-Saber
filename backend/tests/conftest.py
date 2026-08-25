@@ -13,9 +13,9 @@ BASE_URL = os.environ.get("TEST_BASE_URL", os.environ.get("REACT_APP_BACKEND_URL
 
 # Never hardcode credentials in versioned tests.
 SUPER_EMAIL = os.environ.get("TEST_SUPER_ADMIN_EMAIL", "")
-SUPER_PASSWORD = os.environ["TEST_SUPER_ADMIN_PASSWORD"]
+SUPER_PASSWORD = os.environ.get("TEST_SUPER_ADMIN_PASSWORD", "")
 ADMIN_EMAIL = os.environ.get("TEST_ADMIN_EMAIL", "")
-ADMIN_PASSWORD = os.environ["TEST_ADMIN_PASSWORD"]
+ADMIN_PASSWORD = os.environ.get("TEST_ADMIN_PASSWORD", "")
 
 
 @pytest.fixture(scope="session")
@@ -46,9 +46,11 @@ def super_token():
     s = requests.Session()
     r = _login(s, SUPER_EMAIL, SUPER_PASSWORD)
     if r.status_code != 200:
-        # If brute-force locked due to prior tests, wait & try once more
         pytest.skip(f"Super admin login failed: {r.status_code} {r.text}")
-    return r.json()["token"]
+    token = s.cookies.get("access_token")
+    if not token:
+        pytest.skip("Super admin login succeeded but no auth cookie was returned")
+    return token
 
 
 @pytest.fixture(scope="session")
@@ -61,7 +63,10 @@ def admin_token():
     r = _login(s, ADMIN_EMAIL, ADMIN_PASSWORD)
     if r.status_code != 200:
         pytest.skip(f"Admin login failed: {r.status_code} {r.text}")
-    return r.json()["token"]
+    token = s.cookies.get("access_token")
+    if not token:
+        pytest.skip("Admin login succeeded but no auth cookie was returned")
+    return token
 
 
 @pytest.fixture(scope="session")
@@ -79,7 +84,9 @@ def customer():
     }, timeout=30)
     assert r.status_code == 200, f"Customer register failed: {r.text}"
     data = r.json()
-    return {"email": email, "password": password, "token": data["token"], "user": data["user"]}
+    token = s.cookies.get("access_token")
+    assert token, "Customer register succeeded but no auth cookie was returned"
+    return {"email": email, "password": password, "token": token, "user": data["user"]}
 
 
 def auth_headers(token):

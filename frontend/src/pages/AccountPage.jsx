@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/lib/api";
+import { getBookKey } from "@/lib/bookKey";
 import { Button } from "@/components/ui/button";
 import { Heart, User } from "lucide-react";
 import { toast } from "sonner";
@@ -72,7 +73,7 @@ export default function AccountPage() {
                     {b.image_url && <img src={b.image_url} alt="" className="w-full h-full object-cover"/>}
                   </div>
                   <div className="flex-1">
-                    <Link to={`/livro/${b.isbn13}`} className="font-display font-medium text-sm hover:text-[#5A8F1E] line-clamp-2">{b.title}</Link>
+                    <Link to={`/livro/${encodeURIComponent(getBookKey(b))}`} className="font-display font-medium text-sm hover:text-[#5A8F1E] line-clamp-2">{b.title}</Link>
                     <div className="text-xs text-[#4A5568]">{b.publisher}</div>
                     <div className="flex justify-between items-center mt-2">
                       <span className="font-display text-sm">{b.price.toFixed(2)}€</span>

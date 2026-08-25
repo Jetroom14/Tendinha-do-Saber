@@ -41,7 +41,7 @@ export default function VouchersPage() {
     const f = e.target.files?.[0];
     if (!f) return;
     if (!f.name.toLowerCase().endsWith(".pdf")) { toast.error("Apenas ficheiros PDF são aceites"); return; }
-    if (f.size > 5 * 1024 * 1024) { toast.error("Ficheiro demasiado grande (máx 5 MB)"); return; }
+    if (f.size > 8 * 1024 * 1024) { toast.error("Ficheiro demasiado grande (máx 8 MB)"); return; }
     setFile(f);
   };
 
@@ -153,7 +153,7 @@ export default function VouchersPage() {
                 <div className="border-2 border-dashed border-[#CBD5E0] rounded p-5 text-center hover:border-[#5A8F1E] hover:bg-[#F5F8EC] transition-colors">
                   <Upload className="w-5 h-5 text-[#4A5568] mx-auto mb-1.5" strokeWidth={1.5}/>
                   <div className="text-sm text-[#1A202C]">Clique para selecionar PDF</div>
-                  <div className="text-xs text-[#4A5568] mt-1">Máximo 5 MB · O ficheiro fica privado, só visível ao administrador</div>
+                  <div className="text-xs text-[#4A5568] mt-1">Máximo 8 MB · O ficheiro fica privado, só visível ao administrador</div>
                 </div>
               </label>
             )}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import api, { formatApiErrorDetail } from "@/lib/api";
+import { getBookKey } from "@/lib/bookKey";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,10 +13,6 @@ import { toast } from "sonner";
 
 const BLANK = { isbn13: "", pe_code: "", slug: "", related_book_id: "", title: "", author: "", publisher: "", subject: "", year: 2025, price: 0, type: "Manual", status: "Available", stock_qty: 0, synopsis: "", image_url: "", is_lamination_eligible: true };
 const PAGE_SIZE = 50;
-
-// Bloco A: retorna a chave a usar em URLs de admin (edit/delete). Para livros
-// com ISBN, é o ISBN. Para livros sem ISBN, é o slug (ou pe_code como fallback).
-const bookKey = (b) => b.isbn13 || b.slug || b.pe_code || b.id;
 
 export default function AdminBooks() {
   const [books, setBooks] = useState([]);
@@ -111,7 +108,7 @@ export default function AdminBooks() {
   };
 
   const openCreate = () => { setEditing(null); setForm(BLANK); setOpen(true); };
-  const openEdit = (b) => { setEditing(bookKey(b)); setForm({ ...BLANK, ...b, pe_code: b.pe_code || "", slug: b.slug || "", related_book_id: b.related_book_id || "" }); setOpen(true); };
+  const openEdit = (b) => { setEditing(getBookKey(b)); setForm({ ...BLANK, ...b, pe_code: b.pe_code || "", slug: b.slug || "", related_book_id: b.related_book_id || "" }); setOpen(true); };
 
   const save = async () => {
     try {
@@ -129,7 +126,7 @@ export default function AdminBooks() {
 
   const remove = async (b) => {
     if (!confirm("Eliminar este livro?")) return;
-    await api.delete(`/admin/books/${encodeURIComponent(bookKey(b))}`);
+    await api.delete(`/admin/books/${encodeURIComponent(getBookKey(b))}`);
     toast.success("Livro eliminado"); fetchBooks();
   };
 
@@ -143,7 +140,7 @@ export default function AdminBooks() {
         stock_qty: Number.isFinite(stockQty) ? Math.max(0, stockQty) : 0,
         year: parseInt(book.year, 10) || null,
       };
-      await api.put(`/admin/books/${encodeURIComponent(bookKey(book))}`, payload);
+      await api.put(`/admin/books/${encodeURIComponent(getBookKey(book))}`, payload);
       toast.success("Stock atualizado");
       fetchBooks();
     } catch (e) {
@@ -272,7 +269,7 @@ export default function AdminBooks() {
           </thead>
           <tbody>
             {books.map((b) => (
-              <tr key={b.id || bookKey(b)} className="border-t border-slate-100 hover:bg-slate-50" data-testid={`book-row-${bookKey(b)}`}>
+              <tr key={b.id || getBookKey(b)} className="border-t border-slate-100 hover:bg-slate-50" data-testid={`book-row-${getBookKey(b)}`}>
                 <td className="p-3 font-mono text-xs">
                   {b.isbn13 ? b.isbn13 : (
                     <span className="inline-flex items-center gap-1">
@@ -293,13 +290,13 @@ export default function AdminBooks() {
                       value={stockDrafts[b.id] ?? b.stock_qty ?? 0}
                       onChange={(e) => setStockDrafts((cur) => ({ ...cur, [b.id]: e.target.value }))}
                       className="w-20 h-8 text-center"
-                      data-testid={`stock-input-${bookKey(b)}`}
+                      data-testid={`stock-input-${getBookKey(b)}`}
                     />
                     <button
                       type="button"
                       onClick={() => saveStock(b)}
                       className="p-1.5 rounded hover:bg-slate-200 text-slate-600"
-                      data-testid={`save-stock-${bookKey(b)}`}
+                      data-testid={`save-stock-${getBookKey(b)}`}
                       disabled={savingStock === b.id}
                     >
                       <Save className="w-3.5 h-3.5"/>
@@ -312,8 +309,8 @@ export default function AdminBooks() {
                   {b.status === "Unavailable" && <span className="text-rose-700">● Indisponível</span>}
                 </td>
                 <td className="p-3 flex gap-1">
-                  <button onClick={()=>openEdit(b)} className="p-1.5 rounded hover:bg-slate-200" data-testid={`edit-book-${bookKey(b)}`}><Pencil className="w-3.5 h-3.5"/></button>
-                  <button onClick={()=>remove(b)} className="p-1.5 rounded hover:bg-rose-100 text-rose-700" data-testid={`delete-book-${bookKey(b)}`}><Trash2 className="w-3.5 h-3.5"/></button>
+                  <button onClick={()=>openEdit(b)} className="p-1.5 rounded hover:bg-slate-200" data-testid={`edit-book-${getBookKey(b)}`}><Pencil className="w-3.5 h-3.5"/></button>
+                  <button onClick={()=>remove(b)} className="p-1.5 rounded hover:bg-rose-100 text-rose-700" data-testid={`delete-book-${getBookKey(b)}`}><Trash2 className="w-3.5 h-3.5"/></button>
                 </td>
               </tr>
             ))}

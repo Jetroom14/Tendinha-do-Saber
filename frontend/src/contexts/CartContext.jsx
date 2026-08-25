@@ -1,14 +1,10 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import api from "@/lib/api";
+import { getBookKey } from "@/lib/bookKey";
 
 const CartCtx = createContext(null);
 const STORAGE_KEY = "ts_cart_v1";
 const BAGS_KEY = "ts_bags_qty";
-
-function getItemKey(itemOrKey) {
-  if (typeof itemOrKey === "string") return itemOrKey;
-  return itemOrKey?.isbn13 || itemOrKey?.slug || itemOrKey?.pe_code || itemOrKey?.id || "";
-}
 
 export function CartProvider({ children }) {
   const [items, setItems] = useState(() => {
@@ -47,7 +43,7 @@ export function CartProvider({ children }) {
   useEffect(() => { recompute(); }, [recompute]);
 
   const add = (bookOrKey, qty = 1) => {
-    const itemKey = getItemKey(bookOrKey);
+    const itemKey = getBookKey(bookOrKey);
     if (!itemKey) return;
     setItems((cur) => {
       const idx = cur.findIndex((x) => x.isbn13 === itemKey);
@@ -61,15 +57,15 @@ export function CartProvider({ children }) {
   };
 
   const remove = (bookOrKey) => {
-    const itemKey = getItemKey(bookOrKey);
+    const itemKey = getBookKey(bookOrKey);
     setItems((cur) => cur.filter((x) => x.isbn13 !== itemKey));
   };
   const setQty = (bookOrKey, qty) => {
-    const itemKey = getItemKey(bookOrKey);
+    const itemKey = getBookKey(bookOrKey);
     setItems((cur) => cur.map((x) => x.isbn13 === itemKey ? { ...x, qty: Math.max(1, qty) } : x));
   };
   const toggleLamination = (bookOrKey) => {
-    const itemKey = getItemKey(bookOrKey);
+    const itemKey = getBookKey(bookOrKey);
     setItems((cur) => cur.map((x) => x.isbn13 === itemKey ? { ...x, lamination: !x.lamination } : x));
   };
   const setBags = (qty) => setBagsQty(Math.max(0, parseInt(qty || 0, 10) || 0));

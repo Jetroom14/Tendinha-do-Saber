@@ -37,49 +37,7 @@ const deleteCookie = (name) => {
   document.cookie = `${encodeURIComponent(name)}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
 };
 
-export const getAuthToken = () => {
-  if (typeof window === "undefined") return null;
-  try {
-    if (canUseLocalStorage()) {
-      const token = window.localStorage.getItem(TOKEN_KEY);
-      if (token) return token;
-    }
-    if (canUseSessionStorage()) {
-      const token = window.sessionStorage.getItem(TOKEN_KEY);
-      if (token) return token;
-    }
-  } catch {
-    // ignore
-  }
-  return getCookie(TOKEN_KEY);
-};
-
-export const setAuthToken = (token, keepSession) => {
-  if (typeof window === "undefined") return;
-  try {
-    if (keepSession && canUseLocalStorage()) {
-      window.localStorage.setItem(TOKEN_KEY, token);
-      if (canUseSessionStorage()) window.sessionStorage.removeItem(TOKEN_KEY);
-      deleteCookie(TOKEN_KEY);
-      return;
-    }
-    if (!keepSession && canUseSessionStorage()) {
-      window.sessionStorage.setItem(TOKEN_KEY, token);
-      if (canUseLocalStorage()) window.localStorage.removeItem(TOKEN_KEY);
-      deleteCookie(TOKEN_KEY);
-      return;
-    }
-    if (keepSession) {
-      setCookie(TOKEN_KEY, token, 30);
-    } else {
-      setCookie(TOKEN_KEY, token);
-    }
-  } catch {
-    // ignore
-  }
-};
-
-export const removeAuthToken = () => {
+export const clearLegacyAuthToken = () => {
   if (typeof window === "undefined") return;
   try {
     if (canUseLocalStorage()) window.localStorage.removeItem(TOKEN_KEY);

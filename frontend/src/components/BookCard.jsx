@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { CoverImage } from "./CoverImage";
+import { getBookKey } from "@/lib/bookKey";
 
 export function StockBadge({ status }) {
   if (status === "PreOrder") return (
@@ -22,8 +23,9 @@ export function StockBadge({ status }) {
 
 export function BookCard({ book, onAdd }) {
   const canBuy = book.status !== "Unavailable";
+  const bookKey = getBookKey(book);
   return (
-    <Link to={`/livro/${book.isbn13}`} className="book-card flex flex-col bg-white border border-[#E2E8F0] rounded-md overflow-hidden fade-up" data-testid={`book-card-${book.isbn13}`}>
+    <Link to={`/livro/${encodeURIComponent(bookKey)}`} className="book-card flex flex-col bg-white border border-[#E2E8F0] rounded-md overflow-hidden fade-up" data-testid={`book-card-${bookKey}`}>
       <div className="relative aspect-[3/4] bg-[#F5F8EC] overflow-hidden">
         <CoverImage book={book} className="w-full h-full object-cover" />
         <div className="absolute top-2 right-2"><StockBadge status={book.status}/></div>
@@ -43,7 +45,7 @@ export function BookCard({ book, onAdd }) {
               type="button"
               onClick={(e) => { e.preventDefault(); onAdd(book); }}
               className="bg-[#5A8F1E] hover:bg-[#3E6E11] text-white text-xs h-8 px-3"
-              data-testid={`add-to-cart-${book.isbn13}`}
+              data-testid={`add-to-cart-${bookKey}`}
             >
               Adicionar
             </Button>

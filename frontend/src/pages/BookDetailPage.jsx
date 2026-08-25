@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import api from "@/lib/api";
+import { getBookKey } from "@/lib/bookKey";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -25,7 +26,7 @@ export default function BookDetailPage() {
   }, [isbn13]);
 
   const addToCart = () => {
-    add(book.isbn13);
+    add(book);
     toast.success("Adicionado ao carrinho");
   };
 
@@ -42,12 +43,13 @@ export default function BookDetailPage() {
   </div>;
 
   const canBuy = book.status !== "Unavailable";
+  const bookKey = getBookKey(book);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-12" data-testid="book-detail-page">
       <SEO
         title={`${book.title} · ${book.subject || ""}`.trim()}
-        path={`/livro/${book.isbn13}`}
+        path={`/livro/${encodeURIComponent(bookKey)}`}
         description={book.synopsis || `${book.title} — Manual escolar de ${book.subject || ""}, editora ${book.publisher || ""}. Compre online com entrega em Aveiro.`}
         image={book.image_url}
         type="product"

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import api from "@/lib/api";
+import { getBookKey } from "@/lib/bookKey";
 import { toast } from "sonner";
 import { ShoppingBag, X, Trash2, Tag, Check, ArrowRight, ShoppingBasket } from "lucide-react";
 
@@ -73,11 +74,11 @@ export default function CartPage() {
         <div className="lg:col-span-8 space-y-3">
           {items.map((it) => {
             const book = bookMap[it.isbn13];
-            const line = summary?.lines?.find((l) => l.isbn13 === it.isbn13);
+            const line = summary?.lines?.find((l) => l.item_key === it.isbn13);
             const title = book?.title || line?.title || `Livro ${it.isbn13}`;
             const publisher = book?.publisher || "";
             const imageUrl = book?.image_url || line?.image_url || "";
-            const detailKey = book?.isbn13 || it.isbn13;
+            const detailKey = book ? getBookKey(book) : it.isbn13;
             const isLaminationEligible = Boolean(book?.is_lamination_eligible);
             return (
               <div key={it.isbn13} className="bg-white border border-[#E2E8F0] rounded-md p-5 flex gap-4" data-testid={`cart-item-${it.isbn13}`}>
@@ -88,7 +89,7 @@ export default function CartPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       {book ? (
-                        <Link to={`/livro/${detailKey}`} className="font-display font-medium text-[#1A202C] hover:text-[#5A8F1E]">{title}</Link>
+                        <Link to={`/livro/${encodeURIComponent(detailKey)}`} className="font-display font-medium text-[#1A202C] hover:text-[#5A8F1E]">{title}</Link>
                       ) : (
                         <div className="font-display font-medium text-[#1A202C]">{title}</div>
                       )}
@@ -189,7 +190,7 @@ export default function CartPage() {
                 </div>
               ) : (
                 <div className="flex gap-2">
-                  <Input value={promoInput} onChange={(e)=>setPromoInput(e.target.value.toUpperCase())} placeholder="Ex: BEIRAMAR5" className="h-10" data-testid="promo-input"/>
+                  <Input value={promoInput} onChange={(e)=>setPromoInput(e.target.value.toUpperCase())} placeholder="Ex: TDNHA26" className="h-10" data-testid="promo-input"/>
                   <Button onClick={applyPromo} variant="outline" className="h-10 border-[#5A8F1E] text-[#5A8F1E] hover:bg-[#5A8F1E] hover:text-white" data-testid="apply-promo-btn">Aplicar</Button>
                 </div>
               )}
