@@ -4529,6 +4529,10 @@ async def create_order(payload: OrderCreateIn, request: Request):
             "provider_payment_datetime": None,
         },
         "created_at": now_iso,
+        # Notificação administrativa: só documentos criados após esta
+        # funcionalidade recebem este campo. Documentos históricos sem
+        # admin_seen_at NÃO são tratados como notificações novas.
+        "admin_seen_at": None,
     }
     await db.orders.insert_one(doc)
 
@@ -4920,6 +4924,7 @@ async def submit_voucher(payload: VoucherSubmitIn, request: Request, user: Optio
         "customer_id": user["id"] if user else None,
         "order_id": None,
         "created_at": iso(now_utc()),
+        "admin_seen_at": None,
     }
     await db.vouchers.insert_one(doc)
     doc.pop("_id", None)
@@ -4984,6 +4989,7 @@ async def upload_voucher(
         "customer_id": user["id"] if user else None,
         "order_id": None,
         "created_at": iso(now_utc()),
+        "admin_seen_at": None,
     }
     await db.vouchers.insert_one(doc)
     doc.pop("_id", None)
@@ -5094,13 +5100,145 @@ async def remove_wishlist(isbn13: str, user: dict = Depends(get_current_user)):
     await db.wishlist.delete_one({"user_id": user["id"], "isbn13": strip_isbn(isbn13)})
     return {"ok": True}
 
+# ---------- Admin: notifications ----------
+def _admin_unseen_filter() -> dict:
+    """Apenas documentos criados já com suporte de notificações.
+
+    $exists=True é deliberado: documentos históricos sem admin_seen_at
+    não devem aparecer retroativamente como "novos".
+    """
+    return {
+        "admin_seen_at": {"$exists": True, "$eq": None},
+        "archived": {"$ne": True},
+    }
+
+
+@api.get("/admin/notifications")
+async def admin_notifications(admin: dict = Depends(require_admin)):
+    order_filter = _admin_unseen_filter()
+    voucher_filter = _admin_unseen_filter()
+
+    unseen_orders = await db.orders.count_documents(order_filter)
+    unseen_vouchers = await db.vouchers.count_documents(voucher_filter)
+
+    orders = await db.orders.find(
+        order_filter,
+        {
+            "_id": 0,
+            "order_no": 1,
+            "created_at": 1,
+            "status": 1,
+            "customer.name": 1,
+            "totals.total": 1,
+        },
+    ).sort("created_at", -1).limit(10).to_list(10)
+
+    vouchers = await db.vouchers.find(
+        voucher_filter,
+        {
+            "_id": 0,
+            "id": 1,
+            "created_at": 1,
+            "status": 1,
+            "name": 1,
+            "contact": 1,
+        },
+    ).sort("created_at", -1).limit(10).to_list(10)
+
+    items = []
+
+    for order in orders:
+        order_no = str(order.get("order_no") or "")
+        customer = order.get("customer") or {}
+        totals = order.get("totals") or {}
+
+        try:
+            total_text = f"{float(totals.get('total') or 0):.2f} €"
+        except (TypeError, ValueError):
+            total_text = ""
+
+        subtitle_parts = [
+            str(customer.get("name") or "").strip(),
+            total_text,
+        ]
+
+        items.append({
+            "id": order_no,
+            "type": "order",
+            "created_at": order.get("created_at"),
+            "title": f"Nova encomenda {order_no}",
+            "subtitle": " · ".join(x for x in subtitle_parts if x),
+            "target": "/admin/encomendas",
+        })
+
+    for voucher in vouchers:
+        voucher_id = str(voucher.get("id") or "")
+        subtitle = str(voucher.get("name") or voucher.get("contact") or "").strip()
+
+        items.append({
+            "id": voucher_id,
+            "type": "voucher",
+            "created_at": voucher.get("created_at"),
+            "title": "Novo voucher MEGA",
+            "subtitle": subtitle,
+            "target": "/admin/vouchers",
+        })
+
+    items.sort(
+        key=lambda item: str(item.get("created_at") or ""),
+        reverse=True,
+    )
+
+    return {
+        "unseen_orders": unseen_orders,
+        "unseen_vouchers": unseen_vouchers,
+        "total": unseen_orders + unseen_vouchers,
+        "items": items[:15],
+    }
+
+
+@api.post("/admin/notifications/{kind}/mark-seen")
+async def admin_notifications_mark_seen(
+    kind: str,
+    admin: dict = Depends(require_admin),
+):
+    now = iso(now_utc())
+    unseen_filter = _admin_unseen_filter()
+
+    if kind in ("order", "orders"):
+        result = await db.orders.update_many(
+            unseen_filter,
+            {"$set": {"admin_seen_at": now}},
+        )
+        normalized_kind = "orders"
+
+    elif kind in ("voucher", "vouchers"):
+        result = await db.vouchers.update_many(
+            unseen_filter,
+            {"$set": {"admin_seen_at": now}},
+        )
+        normalized_kind = "vouchers"
+
+    else:
+        raise HTTPException(400, "Tipo de notificação inválido")
+
+    return {
+        "ok": True,
+        "kind": normalized_kind,
+        "marked": result.modified_count,
+    }
+
+
 # ---------- Admin: users, settings, logs ----------
 @api.get("/admin/dashboard")
 async def admin_dashboard(admin: dict = Depends(require_admin)):
     total_books = await db.books.count_documents({})
     total_schools = await db.schools.count_documents({})
     total_orders = await db.orders.count_documents({"archived": {"$ne": True}})
-    pending_vouchers = await db.vouchers.count_documents({"status": "Pending", "archived": {"$ne": True}})
+    pending_vouchers = await db.vouchers.count_documents({
+        "status": {"$in": ["Pendente", "Pending"]},
+        "archived": {"$ne": True},
+    })
     anomalies = await db.books.count_documents({"$or": [{"price": 0}, {"price": {"$lte": 0}}]})
     recent_orders = await db.orders.find({"archived": {"$ne": True}}, {"_id": 0}).sort("created_at", -1).limit(5).to_list(5)
     return {
