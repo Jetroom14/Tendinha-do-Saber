@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import api from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -24,12 +24,23 @@ export default function AdminSchools() {
   const [wipeFinalConfirm, setWipeFinalConfirm] = useState(false);
   const [wiping, setWiping] = useState(false);
 
-  const load = async () => {
-    const m = await api.get("/municipalities"); setMunis(m.data);
-    const s = await api.get(`/schools${selectedMun ? `?municipality_id=${selectedMun}` : ""}`); setSchools(s.data);
-  };
+  const load = useCallback(async () => {
+    const m = await api.get("/municipalities");
+    setMunis(m.data);
 
-  useEffect(() => { load(); api.get("/grade-levels").then((r) => setGrades(r.data)); /* eslint-disable-next-line */ }, [selectedMun]);
+    const s = await api.get(
+      `/schools${selectedMun ? `?municipality_id=${selectedMun}` : ""}`
+    );
+    setSchools(s.data);
+  }, [selectedMun]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useEffect(() => {
+    api.get("/grade-levels").then((r) => setGrades(r.data));
+  }, []);
 
   const resetSchoolForm = (school = null) => {
     if (school) {

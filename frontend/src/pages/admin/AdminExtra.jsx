@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
@@ -99,12 +99,16 @@ export function AdminCustomers() {
   const [selected, setSelected] = useState(null);
   const [detail, setDetail] = useState(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const qs = q ? `?q=${encodeURIComponent(q)}` : "";
     const { data } = await api.get(`/admin/customers${qs}`);
     setCustomers(data);
-  };
-  useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t); /* eslint-disable-next-line */ }, [q]);
+  }, [q]);
+
+  useEffect(() => {
+    const t = setTimeout(load, 250);
+    return () => clearTimeout(t);
+  }, [load]);
 
   const openDetail = async (c) => {
     setSelected(c.id); setDetail(null);
