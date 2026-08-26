@@ -216,7 +216,7 @@ export default function AdminLayout() {
         </button>
 
         <Link to="/admin" className="ml-3 flex items-center gap-2">
-          <img src="/logo.svg" alt="" className="w-7 h-7 bg-white rounded p-0.5"/>
+          <img src="/branding/logo-email.png" alt="" className="w-7 h-7 bg-white rounded p-0.5"/>
           <span className="font-display font-semibold text-sm">Tendinha · Admin</span>
         </Link>
 
@@ -359,7 +359,7 @@ export default function AdminLayout() {
             className="flex items-center gap-2.5"
           >
             <img
-              src="/logo.svg"
+              src="/branding/logo-email.png"
               alt="Tendinha"
               className="w-9 h-9 object-contain bg-white rounded p-0.5"
             />

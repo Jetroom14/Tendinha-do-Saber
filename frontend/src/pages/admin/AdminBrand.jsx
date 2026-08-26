@@ -5,42 +5,18 @@ import { toast } from "sonner";
 
 const ASSETS = [
   {
-    id: "color",
-    label: "Logótipo principal (cor)",
-    file: "/logo.svg",
-    description: "Versão a cores — para fundos brancos e claros. Use em emails, faturas, cartazes e website.",
+    id: "official",
+    label: "Logótipo oficial",
+    file: "/branding/logo-email.png",
+    description: "Logótipo oficial da Tendinha do Saber, com fundo branco. Use esta versão como referência principal da marca.",
     bg: "#FFFFFF",
     invert: false,
   },
   {
-    id: "mono",
-    label: "Monocromático (preto)",
-    file: "/logo-mono.svg",
-    description: "Versão para impressão a uma cor, carimbos, faxes e situações onde a cor não está disponível.",
-    bg: "#F5F8EC",
-    invert: false,
-  },
-  {
-    id: "white",
-    label: "Versão branca",
-    file: "/logo-white.svg",
-    description: "Para fundos escuros ou imagens. Use em vinis, t-shirts pretas e posts de social media com fundo escuro.",
-    bg: "#0F1F2E",
-    invert: true,
-  },
-  {
-    id: "favicon",
-    label: "Favicon (32×32)",
-    file: "/favicon.svg",
-    description: "Ícone do separador do navegador. Versão simplificada otimizada para tamanhos pequenos.",
-    bg: "#FFFFFF",
-    invert: false,
-  },
-  {
-    id: "raster",
-    label: "Logótipo original (JPEG)",
-    file: "/logo.jpeg",
-    description: "Versão raster fornecida pelo cliente. Recomendado usar as versões SVG (escaláveis) sempre que possível.",
+    id: "social",
+    label: "Imagem de partilha",
+    file: "/branding/social-share.png",
+    description: "Imagem utilizada quando o endereço do website é partilhado em redes sociais e aplicações de mensagens.",
     bg: "#FFFFFF",
     invert: false,
   },
@@ -83,7 +59,7 @@ export default function AdminBrand() {
         <div className="text-[10px] tracking-[0.2em] uppercase text-slate-500 font-semibold">Identidade Visual</div>
         <h1 className="font-display text-3xl font-medium text-slate-900">Brand Assets</h1>
         <p className="text-sm text-slate-600 mt-2 max-w-2xl">
-          Recursos visuais da marca para partilha com parceiros, imprensa e materiais físicos. Todas as versões SVG são vetoriais — escalam sem perda de qualidade.
+          Recursos oficiais da identidade visual da Tendinha do Saber. O logótipo apresentado nesta página é a referência utilizada no website, emails e partilhas digitais.
         </p>
       </div>
 
@@ -164,8 +140,8 @@ export default function AdminBrand() {
       <section>
         <h2 className="font-display text-lg font-medium text-slate-900 mb-4">Diretrizes de uso</h2>
         <div className="bg-[#F5F8EC] border border-slate-200 rounded p-6 space-y-3 text-sm text-slate-700">
-          <p><strong>✅ Faça:</strong> Use sempre a versão SVG sempre que possível. Mantenha um espaço em branco mínimo à volta do logótipo (1/4 da sua altura). Use a versão branca em fundos escuros.</p>
-          <p><strong>❌ Não faça:</strong> Esticar, rodar ou alterar as cores do logótipo. Não aplicar sombras ou efeitos. Não colocar a versão a cores sobre fundos coloridos saturados.</p>
+          <p><strong>✅ Faça:</strong> Utilize o logótipo oficial com o fundo branco e mantenha espaço livre à sua volta para preservar a legibilidade.</p>
+          <p><strong>❌ Não faça:</strong> Esticar, rodar, recortar, recolorir ou aplicar efeitos ao logótipo.</p>
         </div>
       </section>
     </div>

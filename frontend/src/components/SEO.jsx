@@ -8,7 +8,7 @@ export default function SEO({
   title,
   description = DEFAULT_DESCRIPTION,
   path = "",
-  image = "/logo.svg",
+  image = "/branding/social-share.png?v=20260826",
   type = "website",
   jsonLd = null,
   noIndex = false,
@@ -52,6 +52,9 @@ export const ORGANIZATION_JSONLD = {
   name: "Tendinha do Saber",
   description: "Livraria especializada em manuais escolares e cadernos de fichas, em Aveiro.",
   url: typeof window !== "undefined" ? window.location.origin : "",
+  logo: typeof window !== "undefined"
+    ? `${window.location.origin}/branding/logo-email.png`
+    : "/branding/logo-email.png",
   telephone: "+351 961 194 491",
   email: "tendinhadosaber@gmail.com",
   address: {
