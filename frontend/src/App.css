@@ -111,3 +111,44 @@
 .legal-tabs-scroll::-webkit-scrollbar {
   display: none;
 }
+
+
+/* LEGAL EDITOR ENHANCEMENTS */
+
+.legal-content {
+  overflow-wrap: anywhere;
+}
+
+.legal-content h4 {
+  font-size: 1rem;
+  line-height: 1.5;
+  font-weight: 600;
+  margin: 1.25rem 0 0.4rem;
+}
+
+.legal-content > :first-child {
+  margin-top: 0;
+}
+
+.legal-content a {
+  word-break: break-word;
+}
+
+.legal-content s {
+  text-decoration: line-through;
+}
+
+.legal-content code {
+  font-size: 0.9em;
+}
+
+@media (max-width: 639px) {
+  .legal-content h2 {
+    line-height: 1.35;
+  }
+
+  .legal-content h3,
+  .legal-content h4 {
+    line-height: 1.4;
+  }
+}
