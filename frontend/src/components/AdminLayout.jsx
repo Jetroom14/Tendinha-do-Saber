@@ -13,15 +13,19 @@ import { useCallback, useEffect, useState } from "react";
 // superOnly → only super_admin.
 const NAV = [
   { to: "/admin", icon: LayoutDashboard, label: "Dashboard", end: true },
+
+  // Operação diária — manter no topo para acesso rápido e
+  // para os badges de novas entradas ficarem sempre visíveis.
+  { to: "/admin/encomendas", icon: ShoppingCart, label: "Encomendas", notificationKey: "unseen_orders" },
+  { to: "/admin/vouchers", icon: FileText, label: "Vouchers MEGA", notificationKey: "unseen_vouchers" },
+
   { to: "/admin/livros", icon: BookOpen, label: "Livros" },
   { to: "/admin/categorias", icon: Tag, label: "Categorias" },
   { to: "/admin/importar", icon: Upload, label: "Importações" },
   { to: "/admin/escolas", icon: School2, label: "Escolas", superOnly: true },
   { to: "/admin/adocoes", icon: GraduationCap, label: "Adoções DGE", managerOnly: true },
-  { to: "/admin/encomendas", icon: ShoppingCart, label: "Encomendas", notificationKey: "unseen_orders" },
-  { to: "/admin/entregas", icon: Truck, label: "Custos de Entrega", managerOnly: true },
   { to: "/admin/clientes", icon: UserCircle, label: "Clientes", managerOnly: true },
-  { to: "/admin/vouchers", icon: FileText, label: "Vouchers MEGA", notificationKey: "unseen_vouchers" },
+  { to: "/admin/entregas", icon: Truck, label: "Custos de Entrega", managerOnly: true },
   { to: "/admin/codigos", icon: Ticket, label: "Códigos Promo", managerOnly: true },
   { to: "/admin/parceiros", icon: Handshake, label: "Parceiros", managerOnly: true },
   { to: "/admin/faq", icon: MessageCircleQuestion, label: "Perguntas Frequentes", managerOnly: true },
@@ -379,7 +383,7 @@ export default function AdminLayout() {
           </button>
         </div>
 
-        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+        <nav className="admin-sidebar-nav flex-1 p-3 space-y-0.5 overflow-y-auto">
           {visibleFor(user.role).map(({
             to,
             icon: Icon,
@@ -447,7 +451,7 @@ export default function AdminLayout() {
         </div>
       </aside>
 
-      <main className="flex-1 min-w-0 pt-14 md:pt-0">
+      <main className="admin-main flex-1 min-w-0 max-w-full overflow-x-hidden pt-14 md:pt-0">
         <Outlet />
       </main>
     </div>

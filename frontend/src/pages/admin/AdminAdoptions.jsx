@@ -66,7 +66,7 @@ export default function AdminAdoptions() {
   };
 
   return (
-    <div className="p-8 max-w-4xl" data-testid="admin-adoptions">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl" data-testid="admin-adoptions">
       <div className="mb-6">
         <div className="text-[10px] tracking-[0.2em] uppercase text-slate-500 font-semibold">Adoções DGE</div>
         <h1 className="font-display text-3xl font-medium text-slate-900 flex items-center gap-2">

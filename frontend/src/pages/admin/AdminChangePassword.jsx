@@ -2,7 +2,7 @@ import ChangePasswordForm from "@/components/ChangePasswordForm";
 
 export default function AdminChangePassword() {
   return (
-    <div className="p-8 max-w-3xl" data-testid="admin-change-password">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-3xl" data-testid="admin-change-password">
       <div className="mb-6">
         <div className="text-[10px] tracking-[0.2em] uppercase text-slate-500 font-semibold">Segurança</div>
         <h1 className="font-display text-3xl font-medium text-slate-900">Alterar Password</h1>

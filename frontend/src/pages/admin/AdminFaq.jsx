@@ -95,7 +95,7 @@ export default function AdminFaq() {
   };
 
   return (
-    <div className="p-8 max-w-5xl" data-testid="admin-faq">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl" data-testid="admin-faq">
       <div className="mb-6 flex items-end justify-between gap-4">
         <div>
           <div className="text-[10px] tracking-[0.2em] uppercase text-slate-500 font-semibold">Conteúdo</div>

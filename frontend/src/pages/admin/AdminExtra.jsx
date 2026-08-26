@@ -43,7 +43,7 @@ export function AdminCategories() {
   };
 
   return (
-    <div className="p-8" data-testid="admin-categories">
+    <div className="p-4 sm:p-6 lg:p-8" data-testid="admin-categories">
       <div className="mb-6">
         <div className={EYEBROW}>Catálogo</div>
         <h1 className={H1}>Categorias</h1>
@@ -128,7 +128,7 @@ export function AdminCustomers() {
   };
 
   return (
-    <div className="p-8" data-testid="admin-customers">
+    <div className="p-4 sm:p-6 lg:p-8" data-testid="admin-customers">
       <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
         <div>
           <div className={EYEBROW}>Clientes</div>
@@ -276,7 +276,7 @@ export function AdminPromoCodes() {
   };
 
   return (
-    <div className="p-8" data-testid="admin-promo-codes">
+    <div className="p-4 sm:p-6 lg:p-8" data-testid="admin-promo-codes">
       <div className="mb-6">
         <div className={EYEBROW}>Promoções</div>
         <h1 className={H1}>Códigos Promocionais</h1>
@@ -355,7 +355,7 @@ export function AdminReports() {
   const maxMonth = months.reduce((m, [, v]) => Math.max(m, v), 0) || 1;
 
   return (
-    <div className="p-8" data-testid="admin-reports">
+    <div className="p-4 sm:p-6 lg:p-8" data-testid="admin-reports">
       <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
         <div>
           <div className={EYEBROW}>Análise</div>
@@ -450,7 +450,7 @@ export function AdminContent() {
   if (!content) return <div className="p-8 text-slate-500">A carregar...</div>;
 
   return (
-    <div className="p-8 max-w-3xl" data-testid="admin-content">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-3xl" data-testid="admin-content">
       <div className="mb-6">
         <div className={EYEBROW}>CMS</div>
         <h1 className={H1}>Conteúdo do Site</h1>

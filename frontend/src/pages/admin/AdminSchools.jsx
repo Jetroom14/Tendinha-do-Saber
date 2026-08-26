@@ -119,8 +119,8 @@ export default function AdminSchools() {
   };
 
   return (
-    <div className="p-8" data-testid="admin-schools">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 sm:p-6 lg:p-8" data-testid="admin-schools">
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between mb-6">
         <div>
           <div className="text-[10px] tracking-[0.2em] uppercase text-slate-500 font-semibold">Escolas</div>
           <h1 className="font-display text-3xl font-medium text-slate-900">Concelhos & Escolas</h1>

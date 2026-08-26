@@ -241,23 +241,23 @@ export function AdminVouchers() {
   };
 
   return (
-    <div className="p-8" data-testid="admin-vouchers">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 sm:p-6 lg:p-8" data-testid="admin-vouchers">
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between mb-6">
         <div>
           <div className="text-[10px] tracking-[0.2em] uppercase text-slate-500 font-semibold">Vouchers</div>
           <h1 className="font-display text-3xl font-medium text-slate-900">Vales MEGA</h1>
           <p className="text-sm text-slate-500 mt-1">Lista de vouchers submetidos pelos clientes, do mais recente para o mais antigo.</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <Select value={archiveView} onValueChange={setArchiveView} data-testid="voucher-archive-filter">
-            <SelectTrigger className="w-40"><SelectValue/></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-40"><SelectValue/></SelectTrigger>
             <SelectContent>
               <SelectItem value="active">Ativos</SelectItem>
               <SelectItem value="archived">Arquivados</SelectItem>
             </SelectContent>
           </Select>
           <Select value={filter} onValueChange={setFilter}>
-            <SelectTrigger className="w-52" data-testid="voucher-filter"><SelectValue/></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-52" data-testid="voucher-filter"><SelectValue/></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="Pendente">Pendentes</SelectItem>
@@ -435,22 +435,22 @@ export function AdminOrders() {
   };
 
   return (
-    <div className="p-8" data-testid="admin-orders">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 sm:p-6 lg:p-8" data-testid="admin-orders">
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between mb-6">
         <div>
           <div className="text-[10px] tracking-[0.2em] uppercase text-slate-500 font-semibold">Encomendas</div>
           <h1 className="font-display text-3xl font-medium text-slate-900">Gestão de Encomendas</h1>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <Select value={archiveView} onValueChange={setArchiveView} data-testid="order-archive-filter">
-            <SelectTrigger className="w-40"><SelectValue/></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-40"><SelectValue/></SelectTrigger>
             <SelectContent>
               <SelectItem value="active">Ativas</SelectItem>
               <SelectItem value="archived">Arquivadas</SelectItem>
             </SelectContent>
           </Select>
           <Select value={filter} onValueChange={setFilter}>
-            <SelectTrigger className="w-48"><SelectValue/></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-48"><SelectValue/></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas</SelectItem>
               <SelectItem value="pending_payment">Aguarda Pagamento</SelectItem>
@@ -557,7 +557,7 @@ export function AdminPartners() {
   };
 
   return (
-    <div className="p-8" data-testid="admin-partners">
+    <div className="p-4 sm:p-6 lg:p-8" data-testid="admin-partners">
       <div className="mb-6">
         <div className="text-[10px] tracking-[0.2em] uppercase text-slate-500 font-semibold">Parceiros</div>
         <h1 className="font-display text-3xl font-medium text-slate-900">Códigos de Desconto</h1>
@@ -605,7 +605,7 @@ export function AdminLogs() {
   const [logs, setLogs] = useState([]);
   useEffect(() => { api.get("/admin/activity-logs?limit=200").then((r) => setLogs(r.data)); }, []);
   return (
-    <div className="p-8" data-testid="admin-logs">
+    <div className="p-4 sm:p-6 lg:p-8" data-testid="admin-logs">
       <div className="mb-6">
         <div className="text-[10px] tracking-[0.2em] uppercase text-slate-500 font-semibold">Segurança</div>
         <h1 className="font-display text-3xl font-medium text-slate-900">Histórico de Atividade</h1>
@@ -671,7 +671,7 @@ export function AdminSettings() {
   if (!s) return <div className="p-8 text-slate-500">A carregar...</div>;
 
   return (
-    <div className="p-8 max-w-2xl" data-testid="admin-settings">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-2xl" data-testid="admin-settings">
       <div className="mb-6">
         <div className="text-[10px] tracking-[0.2em] uppercase text-slate-500 font-semibold">Configuração</div>
         <h1 className="font-display text-3xl font-medium text-slate-900">Definições Gerais</h1>
@@ -822,7 +822,7 @@ export function AdminUsers() {
   const [users, setUsers] = useState([]);
   useEffect(() => { api.get("/admin/users").then((r) => setUsers(r.data)).catch(() => setUsers([])); }, []);
   return (
-    <div className="p-8" data-testid="admin-users">
+    <div className="p-4 sm:p-6 lg:p-8" data-testid="admin-users">
       <div className="mb-6">
         <div className="text-[10px] tracking-[0.2em] uppercase text-slate-500 font-semibold">Super-Admin</div>
         <h1 className="font-display text-3xl font-medium text-slate-900">Utilizadores</h1>

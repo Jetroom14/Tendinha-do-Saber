@@ -24,7 +24,7 @@ export default function AdminDashboard() {
   useEffect(() => { api.get("/admin/dashboard").then((r) => setData(r.data)); }, []);
 
   return (
-    <div className="p-8" data-testid="admin-dashboard">
+    <div className="p-4 sm:p-6 lg:p-8" data-testid="admin-dashboard">
       <div className="mb-8 flex items-center justify-between">
         <div>
           <div className="text-[10px] tracking-[0.2em] uppercase text-slate-500 font-semibold">Painel</div>
@@ -41,10 +41,10 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white border border-slate-200 rounded p-6">
+        <div className="lg:col-span-2 bg-white border border-slate-200 rounded p-4 sm:p-6 overflow-x-auto">
           <div className="flex items-center gap-2 mb-4"><TrendingUp className="w-4 h-4 text-slate-500"/><h2 className="font-display text-lg font-medium">Encomendas recentes</h2></div>
           {data?.recent_orders?.length ? (
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[620px] text-sm">
               <thead className="text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-200">
                 <tr><th className="text-left py-2">Nº</th><th className="text-left">Cliente</th><th className="text-left">Total</th><th className="text-left">Estado</th></tr>
               </thead>

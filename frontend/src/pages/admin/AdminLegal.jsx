@@ -140,7 +140,7 @@ export default function AdminLegal() {
   const current = pages.find((p) => p.slug === active);
 
   return (
-    <div className="p-8 max-w-4xl" data-testid="admin-legal">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl" data-testid="admin-legal">
       <div className="mb-6">
         <div className="text-[10px] tracking-[0.2em] uppercase text-slate-500 font-semibold">Legal</div>
         <h1 className="font-display text-3xl font-medium text-slate-900">Páginas Legais</h1>
@@ -151,13 +151,20 @@ export default function AdminLegal() {
         <div className="text-slate-500 p-6">A carregar…</div>
       ) : (
         <Tabs value={active} onValueChange={setActive}>
-          <TabsList className="mb-6">
-            {pages.map((p) => (
-              <TabsTrigger key={p.slug} value={p.slug} data-testid={`legal-tab-${p.slug}`}>
-                {p.title}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+          <div className="legal-tabs-scroll -mx-4 sm:mx-0 px-4 sm:px-0 mb-6 overflow-x-auto overscroll-x-contain">
+            <TabsList className="w-max min-w-full justify-start">
+              {pages.map((p) => (
+                <TabsTrigger
+                  key={p.slug}
+                  value={p.slug}
+                  className="shrink-0 whitespace-nowrap px-4"
+                  data-testid={`legal-tab-${p.slug}`}
+                >
+                  {p.title}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
 
           {pages.map((p) => (
             <TabsContent key={p.slug} value={p.slug}>

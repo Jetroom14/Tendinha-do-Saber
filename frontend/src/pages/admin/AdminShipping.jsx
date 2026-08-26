@@ -60,7 +60,7 @@ export default function AdminShipping() {
   };
 
   return (
-    <div className="p-8 max-w-3xl" data-testid="admin-shipping">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-3xl" data-testid="admin-shipping">
       <div className="mb-6">
         <div className="text-[10px] tracking-[0.2em] uppercase text-slate-500 font-semibold">Logística</div>
         <h1 className="font-display text-3xl font-medium text-slate-900">Custos de Entrega</h1>

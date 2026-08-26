@@ -51,3 +51,63 @@
 .legal-content a:hover { color: #3E6E11; }
 .legal-content blockquote { border-left: 3px solid #E2E8F0; padding-left: 1rem; margin: 1rem 0; color: #4A5568; font-style: italic; }
 .legal-content hr { border: 0; border-top: 1px solid #E2E8F0; margin: 1.5rem 0; }
+
+
+/* ADMIN RESPONSIVE + SIDEBAR SCROLLBAR */
+.admin-sidebar-nav {
+  scrollbar-width: thin;
+  scrollbar-color: #475569 #0f172a;
+}
+
+.admin-sidebar-nav::-webkit-scrollbar {
+  width: 8px;
+}
+
+.admin-sidebar-nav::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+.admin-sidebar-nav::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 9999px;
+  border: 2px solid #0f172a;
+}
+
+.admin-sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+.admin-main {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 767px) {
+  .admin-main {
+    overflow-x: hidden;
+  }
+
+  .admin-main input,
+  .admin-main textarea,
+  .admin-main select,
+  .admin-main button {
+    max-width: 100%;
+  }
+
+  .admin-main h1 {
+    line-height: 1.15;
+  }
+}
+
+
+/* LEGAL TABS MOBILE */
+.legal-tabs-scroll {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+
+.legal-tabs-scroll::-webkit-scrollbar {
+  display: none;
+}

@@ -78,7 +78,7 @@ export default function AdminBrand() {
   };
 
   return (
-    <div className="p-8 max-w-6xl" data-testid="admin-brand">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl" data-testid="admin-brand">
       <div className="mb-8">
         <div className="text-[10px] tracking-[0.2em] uppercase text-slate-500 font-semibold">Identidade Visual</div>
         <h1 className="font-display text-3xl font-medium text-slate-900">Brand Assets</h1>

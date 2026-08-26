@@ -187,15 +187,15 @@ export default function AdminBooks() {
   };
 
   return (
-    <div className="p-8" data-testid="admin-books">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 sm:p-6 lg:p-8" data-testid="admin-books">
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between mb-6">
         <div>
           <div className="text-[10px] tracking-[0.2em] uppercase text-slate-500 font-semibold">Catálogo</div>
           <h1 className="font-display text-3xl font-medium text-slate-900">Livros</h1>
         </div>
-        <Button onClick={openCreate} className="bg-[#5A8F1E] hover:bg-[#3E6E11] text-white" data-testid="add-book-btn"><Plus className="w-4 h-4 mr-2"/>Novo livro</Button>
-        <Button onClick={exportBooks} variant="outline" className="ml-2" data-testid="export-books-btn"><Download className="w-4 h-4 mr-2"/>Exportar livros</Button>
-        <label className="ml-2 inline-flex" data-testid="import-links-wrap">
+        <Button onClick={openCreate} className="w-full sm:w-auto bg-[#5A8F1E] hover:bg-[#3E6E11] text-white" data-testid="add-book-btn"><Plus className="w-4 h-4 mr-2"/>Novo livro</Button>
+        <Button onClick={exportBooks} variant="outline" className="w-full sm:w-auto" data-testid="export-books-btn"><Download className="w-4 h-4 mr-2"/>Exportar livros</Button>
+        <label className="inline-flex w-full sm:w-auto" data-testid="import-links-wrap">
           <Button variant="outline" asChild><span><Link2 className="w-4 h-4 mr-2"/>Importar ligações</span></Button>
           <input type="file" accept=".xlsx,.xls" className="hidden" onChange={importLinks} data-testid="import-links-input"/>
         </label>
@@ -224,7 +224,7 @@ export default function AdminBooks() {
           onClick={syncCovers}
           disabled={syncing || (coverStatus && coverStatus.missing === 0)}
           variant="outline"
-          className="border-[#5A8F1E] text-[#5A8F1E] hover:bg-[#5A8F1E] hover:text-white shrink-0"
+          className="w-full sm:w-auto border-[#5A8F1E] text-[#5A8F1E] hover:bg-[#5A8F1E] hover:text-white shrink-0"
           data-testid="cover-sync-btn"
         >
           <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? "animate-spin" : ""}`}/>
@@ -232,11 +232,11 @@ export default function AdminBooks() {
         </Button>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded p-4 mb-4 flex items-center gap-3">
-        <Search className="w-4 h-4 text-slate-400"/>
+      <div className="bg-white border border-slate-200 rounded p-4 mb-4 flex flex-col sm:flex-row sm:items-center gap-3">
+        <Search className="hidden sm:block w-4 h-4 text-slate-400"/>
         <Input value={q} onChange={(e)=>{ setPage(1); setQ(e.target.value); }} placeholder="Pesquisar por título, ISBN ou código PE..." className="border-0 focus-visible:ring-0 h-8" data-testid="admin-books-search"/>
         <Select value={typeFilter} onValueChange={(v) => { setPage(1); setTypeFilter(v); }}>
-          <SelectTrigger className="w-40 h-9" data-testid="admin-books-type-filter"><SelectValue placeholder="Tipo"/></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-40 h-9" data-testid="admin-books-type-filter"><SelectValue placeholder="Tipo"/></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos os tipos</SelectItem>
             <SelectItem value="Manual">Manual</SelectItem>
@@ -244,7 +244,7 @@ export default function AdminBooks() {
           </SelectContent>
         </Select>
         <Select value={stockFilter} onValueChange={(v) => { setPage(1); setStockFilter(v); }}>
-          <SelectTrigger className="w-44 h-9" data-testid="admin-books-stock-filter"><SelectValue placeholder="Stock"/></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-44 h-9" data-testid="admin-books-stock-filter"><SelectValue placeholder="Stock"/></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todo o stock</SelectItem>
             <SelectItem value="low">Pouco stock</SelectItem>
@@ -254,7 +254,7 @@ export default function AdminBooks() {
       </div>
 
       <div className="bg-white border border-slate-200 rounded overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[900px] text-sm">
           <thead className="text-[10px] uppercase tracking-wider text-slate-500 bg-slate-50">
             <tr>
               <th className="text-left p-3">ISBN / Cód. PE</th>
