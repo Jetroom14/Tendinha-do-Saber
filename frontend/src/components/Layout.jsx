@@ -23,16 +23,16 @@ export function Header() {
   return (
     <header className="glass-header sticky top-0 z-50" data-testid="site-header">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20 gap-6">
-          <Link to="/" className="flex items-center gap-2.5 shrink-0" data-testid="logo-link">
-            <img src="/branding/logo-email.png" alt="Tendinha do Saber" className="w-11 h-11 object-contain" />
+        <div className="flex items-center justify-between h-20 lg:h-[88px] gap-4 lg:gap-7">
+          <Link to="/" className="flex items-center gap-3 shrink-0" data-testid="logo-link">
+            <img src="/branding/logo-email.png" alt="Tendinha do Saber" className="w-11 h-11 lg:w-12 lg:h-12 object-contain" />
             <div className="leading-tight">
               <div className="font-display font-semibold text-[15px] text-[#1A202C]">Tendinha do Saber</div>
               <div className="text-[10px] uppercase tracking-[0.18em] text-[#4A5568]">Manuais Escolares · Aveiro</div>
             </div>
           </Link>
 
-          <form onSubmit={submitSearch} className="hidden md:flex flex-1 max-w-xl" data-testid="search-form">
+          <form onSubmit={submitSearch} className="hidden md:flex flex-1 max-w-[520px]" data-testid="search-form">
             <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#4A5568]" strokeWidth={1.5} />
               <Input
@@ -45,7 +45,7 @@ export function Header() {
             </div>
           </form>
 
-          <nav className="hidden lg:flex items-center gap-1 text-sm">
+          <nav className="hidden lg:flex items-center gap-1.5 text-sm">
             <NavLink to="/catalogo" className={({isActive}) => `px-3 py-2 rounded-md hover:bg-[#F5F8EC] ${isActive ? 'text-[#5A8F1E] font-medium' : 'text-[#1A202C]'}`} data-testid="nav-catalog">Catálogo</NavLink>
             <NavLink to="/parceiros" className={({isActive}) => `px-3 py-2 rounded-md hover:bg-[#F5F8EC] ${isActive ? 'text-[#5A8F1E] font-medium' : 'text-[#1A202C]'}`} data-testid="nav-partners">Parceiros</NavLink>
             <NavLink to="/vouchers" className={({isActive}) => `px-3 py-2 rounded-md hover:bg-[#F5F8EC] ${isActive ? 'text-[#5A8F1E] font-medium' : 'text-[#1A202C]'}`} data-testid="nav-vouchers">Vouchers</NavLink>
@@ -108,7 +108,7 @@ export function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 grid grid-cols-1 md:grid-cols-4 gap-10">
         <div>
           <div className="flex items-center gap-2.5 mb-4">
-            <img src="/branding/logo-email.png" alt="Tendinha do Saber" className="w-11 h-11 object-contain bg-white rounded p-1" />
+            <img src="/branding/logo-email.png" alt="Tendinha do Saber" className="w-20 h-20 object-contain shrink-0" />
             <div>
               <div className="font-display font-semibold">Tendinha do Saber</div>
               <div className="text-[10px] uppercase tracking-[0.18em] text-[#A0AEC0]">Manuais · Aveiro</div>
@@ -129,7 +129,7 @@ export function Footer() {
             <li><Link to="/seguir-encomenda" className="hover:text-white">Seguir encomenda</Link></li>
             <li><Link to="/sobre" className="hover:text-white">Sobre nós</Link></li>
             <li><Link to="/faq" className="hover:text-white">Perguntas frequentes</Link></li>
-            <li><Link to="/contactos" className="hover:text-white">Contactos</Link></li>
+            <li></li>
           </ul>
         </div>
 
@@ -185,12 +185,225 @@ export function Footer() {
         )}
       </div>
       <div className="border-t border-[#1E2F44]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-[#A0AEC0]">
-          <span>© {new Date().getFullYear()} Tendinha do Saber. Todos os direitos reservados.</span>
-          <span>Aviso legal e informação comercial disponíveis nas páginas legais.</span>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-7 flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+          <div>
+            <div className="text-[10px] tracking-[0.2em] uppercase text-[#A0AEC0] font-semibold">
+              Pagamentos seguros
+            </div>
+
+            <p className="text-xs text-[#A0AEC0] mt-1">
+              Métodos de pagamento processados através da Ifthenpay.
+            </p>
+          </div>
+
+          <div
+            className="flex items-center flex-wrap gap-2.5"
+            data-testid="footer-payment-methods"
+          >
+            {[
+              ["Multibanco", "/branding/payments/multibanco.svg"],
+              ["MB WAY", "/branding/payments/mbway.svg"],
+              ["Payshop", "/branding/payments/payshop.png"],
+            ].map(([label, src]) => (
+              <div
+                key={label}
+                className="footer-payment-logo"
+                title={label}
+              >
+                <img
+                  src={src}
+                  alt={label}
+                  className="max-h-7 max-w-[84px] object-contain"
+                />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
-    </footer>
+
+      <div className="border-t border-[#1E2F44]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col lg:flex-row items-center justify-between gap-3 text-xs text-[#A0AEC0] footer-desktop-bottom">
+          <span>
+            © {new Date().getFullYear()} Tendinha do Saber. Todos os direitos reservados.
+          </span>
+
+          <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 text-center">
+            <span>
+              Aviso legal e informação comercial disponíveis nas páginas legais.
+            </span>
+
+            <span data-testid="site-credit">
+              Website por{" "}
+              <span className="text-[#E2E8F0] font-medium">
+                Jetro Manuel
+              </span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+        {/* MOBILE COMPACT FOOTER 2026 */}
+        <div className="mobile-footer-compact">
+          <div className="mobile-footer-brand">
+            <img
+              src="/branding/logo-email.png"
+              alt="Tendinha do Saber"
+            />
+            <div>
+              <strong>Tendinha do Saber</strong>
+              <span>MANUAIS ESCOLARES · AVEIRO</span>
+            </div>
+          </div>
+
+          <p className="mobile-footer-claim">
+            “Mais do que uma livraria, um parceiro das famílias na escolha dos manuais escolares.”
+          </p>
+
+          <div className="mobile-footer-details">
+
+            <details>
+              <summary>Navegar</summary>
+              <div className="mobile-footer-links">
+                <Link to="/catalogo">Catálogo</Link>
+                <Link to="/parceiros">Parceiros</Link>
+                <Link to="/vouchers">Vouchers MEGA</Link>
+                <Link to="/como-funciona-voucher">Como funciona o voucher</Link>
+                <Link to="/seguir-encomenda">Seguir encomenda</Link>
+                <Link to="/sobre">Sobre nós</Link>
+                <Link to="/faq">Perguntas frequentes</Link>
+              </div>
+            </details>
+
+            <details>
+              <summary>Contactos</summary>
+              <div className="mobile-footer-contact">
+                <span>Francisco Neves Tendinha</span>
+
+                <a href="tel:+351961194491">
+                  +351 961 194 491
+                </a>
+
+                <small>Chamada para rede móvel nacional</small>
+
+                <a href="mailto:tendinhadosaber@gmail.com">
+                  tendinhadosaber@gmail.com
+                </a>
+
+                <span>Aveiro, Portugal</span>
+
+                <a
+                  className="footer-instagram-inline"
+                  href="https://www.instagram.com/tendinhadosaber/"
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Instagram da Tendinha do Saber"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19" rx="5.5"></rect><path d="M16.5 11.37a4.5 4.5 0 1 1-8.99 1.26 4.5 4.5 0 0 1 8.99-1.26Z"></path><path d="M17.8 6.8h.01"></path></svg><span>@tendinhadosaber</span>
+                </a>
+              </div>
+            </details>
+
+            <details>
+              <summary>Legal</summary>
+              <div className="mobile-footer-links">
+                <Link to="/politica-privacidade">
+                  Política de Privacidade
+                </Link>
+
+                <Link to="/termos-condicoes">
+                  Termos &amp; Condições
+                </Link>
+
+                <Link to="/politica-cookies">
+                  Política de Cookies
+                </Link>
+
+                <button
+                  type="button"
+                  data-cc="show-preferencesModal"
+                >
+                  Gerir preferências de cookies
+                </button>
+
+                <Link to="/ral">
+                  Resolução de Litígios (RAL)
+                </Link>
+
+                <a
+                  href="https://www.livroreclamacoes.pt/Inicio/"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Livro de Reclamações
+                </a>
+              </div>
+            </details>
+
+            <details>
+              <summary>Em parceria com</summary>
+              <div className="mobile-footer-partners">
+                <Link to="/parceiros">
+                  <span className="mobile-footer-partner bm">BM</span>
+                  Academia do Beira-Mar
+                </Link>
+
+                <Link to="/parceiros">
+                  <span className="mobile-footer-partner va">VA</span>
+                  Academia Vista Alegre
+                </Link>
+              </div>
+            </details>
+
+            <details>
+              <summary>Pagamentos seguros</summary>
+
+              <div className="mobile-footer-payment-content">
+                <p>
+                  Métodos de pagamento processados através da Ifthenpay.
+                </p>
+
+                <div className="mobile-footer-payment-logos">
+                  <span>
+                    <img
+                      src="/branding/payments/multibanco.svg"
+                      alt="Multibanco"
+                    />
+                  </span>
+
+                  <span>
+                    <img
+                      src="/branding/payments/mbway.svg"
+                      alt="MB WAY"
+                    />
+                  </span>
+
+                  <span>
+                    <img
+                      src="/branding/payments/payshop.png"
+                      alt="Payshop"
+                    />
+                  </span>
+                </div>
+              </div>
+            </details>
+          </div>
+
+          <div className="mobile-footer-bottom">
+            <p>
+              © 2026 Tendinha do Saber. Todos os direitos reservados.
+            </p>
+
+            <p>
+              Aviso legal e informação comercial disponíveis nas páginas legais.
+            </p>
+
+            <p>
+              Website por <strong>Jetro Manuel</strong>
+            </p>
+          </div>
+        </div>
+
+</footer>
   );
 }
 
@@ -198,7 +411,7 @@ export function SiteLayout({ children }) {
   return (
     <>
       <Header />
-      <main>{children}</main>
+      <main data-testid="site-main">{children}</main>
       <Footer />
     </>
   );

@@ -67,6 +67,8 @@ function App() {
             <Route path="/contactos" element={<Site><ContactsPage/></Site>}/>
             <Route path="/sobre" element={<Site><AboutPage/></Site>}/>
             <Route path="/faq" element={<Site><FaqPage/></Site>}/>
+
+            <Route path="/perguntas-frequentes" element={<Site><FaqPage/></Site>}/>
             <Route path="/legal/:slug" element={<Site><LegalPage/></Site>}/>
             <Route path="/adopcoes" element={<Site><AdoptionsResultsPage/></Site>}/>
             <Route path="/login" element={<Site><LoginPage/></Site>}/>

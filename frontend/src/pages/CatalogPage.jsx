@@ -12,7 +12,7 @@ import { formatSchoolGrade } from "@/lib/utils";
 import { toast } from "sonner";
 import { Search, Filter, X, ChevronLeft, ChevronRight } from "lucide-react";
 
-const PAGE_SIZE = 24;
+const PAGE_SIZE = typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches ? 18 : 24;
 
 export default function CatalogPage() {
   const [params, setParams] = useSearchParams();

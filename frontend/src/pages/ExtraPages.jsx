@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useEffect } from "react";
 import api from "@/lib/api";
 import SEO from "@/components/SEO";
+import SupportJourney from "@/components/SupportJourney";
 import { Input } from "@/components/ui/input";
 import { Search, BookOpen, FileText, Upload, Truck, Shield, Sparkles, ArrowLeft, Phone, Mail } from "lucide-react";
 
@@ -160,7 +161,8 @@ export function FaqPage() {
 
 export function VoucherGuidePage() {
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16" data-testid="voucher-guide-page">
+    <>
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16" data-testid="voucher-guide-page">
       <div className="text-[10px] tracking-[0.2em] uppercase text-[#4A5568] font-semibold mb-2">Voucher MEGA</div>
       <h1 className="font-display text-4xl md:text-5xl font-medium mb-3">Como funciona em 3 passos</h1>
       <p className="text-[#4A5568] mb-12 max-w-2xl">Simplificámos ao máximo o processo de utilização do seu voucher MEGA.</p>
@@ -189,7 +191,10 @@ export function VoucherGuidePage() {
       </div>
 
       <Link to="/vouchers"><Button className="bg-[#E07A1F] hover:bg-[#B85F0E] text-white h-12 px-6">Submeter o meu voucher</Button></Link>
-    </div>
+      </div>
+
+      <SupportJourney />
+    </>
   );
 }
 
@@ -201,7 +206,9 @@ export function TrackOrderPage() {
 
   const submit = async (e) => {
     e.preventDefault();
-    setErr(""); setOrder(null);
+    setErr("");
+    setOrder(null);
+
     try {
       const { data } = await api.post("/orders/track", {
         order_no: orderNo,
@@ -209,7 +216,10 @@ export function TrackOrderPage() {
       });
       setOrder(data);
     } catch (err) {
-      setErr(err?.response?.data?.detail || "Não foi possível encontrar uma encomenda correspondente aos dados indicados.");
+      setErr(
+        err?.response?.data?.detail ||
+        "Não foi possível encontrar uma encomenda correspondente aos dados indicados."
+      );
     }
   };
 
@@ -223,37 +233,146 @@ export function TrackOrderPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-16" data-testid="track-order-page">
-      <div className="text-[10px] tracking-[0.2em] uppercase text-[#4A5568] font-semibold mb-2">Encomendas</div>
-      <h1 className="font-display text-3xl md:text-4xl font-medium mb-3">Seguir a minha encomenda</h1>
-      <p className="text-[#4A5568] mb-8">Consulte o estado da sua encomenda sem precisar de iniciar sessão.</p>
+    <>
+      <section
+        className="track-final-page"
+        data-testid="track-order-page"
+      >
+        <div className="track-final-hero">
 
-      <form onSubmit={submit} className="bg-white border border-[#E2E8F0] rounded-md p-6 space-y-4">
-        <div>
-          <label className="text-xs uppercase tracking-wider text-[#4A5568] mb-1.5 block">Número da encomenda</label>
-          <Input value={orderNo} onChange={(e)=>setOrderNo(e.target.value)} placeholder="TS-XXXXXX..." required data-testid="track-orderno-input"/>
-        </div>
-        <div>
-          <label className="text-xs uppercase tracking-wider text-[#4A5568] mb-1.5 block">Email usado na encomenda</label>
-          <Input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} required data-testid="track-email-input"/>
-        </div>
-        <Button type="submit" className="w-full bg-[#5A8F1E] hover:bg-[#3E6E11] text-white h-11" data-testid="track-submit-btn">
-          <Search className="w-4 h-4 mr-2"/>Consultar
-        </Button>
-        {err && <p className="text-sm text-[#C53030]" data-testid="track-error">{err}</p>}
-      </form>
+          <div className="track-final-editorial">
 
-      {order && (
-        <div className="bg-white border border-[#E2E8F0] rounded-md p-6 mt-6" data-testid="track-result">
-          <div className="grid grid-cols-2 gap-4 text-sm mb-5">
-            <div><div className="text-[10px] uppercase tracking-wider text-[#4A5568]">Nº</div><div className="font-mono">{order.order_no}</div></div>
-            <div><div className="text-[10px] uppercase tracking-wider text-[#4A5568]">Estado</div><div className="font-medium text-[#5A8F1E]">{STATUS_PT[order.status] || order.status}</div></div>
-            <div><div className="text-[10px] uppercase tracking-wider text-[#4A5568]">Entrega</div><div>{order.delivery?.method === "hand_delivery" ? "Entrega ao domicílio" : "Envio"}</div></div>
-            <div><div className="text-[10px] uppercase tracking-wider text-[#4A5568]">Total</div><div className="font-display text-xl">{order.totals?.total?.toFixed(2)}€</div></div>
+            <div className="track-final-title-block">
+              <div className="final-page-eyebrow">
+                Encomendas
+              </div>
+
+              <h1>
+                Seguir a minha
+                <br />
+                encomenda
+              </h1>
+            </div>
+
+            <div className="track-final-intro-block">
+              <p>
+                Consulte o estado da sua encomenda sem precisar de iniciar sessão.
+              </p>
+            </div>
+
           </div>
+
+
+          <div className="track-final-form-column">
+
+            <div className="track-final-form-stack">
+              <span
+                className="track-form-layer layer-back"
+                aria-hidden="true"
+              />
+
+              <span
+                className="track-form-layer layer-middle"
+                aria-hidden="true"
+              />
+
+              <form
+                onSubmit={submit}
+                className="track-final-form"
+              >
+                <div>
+                  <label>Número da encomenda</label>
+
+                  <Input
+                    value={orderNo}
+                    onChange={(e) => setOrderNo(e.target.value)}
+                    placeholder="TS-XXXXXX..."
+                    required
+                    data-testid="track-orderno-input"
+                  />
+                </div>
+
+                <div>
+                  <label>Email usado na encomenda</label>
+
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    data-testid="track-email-input"
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  className="track-final-submit"
+                  data-testid="track-submit-btn"
+                >
+                  <Search className="w-4 h-4 mr-2" />
+                  Consultar
+                </Button>
+
+                {err && (
+                  <p
+                    className="track-final-error"
+                    data-testid="track-error"
+                  >
+                    {err}
+                  </p>
+                )}
+              </form>
+            </div>
+
+          </div>
+
+
+          <div className="track-final-visual">
+            <img
+              src="/branding/heroes/hero-seguir-encomenda-final.png"
+              alt="Acompanhar uma encomenda Tendinha do Saber"
+            />
+          </div>
+
         </div>
-      )}
-    </div>
+
+        {order && (
+          <div className="track-final-result" data-testid="track-result">
+            <div>
+              <span>Nº</span>
+              <strong className="font-mono">{order.order_no}</strong>
+            </div>
+
+            <div>
+              <span>Estado</span>
+              <strong className="text-[#5A8F1E]">
+                {STATUS_PT[order.status] || order.status}
+              </strong>
+            </div>
+
+            <div>
+              <span>Entrega</span>
+              <strong>
+                {order.delivery?.method === "hand_delivery"
+                  ? "Entrega ao domicílio"
+                  : "Envio"}
+              </strong>
+            </div>
+
+            <div>
+              <span>Total</span>
+              <strong>
+                {order.totals?.total?.toFixed(2)}€
+              </strong>
+            </div>
+          </div>
+        )}
+      </section>
+
+      <div className="track-final-support">
+        <SupportJourney />
+      </div>
+    </>
   );
 }
 

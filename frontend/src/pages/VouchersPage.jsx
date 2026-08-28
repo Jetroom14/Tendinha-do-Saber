@@ -89,16 +89,31 @@ export default function VouchersPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16" data-testid="vouchers-page">
+    <div className="voucher-final-page" data-testid="vouchers-page">
       <SEO title="Submeter Voucher MEGA" path="/vouchers" description="Submeta o seu voucher MEGA para manuais escolares. Preencha o pedido com nome, contacto, código ALN ou PDF, e os manuais pretendidos."/>
-      <div className="text-[10px] tracking-[0.2em] uppercase text-[#4A5568] font-semibold mb-2">Vouchers Escolares</div>
-      <h1 className="font-display text-3xl md:text-4xl font-medium mb-3">Submeter Voucher MEGA</h1>
-      <p className="text-[#4A5568] mb-10 max-w-2xl">
-        Preencha o formulário com os seus dados e indique o código ALN ou anexe o PDF do voucher. Validamos em 24h úteis e contactamos para combinar a entrega.
-      </p>
 
-      <div className="grid md:grid-cols-12 gap-10">
-        <form onSubmit={submit} className="md:col-span-7 bg-white border border-[#E2E8F0] rounded-md p-6 space-y-5" data-testid="vouchers-form">
+      <section className="voucher-final-hero">
+        <div className="voucher-final-copy">
+          <div className="final-page-eyebrow">Vouchers Escolares</div>
+
+          <h1>Submeter Voucher MEGA</h1>
+
+          <p>
+            Preencha o formulário com os seus dados e indique o código ALN ou anexe o PDF do voucher.
+            Validamos em 24h úteis e contactamos para combinar a entrega.
+          </p>
+        </div>
+
+        <div className="voucher-final-visual">
+          <img
+            src="/branding/heroes/hero-voucher-mega.png"
+            alt="Manuais escolares e programa MEGA"
+          />
+        </div>
+      </section>
+
+      <div className="voucher-final-content grid md:grid-cols-12">
+        <form onSubmit={submit} className="voucher-final-form md:col-span-8 bg-white border border-[#E2E8F0] p-6 space-y-5" data-testid="vouchers-form">
           {/* Nome */}
           <div>
             <Label className="text-xs uppercase tracking-wider text-[#4A5568] mb-1.5 block">Nome do encarregado de educação / aluno *</Label>
@@ -240,10 +255,10 @@ export default function VouchersPage() {
           )}
         </form>
 
-        <div className="md:col-span-5 space-y-4 text-sm text-[#4A5568] leading-relaxed bg-[#F2F7EC] border border-[#DDE8CF] rounded-md p-5 h-fit">
+        <div className="voucher-final-how md:col-span-4 space-y-4 text-sm text-[#4A5568] leading-relaxed bg-[#F2F7EC] border border-[#DDE8CF] p-5 h-fit">
           <h3 className="font-display text-lg font-medium text-[#1A202C]">Como funciona</h3>
           <ol className="space-y-3 list-decimal list-inside">
-            <li>Preenche o formulário com nome, contacto e manuais pretendidos.</li>
+            <li>Preencha o formulário com nome, contacto e manuais pretendidos.</li>
             <li>Indica o código ALN <strong>ou</strong> anexa o PDF do voucher.</li>
             <li>Validamos em 24h úteis e entramos em contacto para combinar a entrega em mão.</li>
           </ol>

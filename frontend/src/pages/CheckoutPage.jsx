@@ -28,6 +28,28 @@ function validatePtNif(nif) {
   return check === parseInt(n[8], 10);
 }
 
+const PAYMENT_LOGOS = {
+  multibanco: "/branding/payments/multibanco.svg",
+  mbway: "/branding/payments/mbway.svg",
+  payshop: "/branding/payments/payshop.png",
+};
+
+function PaymentMethodLogo({ method }) {
+  const src = PAYMENT_LOGOS[method];
+  if (!src) return null;
+
+  return (
+    <div className="payment-method-logo">
+      <img
+        src={src}
+        alt=""
+        aria-hidden="true"
+        className="max-w-full max-h-full object-contain"
+      />
+    </div>
+  );
+}
+
 export default function CheckoutPage() {
   const { items, summary, promoCode, clear, bagsQty } = useCart();
   const { user } = useAuth();
@@ -286,19 +308,25 @@ export default function CheckoutPage() {
             <div className="space-y-3">
               {paymentMethods.map((method) => (
                 <label key={method.id} className={`block border rounded-md p-4 cursor-pointer transition-colors ${form.payment_method === method.id ? "border-[#5A8F1E] bg-[#F5F8EC]" : "border-[#E2E8F0] bg-white"}`}>
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-center gap-3 sm:gap-4">
                     <input
                       type="radio"
                       name="payment_method"
                       value={method.id}
                       checked={form.payment_method === method.id}
                       onChange={() => setForm((cur) => ({ ...cur, payment_method: method.id, mbway_phone: method.id === "mbway" ? (cur.mbway_phone || cur.phone) : "" }))}
-                      className="mt-1"
+                      className="shrink-0"
                       data-testid={`payment-method-${method.id}`}
                     />
-                    <div>
-                      <div className="font-display font-medium text-sm text-[#1A202C]">{method.label}</div>
-                      <p className="text-sm text-[#4A5568] mt-1">
+
+                    <PaymentMethodLogo method={method.id} />
+
+                    <div className="min-w-0 flex-1">
+                      <div className="font-display font-semibold text-sm text-[#1A202C]">
+                        {method.label}
+                      </div>
+
+                      <p className="text-sm text-[#4A5568] mt-1 leading-relaxed">
                         {method.id === "multibanco" && "Receba uma entidade e referência para pagar no Multibanco ou homebanking."}
                         {method.id === "mbway" && "Receba um pedido de pagamento na aplicação MB WAY."}
                         {method.id === "payshop" && "Receba uma referência para pagar num agente Payshop."}

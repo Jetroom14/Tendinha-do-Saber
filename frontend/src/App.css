@@ -152,3 +152,9175 @@
     line-height: 1.4;
   }
 }
+
+/* ===== Homepage redesign 2026 ===== */
+
+.hero-new {
+    position: relative;
+    background:
+        radial-gradient(circle at 78% 18%, rgba(164, 194, 134, 0.34), transparent 26%),
+        radial-gradient(circle at 12% 85%, rgba(218, 231, 197, 0.55), transparent 30%),
+        linear-gradient(115deg, #F8FAF1 0%, #F4F8EA 45%, #EAF3DD 100%);
+    border-bottom: 1px solid #DDE8D5;
+    isolation: isolate;
+}
+
+.hero-new::before {
+    content: "";
+    position: absolute;
+    width: 520px;
+    height: 520px;
+    border-radius: 45% 55% 62% 38% / 58% 38% 62% 42%;
+    background: rgba(255, 255, 255, 0.38);
+    left: -180px;
+    top: 110px;
+    transform: rotate(12deg);
+    pointer-events: none;
+}
+
+.hero-new::after {
+    content: "";
+    position: absolute;
+    width: 460px;
+    height: 460px;
+    border-radius: 65% 35% 42% 58% / 38% 58% 42% 62%;
+    background: rgba(102, 145, 75, 0.12);
+    right: -170px;
+    bottom: -230px;
+    transform: rotate(-8deg);
+    pointer-events: none;
+}
+
+.hero-books-art {
+    position: absolute;
+    z-index: 1;
+    width: clamp(270px, 27vw, 455px);
+    height: auto;
+    left: 52%;
+    bottom: -7px;
+    transform: translateX(-52%);
+    pointer-events: none;
+    user-select: none;
+}
+
+.hero-selector-card {
+    position: relative;
+    background: rgba(252, 253, 248, 0.94);
+    border: 1px solid rgba(211, 225, 200, 0.95);
+    border-radius: 18px;
+    box-shadow:
+        0 20px 55px -30px rgba(30, 65, 43, 0.35),
+        0 8px 24px -20px rgba(30, 65, 43, 0.22);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.home-service-card {
+    display: block;
+    padding: 24px;
+    border: 1px solid #E1E8DC;
+    border-radius: 18px;
+    background: linear-gradient(145deg, #FFFFFF, #F9FBF5);
+    box-shadow: 0 10px 30px -28px rgba(34, 70, 44, 0.5);
+    transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.home-service-card:hover {
+    transform: translateY(-3px);
+    border-color: #BCD0AB;
+    box-shadow: 0 18px 36px -28px rgba(34, 70, 44, 0.42);
+}
+
+/* conteúdo público mais compacto em desktop */
+@media (min-width: 1024px) {
+    main .max-w-7xl,
+    main .max-w-6xl {
+        width: 86%;
+        max-width: 1440px;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+    .hero-books-art {
+        width: 285px;
+        left: 46%;
+        bottom: -4px;
+        opacity: 0.82;
+    }
+}
+
+@media (max-width: 767px) {
+    .hero-new::before {
+        width: 300px;
+        height: 300px;
+        left: -180px;
+        top: 180px;
+    }
+
+    .hero-new::after {
+        width: 280px;
+        height: 280px;
+        right: -170px;
+        bottom: -80px;
+    }
+
+    .hero-selector-card {
+        border-radius: 16px;
+    }
+
+    .home-service-card {
+        padding: 20px;
+    }
+}
+
+/* ===== Payment methods + footer refinement ===== */
+
+.payment-method-logo {
+    width: 92px;
+    height: 50px;
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    padding: 8px 10px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+}
+
+.footer-payment-logo {
+    min-width: 86px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    padding: 4px 8px;
+    background: transparent;
+    border-radius: 0;
+}
+
+/*
+ * Os 86% ficam consistentes no site público inteiro:
+ * header, conteúdo e footer.
+ */
+@media (min-width: 1024px) {
+    [data-testid="site-header"] > div,
+    [data-testid="site-main"] .max-w-7xl,
+    [data-testid="site-main"] .max-w-6xl,
+    [data-testid="site-footer"] .max-w-7xl {
+        width: 86%;
+        max-width: 1440px;
+    }
+}
+
+@media (max-width: 639px) {
+    .payment-method-logo {
+        width: 76px;
+        height: 44px;
+        padding: 7px;
+    }
+
+    .footer-payment-logo {
+        min-width: 76px;
+        height: 40px;
+        padding: 6px 9px;
+    }
+}
+
+/* ===== START Partners page 2026 ===== */
+
+.partners-page {
+    background: #F7F8F3;
+    min-height: 100vh;
+}
+
+.partners-visual-section {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    min-height: 920px;
+    background: #F7F8F3;
+}
+
+/*
+ * A arte não usa background-size: cover.
+ * Mantemos a proporção original para evitar cortar
+ * o Vista Alegre à esquerda e o Beira-Mar à direita.
+ */
+.partners-background-art {
+    position: absolute;
+    z-index: -3;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+
+    width: 100%;
+    height: auto;
+    min-width: 1180px;
+
+    pointer-events: none;
+    user-select: none;
+}
+
+/*
+ * Faz a ilustração dissolver-se progressivamente
+ * no fundo creme da página.
+ */
+.partners-background-fade {
+    position: absolute;
+    z-index: -2;
+    inset: 0;
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(247, 248, 243, 0.08) 0%,
+            rgba(247, 248, 243, 0.10) 28%,
+            rgba(247, 248, 243, 0.42) 58%,
+            rgba(247, 248, 243, 0.94) 82%,
+            #F7F8F3 100%
+        );
+
+    pointer-events: none;
+}
+
+
+/* ---------- Cabeçalho ---------- */
+
+.partners-intro {
+    width: min(760px, 100%);
+    margin-inline: auto;
+
+    padding: 28px 34px;
+
+    text-align: center;
+
+    background: rgba(255, 255, 252, 0.76);
+
+    border: 1px solid rgba(218, 226, 212, 0.82);
+    border-radius: 22px;
+
+    box-shadow:
+        0 24px 55px -42px rgba(33, 61, 40, 0.48);
+
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.partners-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+
+    margin-bottom: 12px;
+
+    color: #397448;
+
+    font-size: 10px;
+    font-weight: 700;
+
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+}
+
+
+/* ---------- Cards ---------- */
+
+.partners-cards {
+    max-width: 940px;
+
+    margin: 330px auto 0;
+
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+}
+
+.partner-feature-card {
+    overflow: hidden;
+
+    background: rgba(255, 255, 252, 0.94);
+
+    border: 1px solid rgba(217, 226, 210, 0.96);
+    border-radius: 20px;
+
+    box-shadow:
+        0 24px 55px -40px rgba(31, 58, 38, 0.48);
+
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+
+    transition:
+        transform 180ms ease,
+        border-color 180ms ease,
+        box-shadow 180ms ease;
+}
+
+.partner-feature-card:hover {
+    transform: translateY(-4px);
+
+    border-color: #B8CDAA;
+
+    box-shadow:
+        0 30px 62px -40px rgba(31, 58, 38, 0.56);
+}
+
+.partner-logo-area {
+    height: 190px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 28px;
+
+    background:
+        radial-gradient(
+            circle at center,
+            rgba(255, 255, 255, 0.98) 0%,
+            rgba(244, 248, 239, 0.91) 100%
+        );
+
+    border-bottom: 1px solid #E3EADF;
+}
+
+.partner-benefit {
+    width: fit-content;
+
+    margin-top: 22px;
+
+    padding: 8px 12px;
+
+    color: #397448;
+
+    background: #EEF5E8;
+    border: 1px solid #D9E7D0;
+    border-radius: 999px;
+
+    font-size: 12px;
+    font-weight: 600;
+}
+
+
+/* ---------- CTA ---------- */
+
+.partners-cta {
+    max-width: 940px;
+
+    margin: 34px auto 0;
+
+    padding: 28px 30px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 32px;
+
+    background: rgba(255, 255, 252, 0.91);
+
+    border: 1px solid #DDE6D7;
+    border-radius: 20px;
+
+    box-shadow:
+        0 20px 48px -38px rgba(31, 58, 38, 0.40);
+
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.partners-contact-button {
+    flex: 0 0 auto;
+
+    min-height: 48px;
+
+    padding: 0 22px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+
+    color: #FFFFFF;
+    background: #397448;
+
+    border-radius: 8px;
+
+    font-size: 14px;
+    font-weight: 600;
+
+    transition:
+        background-color 160ms ease,
+        transform 160ms ease;
+}
+
+.partners-contact-button:hover {
+    color: #FFFFFF;
+    background: #285E36;
+    transform: translateY(-1px);
+}
+
+
+/* ---------- Tablet ---------- */
+
+@media (min-width: 768px) and (max-width: 1023px) {
+
+    .partners-visual-section {
+        min-height: 880px;
+    }
+
+    .partners-background-art {
+        width: auto;
+        height: 610px;
+        min-width: 1080px;
+    }
+
+    .partners-intro {
+        max-width: 650px;
+        padding: 26px 28px;
+    }
+
+    .partners-cards {
+        margin-top: 280px;
+        gap: 18px;
+    }
+
+    .partner-logo-area {
+        height: 170px;
+    }
+}
+
+
+/* ---------- Mobile ---------- */
+
+@media (max-width: 767px) {
+
+    .partners-visual-section {
+        min-height: 0;
+    }
+
+    /*
+     * Em mobile mostramos uma faixa da composição primeiro,
+     * em vez de deixar o browser cortar a arte à sorte.
+     */
+    .partners-background-art {
+        top: 0;
+
+        width: auto;
+        height: 320px;
+        min-width: 570px;
+
+        left: 50%;
+        transform: translateX(-50%);
+
+        object-fit: contain;
+    }
+
+    .partners-background-fade {
+        background:
+            linear-gradient(
+                180deg,
+                rgba(247, 248, 243, 0.02) 0%,
+                rgba(247, 248, 243, 0.12) 120px,
+                rgba(247, 248, 243, 0.75) 245px,
+                #F7F8F3 335px,
+                #F7F8F3 100%
+            );
+    }
+
+    .partners-intro {
+        margin-top: 190px;
+
+        padding: 22px 18px;
+
+        border-radius: 18px;
+
+        background: rgba(255, 255, 252, 0.91);
+    }
+
+    .partners-cards {
+        margin-top: 28px;
+
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .partner-feature-card {
+        border-radius: 18px;
+    }
+
+    .partner-logo-area {
+        height: 150px;
+        padding: 22px;
+    }
+
+    .partners-cta {
+        margin-top: 24px;
+
+        padding: 22px;
+
+        flex-direction: column;
+        align-items: stretch;
+        gap: 20px;
+
+        border-radius: 18px;
+    }
+
+    .partners-contact-button {
+        width: 100%;
+    }
+}
+
+
+/* ---------- Ecrãs muito grandes ---------- */
+
+@media (min-width: 1600px) {
+
+    .partners-background-art {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .partners-cards {
+        margin-top: 360px;
+    }
+}
+
+/* ===== END Partners page 2026 ===== */
+
+/* ===== Partners polish v3 ===== */
+
+.partner-feature-card {
+    overflow: hidden;
+}
+
+.partner-logo-area {
+    height: 228px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    border-bottom: 1px solid rgba(220, 228, 217, 0.95);
+    position: relative;
+    overflow: hidden;
+}
+
+.partner-logo-area::before {
+    content: "";
+    position: absolute;
+    inset: 22px 26px;
+    border-radius: 34px;
+    z-index: 0;
+}
+
+.partner-logo-area::after {
+    content: "";
+    position: absolute;
+    width: 220px;
+    height: 220px;
+    border-radius: 999px;
+    z-index: 0;
+    opacity: 0.18;
+}
+
+.partner-logo-area.partner-tone-blue {
+    background:
+        linear-gradient(180deg, rgba(245, 249, 253, 0.96) 0%, rgba(236, 243, 250, 0.94) 100%);
+}
+
+.partner-logo-area.partner-tone-blue::before {
+    background:
+        linear-gradient(135deg, rgba(113, 148, 177, 0.12) 0%, rgba(70, 108, 138, 0.07) 100%);
+    border: 1px solid rgba(164, 188, 210, 0.34);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.82);
+}
+
+.partner-logo-area.partner-tone-blue::after {
+    top: -42px;
+    right: -34px;
+    background: radial-gradient(circle, rgba(107, 145, 176, 0.75) 0%, rgba(107, 145, 176, 0) 72%);
+}
+
+.partner-logo-area.partner-tone-gold {
+    background:
+        linear-gradient(180deg, rgba(253, 250, 240, 0.96) 0%, rgba(249, 244, 226, 0.94) 100%);
+}
+
+.partner-logo-area.partner-tone-gold::before {
+    background:
+        linear-gradient(135deg, rgba(201, 169, 63, 0.12) 0%, rgba(170, 139, 40, 0.07) 100%);
+    border: 1px solid rgba(215, 195, 120, 0.34);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.82);
+}
+
+.partner-logo-area.partner-tone-gold::after {
+    bottom: -46px;
+    left: -30px;
+    background: radial-gradient(circle, rgba(207, 180, 89, 0.72) 0%, rgba(207, 180, 89, 0) 72%);
+}
+
+.partner-logo-badge {
+    width: 155px;
+    height: 155px;
+    border-radius: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    box-shadow:
+        0 18px 34px -26px rgba(31, 58, 38, 0.28),
+        inset 0 1px 0 rgba(255,255,255,0.85);
+    border: 1px solid rgba(220, 228, 217, 0.92);
+    background: rgba(255,255,255,0.70);
+    backdrop-filter: blur(4px);
+    position: relative;
+    z-index: 2;
+}
+
+.partner-logo-badge.partner-tone-blue {
+    background: linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(244,248,252,0.88) 100%);
+    border-color: rgba(193, 211, 227, 0.9);
+}
+
+.partner-logo-badge.partner-tone-gold {
+    background: linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(252,248,238,0.88) 100%);
+    border-color: rgba(225, 214, 171, 0.9);
+}
+
+.partner-logo-image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    max-width: 116px;
+    max-height: 116px;
+}
+
+.partner-card-content {
+    position: relative;
+    padding: 30px 30px 28px;
+    background: rgba(255,255,252,0.97);
+}
+
+.partner-card-content.partner-tone-blue {
+    background:
+        linear-gradient(
+            180deg,
+            rgba(255,255,252,0.98) 0%,
+            rgba(252,253,255,0.98) 100%
+        );
+}
+
+.partner-card-content.partner-tone-gold {
+    background:
+        linear-gradient(
+            180deg,
+            rgba(255,255,252,0.98) 0%,
+            rgba(255,253,248,0.98) 100%
+        );
+}
+
+.partner-accent-line {
+    width: 64px;
+    height: 4px;
+    border-radius: 999px;
+    margin-bottom: 16px;
+    background: #D7E3DB;
+}
+
+.partner-tone-blue .partner-accent-line {
+    background: linear-gradient(90deg, #6E92AF 0%, #8FAFC7 100%);
+}
+
+.partner-tone-gold .partner-accent-line {
+    background: linear-gradient(90deg, #C5A540 0%, #D9C15E 100%);
+}
+
+.partner-feature-card.partner-tone-blue {
+    border-color: #DCE6EF;
+}
+
+.partner-feature-card.partner-tone-gold {
+    border-color: #E7DDB7;
+}
+
+.partner-feature-card.partner-tone-blue:hover {
+    border-color: #BFD2E3;
+}
+
+.partner-feature-card.partner-tone-gold:hover {
+    border-color: #D9C36F;
+}
+
+.partner-benefit {
+    margin-top: 20px;
+}
+
+[data-testid="site-footer"] img[alt="Tendinha do Saber"] {
+    width: 84px;
+    height: 84px;
+    object-fit: contain;
+}
+
+.footer-payment-logo {
+    min-width: 92px;
+    height: 46px;
+    display: grid;
+    place-items: center;
+    padding: 6px 10px;
+    background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+}
+
+[data-testid="site-footer"] .footer-payment-logo img {
+    max-height: 26px;
+    width: auto;
+}
+
+[data-testid="site-footer"] .footer-payment-logo img[src*="multibanco"],
+[data-testid="site-footer"] .footer-payment-logo img[src*="mbway"] {
+    filter: brightness(0) invert(1);
+    opacity: 0.88;
+}
+
+[data-testid="site-footer"] .footer-payment-logo img[src*="payshop"] {
+    filter: saturate(0.82) brightness(0.96) contrast(0.98);
+    opacity: 0.92;
+}
+
+@media (max-width: 767px) {
+    .partner-logo-area {
+        height: 188px;
+        padding: 18px;
+    }
+
+    .partner-logo-area::before {
+        inset: 16px 18px;
+        border-radius: 24px;
+    }
+
+    .partner-logo-badge {
+        width: 124px;
+        height: 124px;
+        border-radius: 22px;
+        padding: 14px;
+    }
+
+    .partner-logo-image {
+        max-width: 92px;
+        max-height: 92px;
+    }
+
+    .partner-card-content {
+        padding: 24px 20px 22px;
+    }
+
+    .partner-card-content h2 {
+        font-size: 26px !important;
+    }
+
+    .footer-payment-logo {
+        min-width: 80px;
+        height: 42px;
+        padding: 5px 8px;
+    }
+}
+
+/* ===== START Partner card heroes ===== */
+
+.partner-card-hero {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: #F7F5EE;
+    border-bottom: 1px solid rgba(220, 228, 217, 0.92);
+}
+
+.partner-card-hero-image {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center center;
+    transition: transform 350ms ease;
+}
+
+.partner-feature-card:hover .partner-card-hero-image {
+    transform: scale(1.018);
+}
+
+/*
+ * Depois de introduzirmos os heros, o corpo do card
+ * volta a ser essencialmente neutro.
+ * A identidade do clube já está toda na imagem.
+ */
+.partner-card-content.partner-tone-blue,
+.partner-card-content.partner-tone-gold {
+    background:
+        linear-gradient(
+            180deg,
+            rgba(255,255,252,0.99) 0%,
+            rgba(250,251,247,0.99) 100%
+        );
+}
+
+.partner-tone-blue .partner-accent-line {
+    background: linear-gradient(
+        90deg,
+        #5F84A5 0%,
+        #8AA9C1 100%
+    );
+}
+
+.partner-tone-gold .partner-accent-line {
+    background: linear-gradient(
+        90deg,
+        #C2A13D 0%,
+        #D9BD5B 100%
+    );
+}
+
+@media (max-width: 767px) {
+    .partner-card-hero {
+        aspect-ratio: 16 / 9;
+    }
+}
+
+/* ===== END Partner card heroes ===== */
+
+/* ===== START Homepage support 2026 ===== */
+
+.home-support-section {
+    position: relative;
+    overflow: hidden;
+
+    padding: 76px 0;
+
+    background:
+        linear-gradient(
+            135deg,
+            #F1F5EA 0%,
+            #F7F7F0 52%,
+            #F5F1E8 100%
+        );
+
+    border-top: 1px solid #E1E9DA;
+    border-bottom: 1px solid #E1E9DA;
+}
+
+.home-support-section::before {
+    content: "";
+    position: absolute;
+
+    width: 420px;
+    height: 420px;
+
+    top: -240px;
+    right: -100px;
+
+    border-radius: 999px;
+
+    background:
+        radial-gradient(
+            circle,
+            rgba(119, 157, 99, 0.13) 0%,
+            rgba(119, 157, 99, 0) 72%
+        );
+
+    pointer-events: none;
+}
+
+.home-support-heading {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 40px;
+
+    margin-bottom: 36px;
+}
+
+.home-support-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.home-support-card {
+    min-height: 218px;
+
+    padding: 25px;
+
+    background: rgba(255, 255, 252, 0.78);
+
+    border: 1px solid rgba(215, 225, 208, 0.95);
+    border-radius: 18px;
+
+    box-shadow:
+        0 20px 45px -38px rgba(28, 57, 35, 0.40);
+
+    transition:
+        transform 180ms ease,
+        border-color 180ms ease,
+        box-shadow 180ms ease;
+}
+
+.home-support-card:hover {
+    transform: translateY(-3px);
+
+    border-color: #BED0B3;
+
+    box-shadow:
+        0 25px 50px -38px rgba(28, 57, 35, 0.48);
+}
+
+.home-support-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.home-support-card-top > span {
+    color: #A6B19E;
+
+    font-family: Georgia, serif;
+    font-size: 13px;
+    font-style: italic;
+}
+
+.home-support-icon {
+    width: 43px;
+    height: 43px;
+
+    display: grid;
+    place-items: center;
+
+    color: #397448;
+
+    background: #FFFFFF;
+    border: 1px solid #D9E6D2;
+    border-radius: 12px;
+}
+
+.home-support-contact {
+    margin-top: 26px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+
+    color: #667387;
+    font-size: 14px;
+}
+
+@media (max-width: 767px) {
+
+    .home-support-section {
+        padding: 58px 0;
+    }
+
+    .home-support-heading {
+        display: block;
+        margin-bottom: 28px;
+    }
+
+    .home-support-heading > p {
+        margin-top: 14px;
+    }
+
+    .home-support-grid {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    .home-support-card {
+        min-height: 0;
+        padding: 22px;
+    }
+
+    .home-support-contact {
+        flex-direction: column;
+        gap: 3px;
+        text-align: center;
+    }
+}
+
+/* ===== END Homepage support 2026 ===== */
+
+/* ===== START Homepage compact carousel 2026 ===== */
+
+
+/* ==================================================
+   HOMEPAGE — ESPAÇAMENTO
+   ================================================== */
+
+[data-testid="home-services"] {
+    padding-top: 54px !important;
+    padding-bottom: 54px !important;
+}
+
+.home-featured-section {
+    padding-top: 58px;
+    padding-bottom: 58px;
+}
+
+.home-partners-section {
+    padding: 54px 0;
+
+    background:
+        linear-gradient(
+            180deg,
+            #F4F7EC 0%,
+            #F7F8F1 100%
+        );
+
+    border-top: 1px solid #E1E8DA;
+    border-bottom: 1px solid #E1E8DA;
+}
+
+.home-partners-heading {
+    margin-bottom: 28px;
+}
+
+
+/* ==================================================
+   APENAS MANUAIS = 76% NO DESKTOP
+   ================================================== */
+
+@media (min-width: 1024px) {
+
+    .home-featured-section {
+        width: 76% !important;
+        max-width: 1440px;
+    }
+
+    /*
+     * Impede o track mobile de aparecer como
+     * uma segunda fila no desktop.
+     */
+    .featured-mobile-track {
+        display: none !important;
+    }
+
+    .featured-desktop-grid {
+        display: grid !important;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        align-items: stretch;
+    }
+}
+
+
+/* ==================================================
+   CARROSSEL
+   ================================================== */
+
+.featured-nav-button {
+    width: 42px;
+    height: 42px;
+
+    display: grid;
+    place-items: center;
+
+    color: #10263A;
+    background: #FFFFFF;
+
+    border: 1px solid #DDE5D8;
+    border-radius: 999px;
+
+    transition:
+        transform 160ms ease,
+        border-color 160ms ease,
+        background-color 160ms ease;
+}
+
+.featured-nav-button:not(:disabled):hover {
+    transform: translateY(-1px);
+
+    background: #F5F8EC;
+    border-color: #BFD0B5;
+}
+
+.featured-nav-button:disabled {
+    opacity: 0.32;
+    cursor: default;
+}
+
+.featured-page-counter {
+    min-width: 45px;
+
+    text-align: center;
+
+    color: #7A8796;
+
+    font-size: 11px;
+    letter-spacing: 0.08em;
+}
+
+.featured-desktop-grid {
+    animation: featured-page-in 220ms ease;
+}
+
+@keyframes featured-page-in {
+    from {
+        opacity: 0;
+        transform: translateX(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.featured-see-all-card {
+    min-height: 100%;
+
+    padding: 26px;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+
+    background:
+        linear-gradient(
+            145deg,
+            #F3F7EC 0%,
+            #FBF8F0 100%
+        );
+
+    border: 1px solid #DDE6D7;
+    border-radius: 12px;
+
+    box-shadow:
+        0 18px 42px -36px rgba(32, 59, 38, 0.38);
+
+    transition:
+        transform 180ms ease,
+        border-color 180ms ease,
+        box-shadow 180ms ease;
+}
+
+.featured-see-all-card:hover {
+    transform: translateY(-3px);
+
+    border-color: #BFD0B3;
+
+    box-shadow:
+        0 25px 46px -34px rgba(32, 59, 38, 0.44);
+}
+
+.featured-see-all-icon {
+    width: 48px;
+    height: 48px;
+
+    display: grid;
+    place-items: center;
+
+    color: #397448;
+    background: #FFFFFF;
+
+    border: 1px solid #D9E5D3;
+    border-radius: 14px;
+}
+
+
+/* ==================================================
+   TABLET / MOBILE — SWIPE
+   ================================================== */
+
+.featured-mobile-track {
+    display: flex;
+
+    gap: 16px;
+
+    overflow-x: auto;
+
+    padding: 2px 2px 12px;
+
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+}
+
+.featured-mobile-track::-webkit-scrollbar {
+    display: none;
+}
+
+.featured-mobile-item {
+    min-width: min(78vw, 310px);
+
+    scroll-snap-align: start;
+}
+
+.featured-mobile-see-all {
+    min-width: min(68vw, 260px);
+
+    padding: 24px;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 16px;
+
+    color: #10263A;
+    background: #F3F7EC;
+
+    border: 1px solid #DDE6D7;
+    border-radius: 12px;
+
+    scroll-snap-align: start;
+}
+
+@media (max-width: 1023px) {
+
+    .featured-desktop-grid {
+        display: none !important;
+    }
+}
+
+
+/* ==================================================
+   PARCEIROS NA HOMEPAGE
+   ================================================== */
+
+.home-partners-grid {
+    max-width: 940px;
+
+    margin-inline: auto;
+
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    gap: 20px;
+}
+
+.home-partner-link {
+    display: block;
+
+    color: #10263A;
+}
+
+.home-partner-hero {
+    width: 100%;
+
+    aspect-ratio: 16 / 8.6;
+
+    overflow: hidden;
+
+    background: #F8F7F2;
+
+    border: 1px solid #DCE4D8;
+    border-radius: 16px;
+
+    box-shadow:
+        0 18px 42px -36px rgba(33, 60, 39, 0.38);
+
+    transition:
+        transform 180ms ease,
+        border-color 180ms ease,
+        box-shadow 180ms ease;
+}
+
+.home-partner-link:hover .home-partner-hero {
+    transform: translateY(-3px);
+
+    border-color: #BDD0B2;
+
+    box-shadow:
+        0 25px 48px -36px rgba(33, 60, 39, 0.46);
+}
+
+.home-partner-hero-image {
+    display: block;
+
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
+    object-position: center;
+}
+
+.home-partner-name-outside {
+    padding: 12px 4px 0;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+
+    color: #10263A;
+
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.home-partner-fallback {
+    min-height: 180px;
+
+    display: grid;
+    place-items: center;
+
+    padding: 20px;
+
+    text-align: center;
+
+    color: #10263A;
+
+    background: #F4F7EE;
+
+    border: 1px solid #DCE4D8;
+    border-radius: 16px;
+}
+
+
+/* ==================================================
+   APOIAMOS O SEU PERCURSO — OUTRAS PÁGINAS
+   ================================================== */
+
+.support-journey-section {
+    margin-top: 34px;
+
+    padding-top: 60px;
+    padding-bottom: 60px;
+}
+
+.support-journey-section .home-support-heading {
+    margin-bottom: 28px;
+}
+
+.support-journey-section .home-support-contact {
+    margin-top: 20px;
+}
+
+
+/* ==================================================
+   PÁGINA PARCEIROS — DIMENSÕES
+   ================================================== */
+
+@media (min-width: 1024px) {
+
+    .partners-cards {
+        width: 78%;
+        max-width: 940px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .partners-cta {
+        width: 58%;
+        max-width: 760px;
+
+        margin-left: auto;
+        margin-right: auto;
+
+        gap: 20px;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+
+    .partners-cards {
+        width: 92%;
+    }
+
+    .partners-cta {
+        width: 82%;
+    }
+}
+
+
+/* ==================================================
+   MOBILE
+   ================================================== */
+
+@media (max-width: 639px) {
+
+    [data-testid="home-services"] {
+        padding-top: 46px !important;
+        padding-bottom: 46px !important;
+    }
+
+    .home-featured-section {
+        padding-top: 48px;
+        padding-bottom: 48px;
+    }
+
+    .home-partners-section {
+        padding: 48px 0;
+    }
+
+    .home-partners-grid {
+        grid-template-columns: 1fr;
+
+        gap: 20px;
+    }
+
+    .support-journey-section {
+        margin-top: 20px;
+
+        padding-top: 52px;
+        padding-bottom: 52px;
+    }
+
+    .partners-cards,
+    .partners-cta {
+        width: 100%;
+    }
+}
+
+/* ===== END Homepage compact carousel 2026 ===== */
+
+/* ===== START Visual sizing refinement 2026 ===== */
+
+
+/* ==================================================
+   1. HERO PRINCIPAL — MENOS ALTURA
+
+   O conteúdo interno não é reduzido.
+   Retiramos apenas espaço vertical em excesso.
+   ================================================== */
+
+@media (min-width: 1024px) {
+
+    .hero-new {
+        min-height: 500px;
+    }
+
+    .hero-new > .max-w-7xl {
+        padding-top: 42px !important;
+        padding-bottom: 42px !important;
+    }
+
+    /*
+     * Mantemos a arte atual enquanto não entra
+     * o novo hero definitivo.
+     */
+    .hero-books-art {
+        bottom: -18px;
+    }
+}
+
+
+/* ==================================================
+   2. MANUAIS MAIS PROCURADOS
+
+   Estava a 76%.
+   -10% relativo = 68.4%.
+   ================================================== */
+
+@media (min-width: 1024px) {
+
+    .home-featured-section {
+        width: 68.4% !important;
+        max-width: 1295px;
+    }
+
+    /*
+     * A capa atual usa 3:4.
+     * Reduzimos a altura visual da capa ~7%
+     * apenas na homepage.
+     */
+    .home-featured-section .book-card > div:first-child {
+        aspect-ratio: 3 / 3.96 !important;
+    }
+}
+
+
+/* ==================================================
+   3. PARCEIROS NA HOMEPAGE
+
+   Heros ~12% mais pequenos.
+   Sem cantos redondos.
+   Nome centrado e sem caixa.
+   ================================================== */
+
+.home-partners-grid {
+    max-width: 827px !important;
+}
+
+.home-partner-hero {
+    border-radius: 0 !important;
+}
+
+.home-partner-name-outside {
+    min-height: auto !important;
+
+    padding: 11px 4px 0 !important;
+
+    display: block !important;
+
+    text-align: center;
+
+    font-size: 15px;
+    font-weight: 700;
+
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+.home-partner-name-outside svg {
+    display: none !important;
+}
+
+
+/* ==================================================
+   4. TUDO NUM SÓ LUGAR
+
+   Os cards ficam aproximadamente 17% menores.
+   Só alteramos a largura da composição no desktop;
+   não diminuímos a legibilidade dos textos.
+   ================================================== */
+
+@media (min-width: 1024px) {
+
+    [data-testid="home-services"] > .max-w-7xl {
+        width: 71.4% !important;
+        max-width: 1350px;
+    }
+}
+
+.home-service-card {
+    border-radius: 0 !important;
+}
+
+
+/* ==================================================
+   5. PÁGINA PARCEIROS — CARDS A 70%
+   ================================================== */
+
+@media (min-width: 1024px) {
+
+    .partners-cards {
+        width: 70% !important;
+        max-width: 820px !important;
+
+        margin-left: auto !important;
+        margin-right: auto !important;
+
+        gap: 18px !important;
+    }
+}
+
+
+/* ==================================================
+   6. FAZER PARTE
+
+   Mais horizontal, menos alto e ligeiramente menor.
+   ================================================== */
+
+@media (min-width: 1024px) {
+
+    .partners-cta {
+        width: 54% !important;
+        max-width: 700px !important;
+
+        min-height: 0 !important;
+
+        margin-left: auto !important;
+        margin-right: auto !important;
+        margin-top: 28px !important;
+
+        padding: 16px 22px !important;
+
+        gap: 20px !important;
+
+        align-items: center !important;
+    }
+
+    .partners-cta h2 {
+        font-size: 23px !important;
+        line-height: 1.18 !important;
+    }
+
+    .partners-cta p {
+        margin-top: 5px !important;
+
+        font-size: 12.5px !important;
+        line-height: 1.55 !important;
+    }
+
+    .partners-contact-button {
+        min-height: 42px !important;
+
+        padding-left: 17px !important;
+        padding-right: 17px !important;
+    }
+}
+
+
+/* ==================================================
+   7. PÁGINA PARCEIROS — ZERO CANTOS REDONDOS
+   ================================================== */
+
+.partners-page .partners-intro,
+.partners-page .partner-feature-card,
+.partners-page .partner-card-hero,
+.partners-page .partner-logo-area,
+.partners-page .partner-logo-badge,
+.partners-page .partners-cta,
+.partners-page .home-support-card {
+    border-radius: 0 !important;
+}
+
+
+/* ==================================================
+   8. MOBILE / TABLET
+
+   Não forçamos as reduções percentuais de desktop.
+   ================================================== */
+
+@media (max-width: 1023px) {
+
+    .home-featured-section {
+        width: auto !important;
+    }
+
+    [data-testid="home-services"] > .max-w-7xl {
+        width: auto !important;
+    }
+
+    .home-partners-grid {
+        max-width: none !important;
+    }
+
+    .partners-cards,
+    .partners-cta {
+        width: 100% !important;
+    }
+}
+
+/* ===== END Visual sizing refinement 2026 ===== */
+
+/* ===== START Editorial refinement 2026 ===== */
+
+
+/* ==================================================
+   HERO PRINCIPAL
+   Aproximadamente -10% de altura,
+   sem reduzir a tipografia.
+   ================================================== */
+
+@media (min-width: 1024px) {
+
+    .hero-new {
+        min-height: 450px !important;
+    }
+
+    .hero-new > .max-w-7xl {
+        padding-top: 32px !important;
+        padding-bottom: 32px !important;
+    }
+
+    .hero-new h1 {
+        margin-bottom: 14px !important;
+    }
+
+    .hero-new p {
+        margin-bottom: 18px;
+    }
+
+    .hero-new .flex.flex-wrap.gap-3 {
+        gap: 10px !important;
+    }
+
+    .hero-new [data-testid="hero-catalog-btn"],
+    .hero-new [data-testid="hero-vouchers-btn"] {
+        height: 44px !important;
+    }
+
+    .hero-new [data-testid="cascading-selector"] {
+        padding-top: 22px !important;
+        padding-bottom: 22px !important;
+    }
+
+    .hero-new [data-testid="cascading-selector"] .space-y-3 {
+        row-gap: 10px !important;
+    }
+
+    .hero-books-art {
+        max-height: 305px;
+        bottom: -12px !important;
+    }
+}
+
+
+/* ==================================================
+   MANUAIS MAIS PROCURADOS
+
+   68.4% -> ~74%.
+   O espaçamento entre os livros continua exatamente
+   o mesmo definido pelo grid.
+   ================================================== */
+
+@media (min-width: 1024px) {
+
+    .home-featured-section {
+        width: 74% !important;
+        max-width: 1400px !important;
+    }
+}
+
+
+/* ==================================================
+   TUDO NUM SÓ LUGAR
+   Deixa de ser uma sequência de cards.
+   Passa a grelha editorial aberta 2 x 2.
+   ================================================== */
+
+@media (min-width: 1024px) {
+
+    [data-testid="home-services"] > .max-w-7xl {
+        width: 74% !important;
+        max-width: 1380px !important;
+    }
+
+    [data-testid="home-services"] .grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 0 !important;
+
+        margin-top: 34px;
+    }
+}
+
+
+.home-service-card {
+    position: relative;
+
+    min-height: 0 !important;
+
+    padding: 27px 30px !important;
+
+    background: transparent !important;
+
+    border: 0 !important;
+    border-radius: 0 !important;
+
+    box-shadow: none !important;
+
+    transition:
+        background-color 180ms ease,
+        transform 180ms ease;
+}
+
+
+/* linha horizontal entre as duas filas */
+.home-service-card:nth-child(1),
+.home-service-card:nth-child(2) {
+    border-bottom: 1px solid #DDE5D8 !important;
+}
+
+
+/* linha vertical entre as duas colunas */
+.home-service-card:nth-child(even) {
+    border-left: 1px solid #DDE5D8 !important;
+}
+
+
+.home-service-card:hover {
+    transform: none !important;
+
+    background:
+        linear-gradient(
+            135deg,
+            rgba(245, 248, 236, 0.72) 0%,
+            rgba(250, 248, 241, 0.42) 100%
+        ) !important;
+
+    box-shadow: none !important;
+}
+
+
+/* o ícone deixa de parecer outro mini-card */
+.home-service-card > div:first-child {
+    width: 34px !important;
+    height: 34px !important;
+
+    margin-bottom: 17px !important;
+
+    display: grid;
+    place-items: start !important;
+
+    background: transparent !important;
+
+    border: 0 !important;
+    border-radius: 0 !important;
+}
+
+
+.home-service-card > div:first-child svg {
+    width: 23px !important;
+    height: 23px !important;
+}
+
+
+.home-service-card h3 {
+    font-size: 20px !important;
+}
+
+
+.home-service-card p {
+    min-height: 0 !important;
+
+    max-width: 440px;
+
+    margin-top: 7px !important;
+}
+
+
+.home-service-card > div:last-child {
+    margin-top: 17px !important;
+}
+
+
+.home-service-card:hover > div:last-child svg {
+    transform: translateX(4px);
+}
+
+
+/* ==================================================
+   PÁGINA PARCEIROS — INTRO
+
+   Sem caixa.
+   Texto integrado diretamente na composição.
+   ================================================== */
+
+.partners-intro {
+    position: relative;
+
+    padding: 16px 20px 22px !important;
+
+    background: transparent !important;
+
+    border: 0 !important;
+    border-radius: 0 !important;
+
+    box-shadow: none !important;
+
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+
+    isolation: isolate;
+}
+
+
+/*
+ * Não é uma box:
+ * é apenas um halo luminoso para garantir leitura
+ * sobre a arte de fundo.
+ */
+.partners-intro::before {
+    content: "";
+
+    position: absolute;
+    z-index: -1;
+
+    inset: -42px -95px -48px;
+
+    background:
+        radial-gradient(
+            ellipse at center,
+            rgba(249, 248, 241, 0.96) 0%,
+            rgba(249, 248, 241, 0.78) 42%,
+            rgba(249, 248, 241, 0.28) 66%,
+            rgba(249, 248, 241, 0) 80%
+        );
+
+    pointer-events: none;
+}
+
+
+/* ==================================================
+   PÁGINA PARCEIROS — FAZER PARTE
+
+   Sai a caixa branca.
+   Passa a CTA editorial horizontal.
+   ================================================== */
+
+@media (min-width: 1024px) {
+
+    .partners-cta {
+        width: 64% !important;
+        max-width: 900px !important;
+
+        margin-top: 34px !important;
+
+        padding: 20px 4px !important;
+
+        background: transparent !important;
+
+        border: 0 !important;
+        border-top: 1px solid #CBD9C5 !important;
+        border-bottom: 1px solid #CBD9C5 !important;
+        border-radius: 0 !important;
+
+        box-shadow: none !important;
+
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+
+        align-items: center !important;
+    }
+
+    .partners-cta > div {
+        max-width: 600px;
+    }
+
+    .partners-cta h2 {
+        max-width: 560px;
+
+        font-size: 24px !important;
+        line-height: 1.17 !important;
+    }
+
+    .partners-cta p {
+        max-width: 540px !important;
+
+        margin-top: 6px !important;
+
+        font-size: 13px !important;
+        line-height: 1.55 !important;
+    }
+
+    .partners-contact-button {
+        min-height: 43px !important;
+
+        padding: 0 19px !important;
+    }
+}
+
+
+/* ==================================================
+   PÁGINA PARCEIROS — CARDS
+
+   Mantemos os cards porque aqui têm conteúdo real,
+   mas sem cantos arredondados.
+   ================================================== */
+
+.partners-page .partner-feature-card,
+.partners-page .partner-card-hero,
+.partners-page .partner-logo-area,
+.partners-page .partner-logo-badge {
+    border-radius: 0 !important;
+}
+
+
+/* ==================================================
+   TABLET / MOBILE — SERVIÇOS
+
+   Em ecrãs mais pequenos mantemos leitura simples,
+   mas continuamos sem caixas pesadas.
+   ================================================== */
+
+@media (max-width: 1023px) {
+
+    [data-testid="home-services"] > .max-w-7xl {
+        width: auto !important;
+    }
+
+    [data-testid="home-services"] .grid {
+        gap: 0 !important;
+    }
+
+    .home-service-card {
+        padding: 24px 20px !important;
+
+        border-left: 0 !important;
+        border-bottom: 1px solid #DDE5D8 !important;
+    }
+
+    .home-service-card:last-child {
+        border-bottom: 0 !important;
+    }
+}
+
+
+/* ==================================================
+   MOBILE PARTNERS
+   ================================================== */
+
+@media (max-width: 767px) {
+
+    .partners-intro {
+        padding: 10px 4px 18px !important;
+    }
+
+    .partners-intro::before {
+        inset: -30px -25px -35px;
+    }
+
+    .partners-cta {
+        padding: 22px 0 !important;
+
+        background: transparent !important;
+
+        border: 0 !important;
+        border-top: 1px solid #CBD9C5 !important;
+        border-bottom: 1px solid #CBD9C5 !important;
+        border-radius: 0 !important;
+
+        box-shadow: none !important;
+    }
+}
+
+/* ===== END Editorial refinement 2026 ===== */
+
+/* ===== START Final homepage architecture 2026 ===== */
+
+
+/* =========================================================
+   1. HERO PRINCIPAL
+   Horizontal, compacto e com menos altura.
+   Não reduzimos o tamanho das fontes.
+   ========================================================= */
+
+.hero-new {
+    position: relative;
+    overflow: hidden;
+
+    background:
+        radial-gradient(
+            circle at 62% 34%,
+            rgba(210, 226, 194, 0.42) 0%,
+            rgba(210, 226, 194, 0.10) 36%,
+            transparent 58%
+        ),
+        linear-gradient(
+            115deg,
+            #FBFAF4 0%,
+            #F3F6E9 52%,
+            #E9F1DE 100%
+        );
+}
+
+
+@media (min-width: 1024px) {
+
+    .hero-new {
+        min-height: 405px !important;
+    }
+
+    .hero-new > .max-w-7xl {
+        padding-top: 24px !important;
+        padding-bottom: 24px !important;
+    }
+
+    /*
+     * A arte passa a ocupar mais horizontalmente
+     * e menos verticalmente.
+     */
+    .hero-books-art {
+        width: clamp(260px, 25vw, 390px) !important;
+
+        max-height: 270px !important;
+
+        left: 52% !important;
+        bottom: -4px !important;
+    }
+
+    /*
+     * O seletor mantém legibilidade,
+     * mas perde altura desnecessária.
+     */
+    .hero-selector-card {
+        padding: 20px 22px !important;
+    }
+
+    .hero-selector-card h2 {
+        margin-bottom: 3px !important;
+    }
+
+    .hero-selector-card .space-y-4 {
+        row-gap: 10px !important;
+    }
+
+    .hero-selector-card .space-y-3 {
+        row-gap: 9px !important;
+    }
+
+    .hero-new h1 {
+        margin-bottom: 10px !important;
+    }
+
+    .hero-new p {
+        margin-bottom: 14px !important;
+    }
+}
+
+
+/*
+ * Quando colocarmos o novo PNG escolar,
+ * basta adicionar a classe .hero-school-ready
+ * ao container ou substituir o src atual.
+ */
+.hero-school-image {
+    display: none;
+}
+
+
+/* =========================================================
+   2. TRUST BAR
+   Mais fina para acompanhar o hero compacto.
+   ========================================================= */
+
+[data-testid="home-page"] .hero-new + section,
+[data-testid="home-page"] .hero-new + div {
+    position: relative;
+}
+
+@media (min-width: 1024px) {
+
+    [data-testid="home-page"] .home-trust-bar {
+        padding-top: 13px !important;
+        padding-bottom: 13px !important;
+    }
+}
+
+
+/* =========================================================
+   3. MANUAIS MAIS PROCURADOS
+   Mantemos exatamente o formato aprovado.
+   ========================================================= */
+
+@media (min-width: 1024px) {
+
+    .home-featured-section {
+        width: 74% !important;
+        max-width: 1400px !important;
+
+        padding-top: 46px !important;
+        padding-bottom: 50px !important;
+    }
+
+    .featured-desktop-grid {
+        gap: 20px !important;
+    }
+}
+
+
+/* =========================================================
+   4. PARCEIROS
+   Secção editorial mais curta:
+   texto à esquerda + dois heros.
+   Sem legenda repetida por baixo.
+   ========================================================= */
+
+.home-partners-section {
+    position: relative;
+
+    padding-top: 42px !important;
+    padding-bottom: 42px !important;
+
+    background:
+        linear-gradient(
+            105deg,
+            #F6F4EA 0%,
+            #F1F5E9 46%,
+            #F6F6EF 100%
+        ) !important;
+
+    border-top: 1px solid #E1E7DA;
+    border-bottom: 1px solid #E1E7DA;
+}
+
+
+@media (min-width: 1024px) {
+
+    .home-partners-section > .max-w-7xl {
+        width: 78% !important;
+        max-width: 1450px !important;
+
+        display: grid;
+        grid-template-columns: minmax(220px, 0.72fr) minmax(0, 2fr);
+        column-gap: 34px;
+        align-items: center;
+    }
+
+    .home-partners-heading {
+        margin: 0 !important;
+
+        text-align: left !important;
+    }
+
+    .home-partners-heading p {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+
+        max-width: 320px !important;
+    }
+
+    .home-partners-grid {
+        width: 100% !important;
+        max-width: none !important;
+
+        margin: 0 !important;
+
+        gap: 14px !important;
+    }
+}
+
+
+.home-partner-link {
+    display: block;
+
+    overflow: hidden;
+
+    background: transparent !important;
+
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+
+.home-partner-hero {
+    aspect-ratio: 16 / 7.4 !important;
+
+    overflow: hidden;
+
+    border: 0 !important;
+    border-radius: 0 !important;
+
+    box-shadow: none !important;
+
+    transition:
+        transform 200ms ease,
+        filter 200ms ease;
+}
+
+
+.home-partner-link:hover .home-partner-hero {
+    transform: translateY(-2px) scale(1.008);
+
+    filter: saturate(1.03);
+
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+
+.home-partner-hero-image {
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
+    object-position: center;
+}
+
+
+.home-partner-name-outside {
+    display: none !important;
+}
+
+
+/* =========================================================
+   5. TUDO NUM SÓ LUGAR
+   Faixa editorial horizontal.
+   Sem caixas individuais.
+   ========================================================= */
+
+[data-testid="home-services"] {
+    padding-top: 36px !important;
+    padding-bottom: 38px !important;
+
+    background:
+        linear-gradient(
+            180deg,
+            #FBFAF5 0%,
+            #F7F7EF 100%
+        );
+}
+
+
+@media (min-width: 1024px) {
+
+    [data-testid="home-services"] > .max-w-7xl {
+        width: 78% !important;
+        max-width: 1450px !important;
+
+        display: grid;
+        grid-template-columns: minmax(250px, 0.85fr) minmax(0, 2.15fr);
+        column-gap: 50px;
+        align-items: center;
+    }
+
+    /*
+     * Cabeçalho / título do bloco
+     */
+    [data-testid="home-services"] .text-center {
+        text-align: left !important;
+
+        margin-bottom: 0 !important;
+    }
+
+    [data-testid="home-services"] .text-center p {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+
+        max-width: 330px !important;
+    }
+
+    /*
+     * Serviços = uma linha horizontal.
+     */
+    [data-testid="home-services"] .grid {
+        margin-top: 0 !important;
+
+        display: grid !important;
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+
+        gap: 0 !important;
+    }
+}
+
+
+.home-service-card {
+    min-height: 116px !important;
+
+    padding: 15px 22px !important;
+
+    background: transparent !important;
+
+    border: 0 !important;
+    border-left: 1px solid #DCE4D7 !important;
+    border-radius: 0 !important;
+
+    box-shadow: none !important;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+
+    transition:
+        background-color 160ms ease,
+        transform 160ms ease;
+}
+
+
+.home-service-card:first-child {
+    border-left: 0 !important;
+}
+
+
+.home-service-card:nth-child(1),
+.home-service-card:nth-child(2),
+.home-service-card:nth-child(3),
+.home-service-card:nth-child(4) {
+    border-bottom: 0 !important;
+}
+
+
+.home-service-card:hover {
+    transform: translateY(-1px) !important;
+
+    background:
+        rgba(237, 243, 229, 0.52) !important;
+
+    box-shadow: none !important;
+}
+
+
+.home-service-card > div:first-child {
+    width: 31px !important;
+    height: 31px !important;
+
+    margin-bottom: 10px !important;
+
+    background: transparent !important;
+
+    border: 0 !important;
+    border-radius: 0 !important;
+}
+
+
+.home-service-card > div:first-child svg {
+    width: 22px !important;
+    height: 22px !important;
+}
+
+
+.home-service-card h3 {
+    font-size: 16px !important;
+
+    margin-top: 0 !important;
+}
+
+
+.home-service-card p {
+    margin-top: 4px !important;
+
+    font-size: 12px !important;
+    line-height: 1.5 !important;
+}
+
+
+.home-service-card > div:last-child {
+    margin-top: 8px !important;
+
+    font-size: 12px !important;
+}
+
+
+/* =========================================================
+   6. TRANSIÇÃO PARA O FOOTER
+   ========================================================= */
+
+[data-testid="home-services"] {
+    border-bottom: 1px solid #E1E7DA;
+}
+
+
+/* =========================================================
+   TABLET
+   ========================================================= */
+
+@media (min-width: 768px) and (max-width: 1023px) {
+
+    .home-partners-section,
+    [data-testid="home-services"] {
+        padding-top: 42px !important;
+        padding-bottom: 42px !important;
+    }
+
+    .home-partners-grid {
+        gap: 14px !important;
+    }
+
+    [data-testid="home-services"] .grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    .home-service-card {
+        border-left: 0 !important;
+        border-bottom: 1px solid #DCE4D7 !important;
+    }
+
+    .home-service-card:nth-child(even) {
+        border-left: 1px solid #DCE4D7 !important;
+    }
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 767px) {
+
+    .hero-new {
+        min-height: 0 !important;
+    }
+
+    .home-partners-section {
+        padding-top: 38px !important;
+        padding-bottom: 38px !important;
+    }
+
+    .home-partners-grid {
+        grid-template-columns: 1fr !important;
+
+        gap: 14px !important;
+    }
+
+    .home-partner-hero {
+        aspect-ratio: 16 / 8.8 !important;
+    }
+
+    [data-testid="home-services"] {
+        padding-top: 38px !important;
+        padding-bottom: 38px !important;
+    }
+
+    [data-testid="home-services"] .grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .home-service-card {
+        min-height: 0 !important;
+
+        padding: 19px 4px !important;
+
+        border-left: 0 !important;
+        border-bottom: 1px solid #DCE4D7 !important;
+    }
+
+    .home-service-card:last-child {
+        border-bottom: 0 !important;
+    }
+}
+
+/* ===== END Final homepage architecture 2026 ===== */
+
+/* ===== START Homepage final proportions 2026 ===== */
+
+
+/* =========================================================
+   1. HERO PRINCIPAL
+   Mais baixo e horizontal.
+   Compactamos também os elementos, sem alterar conteúdo.
+   ========================================================= */
+
+@media (min-width: 1024px) {
+
+    .hero-new {
+        min-height: 355px !important;
+        max-height: 380px;
+    }
+
+    .hero-new > .max-w-7xl {
+        padding-top: 18px !important;
+        padding-bottom: 18px !important;
+    }
+
+    /* campanha */
+    .hero-new .inline-flex {
+        margin-bottom: 10px !important;
+    }
+
+    /* título */
+    .hero-new h1 {
+        font-size: clamp(42px, 4.15vw, 61px) !important;
+        line-height: 0.98 !important;
+
+        margin-bottom: 9px !important;
+    }
+
+    /* descrição */
+    .hero-new h1 + p,
+    .hero-new p {
+        line-height: 1.5;
+    }
+
+    /* botões */
+    .hero-new [data-testid="hero-catalog-btn"],
+    .hero-new [data-testid="hero-vouchers-btn"] {
+        min-height: 42px !important;
+        height: 42px !important;
+    }
+
+    /* arte central atual / futura */
+    .hero-books-art {
+        width: clamp(235px, 22vw, 345px) !important;
+        max-height: 235px !important;
+
+        left: 52.5% !important;
+        bottom: -4px !important;
+    }
+
+    /* seletor */
+    .hero-selector-card {
+        padding: 16px 20px !important;
+    }
+
+    .hero-selector-card h2 {
+        font-size: 23px !important;
+        line-height: 1.1 !important;
+    }
+
+    .hero-selector-card .space-y-4 {
+        row-gap: 8px !important;
+    }
+
+    .hero-selector-card .space-y-3 {
+        row-gap: 7px !important;
+    }
+
+    .hero-selector-card select,
+    .hero-selector-card button {
+        min-height: 41px;
+    }
+}
+
+
+/* =========================================================
+   2. PARCEIROS NA HOMEPAGE
+   Texto mantém-se.
+   Os dois heros passam a dominar mais a secção.
+   ========================================================= */
+
+@media (min-width: 1024px) {
+
+    .home-partners-section > .max-w-7xl {
+        width: 84% !important;
+        max-width: 1540px !important;
+
+        grid-template-columns:
+            minmax(205px, 0.52fr)
+            minmax(0, 2.48fr) !important;
+
+        column-gap: 30px !important;
+    }
+
+    .home-partners-heading {
+        max-width: 300px;
+    }
+
+    .home-partners-heading h2 {
+        font-size: clamp(31px, 2.65vw, 41px) !important;
+        line-height: 1.06 !important;
+    }
+
+    .home-partners-heading p {
+        max-width: 285px !important;
+    }
+
+    .home-partners-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+
+        gap: 14px !important;
+    }
+
+    .home-partner-hero {
+        width: 100% !important;
+
+        aspect-ratio: 16 / 7.15 !important;
+    }
+}
+
+
+/* =========================================================
+   3. TUDO NUM SÓ LUGAR
+   Criar separação entre introdução e opções.
+   ========================================================= */
+
+@media (min-width: 1024px) {
+
+    [data-testid="home-services"] > .max-w-7xl {
+        align-items: start !important;
+    }
+
+    [data-testid="home-services"] .text-center p {
+        margin-top: 8px !important;
+        margin-bottom: 0 !important;
+    }
+
+    /*
+     * Desce ligeiramente as opções para que o parágrafo
+     * não pareça estar encostado / por cima delas.
+     */
+    [data-testid="home-services"] .grid {
+        margin-top: 22px !important;
+    }
+}
+
+
+/* =========================================================
+   TABLET
+   Mantemos a lógica, apenas sem forçar dimensões desktop.
+   ========================================================= */
+
+@media (min-width: 768px) and (max-width: 1023px) {
+
+    .home-partners-section > .max-w-7xl {
+        width: auto !important;
+    }
+
+    [data-testid="home-services"] .grid {
+        margin-top: 24px !important;
+    }
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 767px) {
+
+    .hero-new {
+        max-height: none;
+    }
+
+    [data-testid="home-services"] .grid {
+        margin-top: 24px !important;
+    }
+}
+
+/* ===== END Homepage final proportions 2026 ===== */
+
+/* ===== START Homepage reference layout 2026 ===== */
+
+
+/* ==========================================================
+   HERO — formato horizontal da referência
+   ========================================================== */
+
+@media (min-width: 1024px) {
+
+    .hero-new {
+        position: relative;
+
+        min-height: 310px !important;
+        max-height: none !important;
+
+        overflow: hidden;
+    }
+
+    .hero-new > .max-w-7xl {
+        min-height: 310px;
+
+        padding-top: 17px !important;
+        padding-bottom: 17px !important;
+
+        align-items: center !important;
+    }
+
+    /*
+     * Mantemos o conteúdo real à esquerda e o
+     * seletor funcional à direita.
+     */
+    .hero-new h1 {
+        max-width: 520px;
+
+        font-size: clamp(39px, 3.55vw, 54px) !important;
+        line-height: 0.98 !important;
+
+        margin-bottom: 8px !important;
+    }
+
+    .hero-new h1 + p {
+        max-width: 470px;
+
+        margin-bottom: 12px !important;
+
+        font-size: 15px !important;
+        line-height: 1.48 !important;
+    }
+
+    .hero-new .inline-flex {
+        margin-bottom: 9px !important;
+    }
+
+    .hero-new [data-testid="hero-catalog-btn"],
+    .hero-new [data-testid="hero-vouchers-btn"] {
+        height: 40px !important;
+        min-height: 40px !important;
+
+        padding-left: 20px !important;
+        padding-right: 20px !important;
+    }
+
+
+    /* -------------------------------------------------------
+       FOTO ESCOLAR — recorte da referência escolhida
+       ------------------------------------------------------- */
+
+    .hero-new::after {
+        content: "";
+
+        position: absolute;
+        z-index: 0;
+
+        top: 0;
+        bottom: 0;
+
+        left: 37%;
+        width: 43%;
+
+        background-image:
+            linear-gradient(
+                90deg,
+                #F7F7EF 0%,
+                rgba(247,247,239,0.18) 17%,
+                rgba(247,247,239,0.02) 80%,
+                rgba(247,247,239,0.30) 100%
+            ),
+            linear-gradient(transparent, transparent);
+
+        /*
+         * A imagem fornecida é a homepage inteira.
+         * Ampliamos para mostrar apenas a zona do
+         * hero escolar que escolheste.
+         */
+        background-size:
+            100% 100%,
+            auto 350%;
+
+        background-position:
+            center,
+            center 8%;
+
+        background-repeat: no-repeat;
+
+        pointer-events: none;
+    }
+
+    .hero-new > .max-w-7xl {
+        position: relative;
+        z-index: 2;
+    }
+
+    /*
+     * Se a referência existir, a fotografia substitui
+     * visualmente a antiga pilha de livros.
+     */
+    .hero-books-art {
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+
+
+    /* -------------------------------------------------------
+       SELETOR — compacto para caber inteiro
+       ------------------------------------------------------- */
+
+    .hero-selector-card {
+        padding: 13px 17px !important;
+
+        border-radius: 14px !important;
+
+        box-shadow:
+            0 17px 38px -27px rgba(25, 51, 28, 0.38) !important;
+    }
+
+    .hero-selector-card h2 {
+        font-size: 21px !important;
+        line-height: 1.08 !important;
+
+        margin-bottom: 2px !important;
+    }
+
+    .hero-selector-card .space-y-3 {
+        row-gap: 5px !important;
+    }
+
+    .hero-selector-card label {
+        margin-bottom: 3px !important;
+
+        font-size: 10px !important;
+    }
+
+    .hero-selector-card button[role="combobox"] {
+        height: 37px !important;
+        min-height: 37px !important;
+    }
+
+    .hero-selector-card [data-testid="search-school-btn"] {
+        height: 38px !important;
+        min-height: 38px !important;
+
+        margin-top: 5px !important;
+    }
+}
+
+
+/* ==========================================================
+   TRUST BAR
+   ========================================================== */
+
+@media (min-width: 1024px) {
+
+    [data-testid="home-page"] .home-trust-bar {
+        padding-top: 11px !important;
+        padding-bottom: 11px !important;
+    }
+}
+
+
+/* ==========================================================
+   MANUAIS — formato horizontal APENAS NA HOMEPAGE
+   ========================================================== */
+
+@media (min-width: 1024px) {
+
+    .home-featured-section {
+        width: 82% !important;
+        max-width: 1510px !important;
+
+        padding-top: 36px !important;
+        padding-bottom: 38px !important;
+    }
+
+    .featured-desktop-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+
+        gap: 14px !important;
+    }
+
+    /*
+     * O BookCard global não é alterado.
+     * Só estes quatro cards da homepage ficam horizontais.
+     */
+    .home-featured-section .book-card {
+        min-height: 148px;
+
+        display: grid !important;
+        grid-template-columns: 38% 62% !important;
+
+        align-items: stretch;
+
+        border-radius: 7px !important;
+    }
+
+    .home-featured-section .book-card > div:first-child {
+        width: 100%;
+        height: 100%;
+
+        min-height: 148px;
+
+        aspect-ratio: auto !important;
+    }
+
+    .home-featured-section .book-card > div:first-child img {
+        object-fit: cover !important;
+    }
+
+    .home-featured-section .book-card > div:nth-child(2) {
+        min-width: 0;
+
+        padding: 12px 11px !important;
+    }
+
+    .home-featured-section .book-card h3 {
+        font-size: 13px !important;
+        line-height: 1.25 !important;
+    }
+
+    .home-featured-section .book-card
+    > div:nth-child(2)
+    > div:first-child {
+        font-size: 8px !important;
+    }
+
+    .home-featured-section .book-card
+    > div:nth-child(2)
+    > div:nth-child(3) {
+        margin-bottom: 7px !important;
+
+        font-size: 10px !important;
+    }
+
+    .home-featured-section .book-card
+    > div:nth-child(2)
+    > div:last-child {
+        align-items: center !important;
+    }
+
+    .home-featured-section .book-card
+    > div:nth-child(2)
+    > div:last-child > span {
+        font-size: 16px !important;
+    }
+
+    .home-featured-section .book-card button {
+        height: 29px !important;
+
+        padding-left: 9px !important;
+        padding-right: 9px !important;
+
+        font-size: 10px !important;
+    }
+
+    /*
+     * Badges compactos porque a capa agora é estreita.
+     */
+    .home-featured-section .book-card
+    [data-testid="stock-badge"] {
+        padding: 3px 5px !important;
+
+        font-size: 7px !important;
+        letter-spacing: 0.02em !important;
+    }
+
+    .home-featured-section .book-card
+    > div:first-child > span {
+        padding: 3px 5px !important;
+
+        font-size: 7px !important;
+    }
+}
+
+
+/* ==========================================================
+   PARCEIROS — mantém layout aprovado,
+   com bastante presença visual
+   ========================================================== */
+
+@media (min-width: 1024px) {
+
+    .home-partners-section {
+        padding-top: 32px !important;
+        padding-bottom: 32px !important;
+    }
+
+    .home-partners-section > .max-w-7xl {
+        width: 84% !important;
+        max-width: 1540px !important;
+
+        grid-template-columns:
+            minmax(210px, 0.50fr)
+            minmax(0, 2.50fr) !important;
+
+        column-gap: 27px !important;
+    }
+
+    .home-partners-grid {
+        gap: 13px !important;
+    }
+
+    .home-partner-hero {
+        aspect-ratio: 16 / 6.8 !important;
+    }
+}
+
+
+/* ==========================================================
+   TUDO NUM SÓ LUGAR — compacto como referência
+   ========================================================== */
+
+@media (min-width: 1024px) {
+
+    [data-testid="home-services"] {
+        padding-top: 27px !important;
+        padding-bottom: 29px !important;
+    }
+
+    [data-testid="home-services"] > .max-w-7xl {
+        width: 84% !important;
+        max-width: 1540px !important;
+
+        grid-template-columns:
+            minmax(260px, 0.76fr)
+            minmax(0, 2.24fr) !important;
+
+        column-gap: 38px !important;
+    }
+
+    [data-testid="home-services"] .text-center p {
+        margin-top: 7px !important;
+        margin-bottom: 13px !important;
+    }
+
+    [data-testid="home-services"] .grid {
+        margin-top: 13px !important;
+    }
+
+    .home-service-card {
+        min-height: 105px !important;
+
+        padding: 11px 18px !important;
+    }
+
+    .home-service-card h3 {
+        font-size: 14px !important;
+    }
+
+    .home-service-card p {
+        font-size: 11px !important;
+    }
+}
+
+
+/* ==========================================================
+   FOOTER — NOVA COR + MUITO MAIS COMPACTO
+   Mantém TODO o conteúdo existente.
+   ========================================================== */
+
+[data-testid="site-footer"] {
+    margin-top: 0 !important;
+
+    color: #F4F6F0 !important;
+
+    background:
+        linear-gradient(
+            115deg,
+            #647A65 0%,
+            #58705B 48%,
+            #506657 100%
+        ) !important;
+}
+
+
+/* primeira grelha do footer */
+[data-testid="site-footer"]
+> .max-w-7xl:first-child {
+    padding-top: 28px !important;
+    padding-bottom: 25px !important;
+
+    gap: 27px !important;
+}
+
+
+/* largura semelhante ao corpo da homepage */
+@media (min-width: 1024px) {
+
+    [data-testid="site-footer"] .max-w-7xl {
+        width: 84% !important;
+        max-width: 1540px !important;
+    }
+}
+
+
+[data-testid="site-footer"] h4 {
+    margin-bottom: 9px !important;
+
+    color: rgba(255,255,255,0.72) !important;
+}
+
+
+[data-testid="site-footer"] ul {
+    row-gap: 5px !important;
+}
+
+
+[data-testid="site-footer"] li,
+[data-testid="site-footer"] p {
+    line-height: 1.45 !important;
+}
+
+
+[data-testid="site-footer"] a,
+[data-testid="site-footer"] button {
+    transition: opacity 150ms ease;
+}
+
+
+[data-testid="site-footer"] a:hover,
+[data-testid="site-footer"] button:hover {
+    color: #FFFFFF !important;
+    opacity: 1;
+}
+
+
+/* divisórias */
+[data-testid="site-footer"] .border-t {
+    border-color: rgba(255,255,255,0.14) !important;
+}
+
+
+/* parceiros do rodapé */
+[data-testid="footer-partners"] {
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
+}
+
+
+[data-testid="footer-partners"] > div:first-child {
+    margin-bottom: 8px !important;
+
+    color: rgba(255,255,255,0.65) !important;
+}
+
+
+/* logos de parceiros mais discretos */
+[data-testid="footer-partners"] img {
+    width: 31px !important;
+    height: 31px !important;
+}
+
+
+/* zona de pagamentos */
+[data-testid="site-footer"] .footer-payment-logo,
+[data-testid="site-footer"] .payment-logo {
+    max-height: 28px !important;
+}
+
+
+/* última linha */
+[data-testid="site-footer"]
+> .border-t:last-child
+.max-w-7xl {
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
+}
+
+
+/* textos secundários */
+[data-testid="site-footer"] .text-\[\#A0AEC0\],
+[data-testid="site-footer"] .text-\[\#CBD5E0\] {
+    color: rgba(255,255,255,0.70) !important;
+}
+
+
+/* ==========================================================
+   TABLET / MOBILE
+   ========================================================== */
+
+@media (max-width: 1023px) {
+
+    .hero-new::after {
+        display: none;
+    }
+
+    .hero-books-art {
+        opacity: 1 !important;
+    }
+
+    .home-featured-section {
+        width: auto !important;
+    }
+
+    /*
+     * Tablet/mobile continuam com o BookCard normal.
+     */
+    .home-featured-section .book-card {
+        display: flex !important;
+    }
+
+    [data-testid="site-footer"] {
+        margin-top: 0 !important;
+    }
+}
+
+/* ===== END Homepage reference layout 2026 ===== */
+
+/* ===== START Hero public image fix 2026 ===== */
+
+@media (min-width: 1024px) {
+    .hero-new {
+        /*
+         * A fotografia já foi criada com espaço limpo
+         * à esquerda e alunos/escola à direita.
+         */
+        background-size: cover !important;
+        background-position: center center !important;
+        background-repeat: no-repeat !important;
+    }
+
+    /*
+     * Overlay muito subtil para o texto manter contraste.
+     * Não esconde os alunos.
+     */
+    .hero-new::before {
+        background:
+            linear-gradient(
+                90deg,
+                rgba(249, 249, 242, 0.97) 0%,
+                rgba(249, 249, 242, 0.78) 28%,
+                rgba(249, 249, 242, 0.08) 50%,
+                rgba(249, 249, 242, 0.00) 70%
+            ) !important;
+    }
+
+    /*
+     * O ::after antigo deixa de tentar criar outra foto.
+     */
+    .hero-new::after {
+        background-image: none !important;
+    }
+
+    .hero-new > .max-w-7xl {
+        position: relative;
+        z-index: 2;
+    }
+
+    .hero-books-art {
+        display: none !important;
+    }
+}
+
+/* ===== END Hero public image fix 2026 ===== */
+
+/* ===== START Books footer payment fix 2026 ===== */
+
+
+/* =========================================================
+   1. MANUAIS DA HOMEPAGE
+   Mostrar a capa INTEIRA em vez de a cortar.
+   ========================================================= */
+
+@media (min-width: 1024px) {
+
+    .home-featured-section .book-card {
+        min-height: 150px !important;
+
+        grid-template-columns: 35% 65% !important;
+    }
+
+    .home-featured-section .book-card > div:first-child {
+        min-height: 150px !important;
+
+        padding: 7px !important;
+
+        background: #F8F8F3 !important;
+    }
+
+    .home-featured-section .book-card > div:first-child img {
+        width: 100% !important;
+        height: 100% !important;
+
+        object-fit: contain !important;
+        object-position: center !important;
+    }
+
+    /*
+     * Badges um pouco menores para não taparem
+     * uma capa que agora ocupa uma coluna estreita.
+     */
+    .home-featured-section .book-card
+    [data-testid="stock-badge"] {
+        top: 5px !important;
+        right: 5px !important;
+    }
+
+    .home-featured-section .book-card
+    > div:first-child > span {
+        top: 5px !important;
+        left: 5px !important;
+    }
+}
+
+
+/* =========================================================
+   2. FOOTER
+   Mantém o verde aprovado, mas fica muito mais compacto.
+   ========================================================= */
+
+@media (min-width: 1024px) {
+
+    [data-testid="site-footer"] {
+        display: grid;
+
+        grid-template-columns: 1fr 1fr;
+    }
+
+    /*
+     * Bloco principal:
+     * logo + navegar + contactos + legal.
+     */
+    [data-testid="site-footer"] > div:first-child {
+        grid-column: 1 / -1;
+
+        padding-top: 22px !important;
+        padding-bottom: 20px !important;
+
+        gap: 22px !important;
+    }
+
+    /*
+     * Em parceria com e pagamentos ficam
+     * lado a lado em vez de criarem duas grandes filas.
+     */
+    [data-testid="site-footer"] > div:nth-child(2) {
+        grid-column: 1;
+
+        border-top: 1px solid rgba(255,255,255,.14) !important;
+        border-right: 1px solid rgba(255,255,255,.14);
+    }
+
+    [data-testid="site-footer"] > div:nth-child(3) {
+        grid-column: 2;
+
+        border-top: 1px solid rgba(255,255,255,.14) !important;
+    }
+
+    /*
+     * Copyright / legal / crédito.
+     */
+    [data-testid="site-footer"] > div:last-child {
+        grid-column: 1 / -1;
+    }
+
+
+    [data-testid="footer-partners"] {
+        min-height: 78px;
+
+        padding-top: 12px !important;
+        padding-bottom: 12px !important;
+
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+
+    /*
+     * O bloco que contém "Pagamentos seguros".
+     * nth-child(3) porque é a terceira zona do footer.
+     */
+    [data-testid="site-footer"] > div:nth-child(3)
+    > .max-w-7xl {
+        width: 100% !important;
+        max-width: none !important;
+
+        min-height: 78px;
+
+        padding: 12px 34px !important;
+
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+
+        gap: 26px;
+    }
+
+
+    [data-testid="site-footer"]
+    > .border-t:last-child
+    .max-w-7xl {
+        padding-top: 10px !important;
+        padding-bottom: 10px !important;
+    }
+}
+
+
+/* =========================================================
+   3. LOGOS DE PAGAMENTO DO FOOTER
+
+   Sem brilho/neon.
+   MB e MB WAY brancos.
+   Payshop mantém o vermelho original.
+   ========================================================= */
+
+[data-testid="site-footer"]
+img[src*="/branding/payments/"] {
+    display: block;
+
+    width: auto !important;
+    max-width: 92px;
+
+    height: 25px !important;
+    max-height: 25px !important;
+
+    object-fit: contain;
+
+    opacity: 1 !important;
+
+    box-shadow: none !important;
+    text-shadow: none !important;
+
+    transition: opacity 150ms ease;
+}
+
+
+/* Multibanco */
+[data-testid="site-footer"]
+img[src*="multibanco"] {
+    filter:
+        grayscale(1)
+        brightness(0)
+        invert(1) !important;
+}
+
+
+/* MB WAY */
+[data-testid="site-footer"]
+img[src*="mbway"] {
+    filter:
+        grayscale(1)
+        brightness(0)
+        invert(1) !important;
+}
+
+
+/* Payshop — vermelho original */
+[data-testid="site-footer"]
+img[src*="payshop"] {
+    filter: none !important;
+}
+
+
+/*
+ * Pequenas cápsulas discretas.
+ * Não são caixas brancas e não têm glow.
+ */
+[data-testid="site-footer"]
+div:has(> img[src*="/branding/payments/"]),
+[data-testid="site-footer"]
+span:has(> img[src*="/branding/payments/"]) {
+    min-width: 82px;
+    height: 38px;
+
+    padding: 6px 10px !important;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: rgba(255,255,255,.045) !important;
+
+    border: 1px solid rgba(255,255,255,.14) !important;
+    border-radius: 8px !important;
+
+    box-shadow: none !important;
+}
+
+
+/* =========================================================
+   4. TIPOGRAFIA DO FOOTER UM POUCO MAIS COMPACTA
+   ========================================================= */
+
+@media (min-width: 1024px) {
+
+    [data-testid="site-footer"] li,
+    [data-testid="site-footer"] p,
+    [data-testid="site-footer"] a,
+    [data-testid="site-footer"] button {
+        font-size: 12px;
+    }
+
+    [data-testid="site-footer"] h4 {
+        margin-bottom: 7px !important;
+    }
+
+    [data-testid="site-footer"] ul {
+        row-gap: 4px !important;
+    }
+}
+
+
+/* =========================================================
+   MOBILE/TABLET
+   Footer volta ao fluxo vertical normal.
+   ========================================================= */
+
+@media (max-width: 1023px) {
+
+    [data-testid="site-footer"] {
+        display: block;
+    }
+
+    [data-testid="site-footer"] > div:nth-child(2) {
+        border-right: 0;
+    }
+}
+
+/* ===== END Books footer payment fix 2026 ===== */
+
+/* ===== START Mobile proposal 01 2026 ===== */
+
+
+/* =========================================================
+   DESKTOP
+   Footer mobile não aparece.
+   ========================================================= */
+
+.mobile-footer-compact {
+    display: none;
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 767px) {
+
+
+    /* =====================================================
+       HEADER
+       ===================================================== */
+
+    [data-testid="site-header"] {
+        min-height: 86px;
+    }
+
+
+    /* =====================================================
+       HERO HOMEPAGE
+
+       Fotografia em faixa própria no topo.
+       Recorte deslocado para os alunos.
+       ===================================================== */
+
+    .hero-new {
+        position: relative;
+
+        min-height: 0 !important;
+        max-height: none !important;
+
+        background-size: 0 0 !important;
+
+        overflow: hidden;
+    }
+
+
+    /*
+     * A imagem já está aplicada inline no próprio hero.
+     * O pseudo-elemento herda-a sem voltar a escrever
+     * url() no CSS.
+     */
+    .hero-new::after {
+        content: "" !important;
+
+        display: block !important;
+
+        position: absolute !important;
+        z-index: 0 !important;
+
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+
+        width: 100% !important;
+        height: 170px !important;
+
+        background-image: inherit !important;
+
+        background-size: cover !important;
+
+        /*
+         * O foco fica mais para a direita,
+         * precisamente onde estão os alunos.
+         */
+        background-position: 68% 50% !important;
+
+        background-repeat: no-repeat !important;
+
+        opacity: 1 !important;
+
+        pointer-events: none;
+    }
+
+
+    .hero-new::before {
+        content: "" !important;
+
+        position: absolute !important;
+        z-index: 1 !important;
+
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+
+        height: 170px !important;
+
+        background:
+            linear-gradient(
+                180deg,
+                rgba(247,249,239,0.04) 0%,
+                rgba(247,249,239,0.03) 65%,
+                rgba(247,249,239,0.94) 100%
+            ) !important;
+
+        pointer-events: none;
+    }
+
+
+    .hero-new > .max-w-7xl {
+        position: relative;
+        z-index: 2;
+
+        width: auto !important;
+
+        padding-top: 186px !important;
+        padding-left: 18px !important;
+        padding-right: 18px !important;
+        padding-bottom: 27px !important;
+    }
+
+
+    .hero-books-art {
+        display: none !important;
+    }
+
+
+    .hero-new .inline-flex {
+        margin-bottom: 17px !important;
+    }
+
+
+    .hero-new h1 {
+        max-width: none !important;
+
+        margin-bottom: 15px !important;
+
+        font-size: clamp(36px, 10.8vw, 48px) !important;
+        line-height: 0.99 !important;
+        letter-spacing: -0.035em !important;
+    }
+
+
+    .hero-new h1 + p {
+        max-width: none !important;
+
+        margin-bottom: 21px !important;
+
+        font-size: 16px !important;
+        line-height: 1.62 !important;
+    }
+
+
+    /*
+     * CTAs como na proposta 01.
+     */
+    .hero-new [data-testid="hero-catalog-btn"],
+    .hero-new [data-testid="hero-vouchers-btn"] {
+        width: 100% !important;
+
+        min-height: 48px !important;
+        height: 48px !important;
+
+        justify-content: center !important;
+    }
+
+
+    /*
+     * Card funcional da lista oficial.
+     */
+    .hero-selector-card {
+        width: 100% !important;
+
+        margin-top: 23px !important;
+
+        padding: 20px 18px !important;
+
+        border-radius: 16px !important;
+
+        box-shadow:
+            0 16px 35px -28px
+            rgba(33, 60, 34, 0.38) !important;
+    }
+
+
+    .hero-selector-card h2 {
+        font-size: 24px !important;
+    }
+
+
+    .hero-selector-card button[role="combobox"] {
+        min-height: 44px !important;
+        height: 44px !important;
+    }
+
+
+    /* =====================================================
+       TRUST BAR
+       Mantém os quatro itens,
+       mas ocupa muito menos altura.
+       ===================================================== */
+
+    .home-trust-bar {
+        padding: 20px 18px !important;
+    }
+
+
+    .home-trust-bar > div {
+        gap: 22px 14px !important;
+    }
+
+
+    .home-trust-bar p {
+        margin-top: 2px !important;
+
+        font-size: 12px !important;
+        line-height: 1.45 !important;
+    }
+
+
+    /* =====================================================
+       MANUAIS MAIS PROCURADOS
+
+       2 livros visíveis por vez,
+       como na Proposta 01.
+       ===================================================== */
+
+    .home-featured-section {
+        width: auto !important;
+
+        padding:
+            34px 18px
+            38px !important;
+    }
+
+
+    .home-featured-section h2 {
+        font-size: 30px !important;
+        line-height: 1.05 !important;
+    }
+
+
+    .featured-desktop-grid {
+        display: flex !important;
+
+        grid-template-columns: none !important;
+
+        gap: 10px !important;
+
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+
+        scroll-snap-type: x mandatory;
+
+        scrollbar-width: none;
+
+        padding-bottom: 4px;
+    }
+
+
+    .featured-desktop-grid::-webkit-scrollbar {
+        display: none;
+    }
+
+
+    .home-featured-section .book-card {
+        flex:
+            0 0
+            calc(50% - 5px) !important;
+
+        min-width: 0 !important;
+
+        scroll-snap-align: start;
+
+        display: flex !important;
+        flex-direction: column !important;
+
+        border-radius: 7px !important;
+    }
+
+
+    .home-featured-section
+    .book-card > div:first-child {
+        width: 100% !important;
+
+        min-height: 0 !important;
+
+        padding: 0 !important;
+
+        aspect-ratio: 0.72 !important;
+    }
+
+
+    .home-featured-section
+    .book-card > div:first-child img {
+        width: 100% !important;
+        height: 100% !important;
+
+        object-fit: cover !important;
+    }
+
+
+    .home-featured-section
+    .book-card > div:nth-child(2) {
+        padding: 11px !important;
+    }
+
+
+    .home-featured-section
+    .book-card h3 {
+        font-size: 13px !important;
+        line-height: 1.28 !important;
+    }
+
+
+    .home-featured-section
+    .book-card button {
+        min-height: 34px !important;
+
+        font-size: 11px !important;
+    }
+
+
+    /* =====================================================
+       PARCEIROS — HOMEPAGE
+
+       Mantém exatamente os heros Beira-Mar / Vista Alegre.
+       ===================================================== */
+
+    .home-partners-section {
+        padding:
+            36px 18px
+            38px !important;
+    }
+
+
+    .home-partners-section > .max-w-7xl {
+        width: auto !important;
+
+        display: block !important;
+    }
+
+
+    .home-partners-heading {
+        max-width: none !important;
+
+        margin-bottom: 25px !important;
+
+        text-align: left !important;
+    }
+
+
+    .home-partners-heading h2 {
+        font-size: 31px !important;
+        line-height: 1.06 !important;
+    }
+
+
+    .home-partners-heading p {
+        max-width: none !important;
+
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+
+        font-size: 15px !important;
+        line-height: 1.55 !important;
+    }
+
+
+    .home-partners-grid {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+
+        gap: 10px !important;
+    }
+
+
+    .home-partner-hero {
+        width: 100% !important;
+
+        aspect-ratio: 16 / 7.4 !important;
+
+        border-radius: 0 !important;
+    }
+
+
+    /* =====================================================
+       TUDO NUM SÓ LUGAR
+
+       Menos "caixas grandes",
+       mais lista funcional.
+       ===================================================== */
+
+    [data-testid="home-services"] {
+        padding:
+            36px 18px
+            38px !important;
+    }
+
+
+    [data-testid="home-services"]
+    > .max-w-7xl {
+        width: auto !important;
+    }
+
+
+    [data-testid="home-services"]
+    .text-center {
+        margin-bottom: 24px !important;
+
+        text-align: left !important;
+    }
+
+
+    [data-testid="home-services"]
+    .text-center h2 {
+        font-size: 31px !important;
+        line-height: 1.08 !important;
+    }
+
+
+    [data-testid="home-services"]
+    .text-center p {
+        margin-top: 10px !important;
+        margin-bottom: 0 !important;
+
+        font-size: 15px !important;
+        line-height: 1.55 !important;
+    }
+
+
+    [data-testid="home-services"]
+    .grid {
+        display: block !important;
+
+        margin-top: 0 !important;
+    }
+
+
+    .home-service-card {
+        min-height: 0 !important;
+
+        padding:
+            17px 4px
+            18px !important;
+
+        background: transparent !important;
+
+        border: 0 !important;
+        border-bottom:
+            1px solid
+            #DCE5D7 !important;
+
+        border-radius: 0 !important;
+
+        box-shadow: none !important;
+    }
+
+
+    .home-service-card:last-child {
+        border-bottom: 0 !important;
+    }
+
+
+    .home-service-card > div:first-child {
+        width: 34px !important;
+        height: 34px !important;
+
+        margin-bottom: 10px !important;
+    }
+
+
+    .home-service-card h3 {
+        font-size: 17px !important;
+    }
+
+
+    .home-service-card p {
+        margin-top: 4px !important;
+
+        font-size: 13px !important;
+        line-height: 1.52 !important;
+    }
+
+
+    /* =====================================================
+       PÁGINA PARCEIROS
+
+       Os heros continuam a ser os elementos principais,
+       sem gigantismo dos cards atuais.
+       ===================================================== */
+
+    .partner-feature-card {
+        width: 100% !important;
+
+        margin: 0 !important;
+
+        border-radius: 0 !important;
+
+        box-shadow: none !important;
+    }
+
+
+    .partner-card-hero {
+        width: 100% !important;
+
+        aspect-ratio: 16 / 8 !important;
+
+        border-radius: 0 !important;
+    }
+
+
+    .partner-card-content {
+        padding:
+            18px 16px
+            20px !important;
+    }
+
+
+    .partner-card-content h2,
+    .partner-card-content h3 {
+        font-size: 25px !important;
+        line-height: 1.08 !important;
+    }
+
+
+    .partner-card-content p {
+        font-size: 14px !important;
+        line-height: 1.55 !important;
+    }
+
+
+    /* =====================================================
+       FOOTER MOBILE — PROPOSTA 01
+
+       O footer desktop atual desaparece APENAS no mobile.
+       Cor verde atual mantém-se.
+       ===================================================== */
+
+    [data-testid="site-footer"]
+    > *:not(.mobile-footer-compact) {
+        display: none !important;
+    }
+
+
+    [data-testid="site-footer"] {
+        display: block !important;
+
+        background:
+            #5E7562 !important;
+    }
+
+
+    .mobile-footer-compact {
+        display: block !important;
+
+        width: 100%;
+
+        padding:
+            24px 20px
+            16px;
+
+        color: #FFFFFF;
+    }
+
+
+    .mobile-footer-brand {
+        display: flex;
+        align-items: center;
+
+        gap: 12px;
+
+        margin-bottom: 17px;
+    }
+
+
+    .mobile-footer-brand img {
+        width: 52px;
+        height: 52px;
+
+        object-fit: contain;
+    }
+
+
+    .mobile-footer-brand div {
+        display: flex;
+        flex-direction: column;
+
+        min-width: 0;
+    }
+
+
+    .mobile-footer-brand strong {
+        font-size: 17px;
+        line-height: 1.2;
+    }
+
+
+    .mobile-footer-brand span {
+        margin-top: 3px;
+
+        font-size: 9px;
+        line-height: 1.2;
+
+        letter-spacing: 0.19em;
+    }
+
+
+    .mobile-footer-claim {
+        margin:
+            0 0
+            18px !important;
+
+        color:
+            rgba(
+                255,
+                255,
+                255,
+                0.76
+            ) !important;
+
+        font-family: Georgia, serif;
+
+        font-size: 13px !important;
+        font-style: italic;
+        line-height: 1.55 !important;
+    }
+
+
+    .mobile-footer-details {
+        border-top:
+            1px solid
+            rgba(
+                255,
+                255,
+                255,
+                0.18
+            );
+    }
+
+
+    .mobile-footer-details details {
+        border-bottom:
+            1px solid
+            rgba(
+                255,
+                255,
+                255,
+                0.18
+            );
+    }
+
+
+    .mobile-footer-details summary {
+        position: relative;
+
+        padding:
+            15px 27px
+            15px 0;
+
+        cursor: pointer;
+
+        list-style: none;
+
+        color: #FFFFFF;
+
+        font-size: 12px;
+        font-weight: 700;
+
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+    }
+
+
+    .mobile-footer-details
+    summary::-webkit-details-marker {
+        display: none;
+    }
+
+
+    .mobile-footer-details
+    summary::after {
+        content: "+";
+
+        position: absolute;
+
+        top: 50%;
+        right: 2px;
+
+        transform:
+            translateY(-50%);
+
+        font-size: 18px;
+        font-weight: 400;
+    }
+
+
+    .mobile-footer-details
+    details[open]
+    summary::after {
+        content: "−";
+    }
+
+
+    .mobile-footer-links,
+    .mobile-footer-contact,
+    .mobile-footer-partners {
+        display: grid;
+
+        gap: 10px;
+
+        padding:
+            1px 0
+            16px;
+    }
+
+
+    .mobile-footer-links a,
+    .mobile-footer-links button,
+    .mobile-footer-contact a,
+    .mobile-footer-contact span,
+    .mobile-footer-partners a {
+        padding: 0;
+
+        color:
+            rgba(
+                255,
+                255,
+                255,
+                0.88
+            ) !important;
+
+        background: transparent;
+
+        border: 0;
+
+        text-align: left;
+
+        font-size: 13px;
+        line-height: 1.45;
+
+        text-decoration: none;
+    }
+
+
+    .mobile-footer-contact small {
+        margin-top: -7px;
+
+        color:
+            rgba(
+                255,
+                255,
+                255,
+                0.58
+            );
+
+        font-size: 10px;
+    }
+
+
+    .mobile-footer-partners a {
+        display: flex;
+        align-items: center;
+
+        gap: 10px;
+    }
+
+
+    .mobile-footer-partner {
+        width: 33px;
+        height: 33px;
+
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+
+        flex: 0 0 33px;
+
+        color: white;
+
+        font-weight: 700;
+
+        border-radius: 4px;
+    }
+
+
+    .mobile-footer-partner.bm {
+        background: #080D10;
+    }
+
+
+    .mobile-footer-partner.va {
+        background: #235773;
+    }
+
+
+    .mobile-footer-payment-content {
+        padding:
+            0 0
+            17px;
+    }
+
+
+    .mobile-footer-payment-content p {
+        margin:
+            0 0
+            12px !important;
+
+        color:
+            rgba(
+                255,
+                255,
+                255,
+                .72
+            ) !important;
+
+        font-size: 11px !important;
+    }
+
+
+    .mobile-footer-payment-logos {
+        display: flex;
+
+        gap: 7px;
+
+        flex-wrap: wrap;
+    }
+
+
+    .mobile-footer-payment-logos span {
+        width: auto;
+        min-width: 76px;
+        height: 38px;
+
+        padding: 5px 9px;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        background:
+            rgba(
+                255,
+                255,
+                255,
+                .055
+            );
+
+        border:
+            1px solid
+            rgba(
+                255,
+                255,
+                255,
+                .18
+            );
+
+        border-radius: 7px;
+    }
+
+
+    .mobile-footer-payment-logos img {
+        display: block;
+
+        width: auto !important;
+        max-width: 88px !important;
+
+        height: 23px !important;
+
+        object-fit: contain;
+
+        filter: none !important;
+    }
+
+
+    .mobile-footer-payment-logos
+    img[src*="multibanco"],
+    .mobile-footer-payment-logos
+    img[src*="mbway"] {
+        filter:
+            grayscale(1)
+            brightness(0)
+            invert(1) !important;
+    }
+
+
+    .mobile-footer-bottom {
+        padding-top: 16px;
+
+        text-align: center;
+    }
+
+
+    .mobile-footer-bottom p {
+        margin:
+            0 0
+            7px !important;
+
+        color:
+            rgba(
+                255,
+                255,
+                255,
+                .68
+            ) !important;
+
+        font-size: 10px !important;
+        line-height: 1.45 !important;
+    }
+
+
+    .mobile-footer-bottom strong {
+        color: #FFFFFF;
+    }
+}
+
+/* ===== END Mobile proposal 01 2026 ===== */
+
+/* =========================================================
+   MOBILE REFINEMENT — HERO + FOOTER
+   proposta 1 + cor atual do rodapé
+   ========================================================= */
+
+@media (max-width: 768px) {
+
+  /* ---------- HERO MOBILE ---------- */
+
+  .home-hero,
+  .homepage-hero,
+  .hero-home,
+  .hero-section-main {
+    background: linear-gradient(180deg, #F7F8F2 0%, #EEF3E7 100%) !important;
+    padding-top: 0 !important;
+  }
+
+  .home-hero-media,
+  .homepage-hero-media,
+  .hero-home-media,
+  .hero-visual,
+  .hero-image-wrap,
+  .home-hero-figure {
+    position: relative !important;
+    margin: 14px 20px 10px !important;
+    height: clamp(165px, 42vw, 215px) !important;
+    border-radius: 999px !important;
+    overflow: hidden !important;
+    display: block !important;
+  }
+
+  .home-hero-media img,
+  .homepage-hero-media img,
+  .hero-home-media img,
+  .hero-visual img,
+  .hero-image-wrap img,
+  .home-hero-figure img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    object-position: 68% center !important; /* mais centrado nos alunos */
+    display: block !important;
+  }
+
+  .home-hero-media::after,
+  .homepage-hero-media::after,
+  .hero-home-media::after,
+  .hero-visual::after,
+  .hero-image-wrap::after,
+  .home-hero-figure::after {
+    content: "" !important;
+    position: absolute !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    height: 42% !important;
+    background: linear-gradient(
+      to bottom,
+      rgba(247, 248, 242, 0) 0%,
+      rgba(247, 248, 242, 0.78) 68%,
+      #F7F8F2 100%
+    ) !important;
+    pointer-events: none !important;
+  }
+
+  .home-hero-badge,
+  .homepage-hero-badge,
+  .hero-home-badge,
+  .hero-badge,
+  .home-hero-eyebrow {
+    position: relative !important;
+    z-index: 2 !important;
+    margin: -6px 20px 14px !important; /* aproxima a badge à imagem */
+  }
+
+  .home-hero-content,
+  .homepage-hero-content,
+  .hero-home-content,
+  .hero-copy,
+  .hero-text {
+    padding: 0 20px !important;
+  }
+
+  .home-hero-title,
+  .homepage-hero-title,
+  .hero-home-title,
+  .hero-title {
+    margin-bottom: 14px !important;
+  }
+
+  .home-hero-description,
+  .homepage-hero-description,
+  .hero-home-description,
+  .hero-description {
+    margin-bottom: 18px !important;
+  }
+
+  .home-hero-actions,
+  .homepage-hero-actions,
+  .hero-home-actions,
+  .hero-actions {
+    gap: 12px !important;
+    margin-bottom: 20px !important;
+  }
+
+  .home-hero-card,
+  .homepage-hero-card,
+  .hero-home-card,
+  .school-finder-card,
+  .hero-school-card {
+    margin: 0 20px 0 !important;
+  }
+
+  /* ---------- FOOTER MOBILE COMPACTO ---------- */
+
+  .site-footer,
+  .footer,
+  .main-footer {
+    background: #667F67 !important; /* cor atual/sem mudar a identidade */
+    color: #F7FAF4 !important;
+    padding: 26px 20px 18px !important;
+  }
+
+  .site-footer a,
+  .footer a,
+  .main-footer a {
+    color: #F7FAF4 !important;
+  }
+
+  .site-footer .footer-top,
+  .site-footer .footer-main,
+  .site-footer .footer-grid,
+  .footer .footer-top,
+  .footer .footer-main,
+  .footer .footer-grid,
+  .main-footer .footer-top,
+  .main-footer .footer-main,
+  .main-footer .footer-grid {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 18px !important;
+  }
+
+  .site-footer .footer-brand,
+  .footer .footer-brand,
+  .main-footer .footer-brand {
+    margin-bottom: 4px !important;
+  }
+
+  .site-footer .footer-brand p,
+  .footer .footer-brand p,
+  .main-footer .footer-brand p {
+    margin-bottom: 0 !important;
+    max-width: none !important;
+  }
+
+  .site-footer .footer-columns,
+  .footer .footer-columns,
+  .main-footer .footer-columns {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 18px 22px !important;
+  }
+
+  .site-footer h4,
+  .site-footer h5,
+  .footer h4,
+  .footer h5,
+  .main-footer h4,
+  .main-footer h5 {
+    margin-bottom: 10px !important;
+    font-size: 12px !important;
+    letter-spacing: 0.18em !important;
+    text-transform: uppercase !important;
+    opacity: 0.95 !important;
+  }
+
+  .site-footer ul,
+  .footer ul,
+  .main-footer ul {
+    margin: 0 !important;
+    padding: 0 !important;
+    list-style: none !important;
+  }
+
+  .site-footer li,
+  .footer li,
+  .main-footer li {
+    margin-bottom: 8px !important;
+  }
+
+  .site-footer [class*="partners"],
+  .footer [class*="partners"],
+  .main-footer [class*="partners"] {
+    margin-top: 4px !important;
+    padding-top: 14px !important;
+    border-top: 1px solid rgba(255,255,255,0.14) !important;
+  }
+
+  .site-footer [class*="payment"],
+  .footer [class*="payment"],
+  .main-footer [class*="payment"] {
+    margin-top: 2px !important;
+    padding-top: 14px !important;
+    border-top: 1px solid rgba(255,255,255,0.14) !important;
+  }
+
+  .site-footer [class*="payment"] img,
+  .footer [class*="payment"] img,
+  .main-footer [class*="payment"] img {
+    max-height: 26px !important;
+    width: auto !important;
+    object-fit: contain !important;
+    display: inline-block !important;
+    vertical-align: middle !important;
+  }
+
+  .site-footer [class*="payment-logos"],
+  .site-footer [class*="payments-logos"],
+  .footer [class*="payment-logos"],
+  .footer [class*="payments-logos"],
+  .main-footer [class*="payment-logos"],
+  .main-footer [class*="payments-logos"] {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+    align-items: center !important;
+  }
+
+  .site-footer [class*="bottom"],
+  .footer [class*="bottom"],
+  .main-footer [class*="bottom"] {
+    margin-top: 16px !important;
+    padding-top: 14px !important;
+    border-top: 1px solid rgba(255,255,255,0.14) !important;
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+    text-align: left !important;
+  }
+}
+
+
+/* =========================================================
+   PATCH 2026-08-27 — SUPPORT SECTION + FOOTER REFINEMENT
+   proposta 01 mobile, sem newsletter, mantendo conteúdo
+   ========================================================= */
+
+/* ---------- HOME SUPPORT / "Tudo num só lugar" ---------- */
+
+.home-support-section {
+  padding-top: 56px !important;
+  padding-bottom: 64px !important;
+  background: #FAFBF7 !important;
+}
+
+.home-support-section::before {
+  display: none !important;
+}
+
+.home-support-heading {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 14px !important;
+  margin-bottom: 28px !important;
+}
+
+.home-support-heading > p {
+  max-width: 720px !important;
+  margin-top: 0 !important;
+}
+
+.home-support-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 18px !important;
+  align-items: stretch !important;
+}
+
+.home-support-card {
+  position: relative !important;
+  padding: 26px 24px !important;
+  background: #FFFFFF !important;
+  border: 1px solid #DCE7D5 !important;
+  border-radius: 14px !important;
+  min-height: 0 !important;
+  box-shadow: 0 14px 30px -26px rgba(18, 38, 36, 0.18) !important;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease !important;
+}
+
+.home-support-card:hover {
+  transform: translateY(-2px) !important;
+  border-color: #C8D8C0 !important;
+  box-shadow: 0 18px 34px -24px rgba(18, 38, 36, 0.22) !important;
+}
+
+.home-support-card-top {
+  display: flex !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  gap: 12px !important;
+  margin-bottom: 18px !important;
+}
+
+.home-support-card-top > span {
+  display: none !important; /* esconde 01, 02, 03... */
+}
+
+.home-support-icon {
+  width: 54px !important;
+  height: 54px !important;
+  border-radius: 12px !important;
+  display: grid !important;
+  place-items: center !important;
+  background: #F5F9F0 !important;
+  border: 1px solid #D8E5D1 !important;
+  color: #397448 !important;
+}
+
+.home-support-card h3 {
+  margin-top: 0 !important;
+  font-size: 1.05rem !important;
+  line-height: 1.25 !important;
+}
+
+.home-support-card p {
+  margin-top: 10px !important;
+  min-height: 0 !important;
+}
+
+.home-support-contact {
+  display: none !important; /* remove a caixa/cta extra tipo newsletter */
+}
+
+@media (max-width: 1100px) {
+  .home-support-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .home-support-section {
+    padding-top: 46px !important;
+    padding-bottom: 54px !important;
+  }
+
+  .home-support-heading {
+    margin-bottom: 22px !important;
+    gap: 10px !important;
+  }
+
+  .home-support-heading > p {
+    max-width: none !important;
+  }
+
+  .home-support-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  .home-support-card {
+    padding: 24px 20px !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+  }
+
+  .home-support-icon {
+    width: 50px !important;
+    height: 50px !important;
+  }
+}
+
+/* ---------- FOOTER ---------- */
+
+.site-footer,
+.footer,
+.main-footer {
+  background: #667F67 !important; /* manter a cor atual */
+}
+
+.footer-instagram-inline {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  color: inherit !important;
+  text-decoration: none !important;
+}
+
+.footer-instagram-inline:hover {
+  opacity: 0.9;
+}
+
+.footer-instagram-inline svg {
+  width: 18px !important;
+  height: 18px !important;
+  flex: 0 0 auto !important;
+}
+
+/* mais compacto no mobile */
+@media (max-width: 768px) {
+  .site-footer,
+  .footer,
+  .main-footer {
+    padding-top: 24px !important;
+    padding-bottom: 18px !important;
+  }
+
+  .site-footer .footer-top,
+  .site-footer .footer-main,
+  .site-footer .footer-grid,
+  .footer .footer-top,
+  .footer .footer-main,
+  .footer .footer-grid,
+  .main-footer .footer-top,
+  .main-footer .footer-main,
+  .main-footer .footer-grid {
+    gap: 14px !important;
+  }
+
+  .site-footer .footer-columns,
+  .footer .footer-columns,
+  .main-footer .footer-columns {
+    gap: 14px !important;
+  }
+
+  .site-footer li,
+  .footer li,
+  .main-footer li {
+    margin-bottom: 6px !important;
+  }
+}
+
+/* linha de separação por baixo de pagamentos seguros */
+@media (min-width: 769px) {
+  .site-footer [class*="payment"],
+  .footer [class*="payment"],
+  .main-footer [class*="payment"] {
+    padding-bottom: 16px !important;
+    margin-bottom: 16px !important;
+    border-bottom: 1px solid rgba(255,255,255,0.14) !important;
+  }
+}
+
+/* parte final do rodapé centrada no desktop */
+@media (min-width: 769px) {
+  .site-footer [class*="bottom"],
+  .footer [class*="bottom"],
+  .main-footer [class*="bottom"] {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    text-align: center !important;
+  }
+
+  .site-footer [class*="bottom"] > *,
+  .footer [class*="bottom"] > *,
+  .main-footer [class*="bottom"] > * {
+    margin-left: auto !important;
+    margin-right: auto !important;
+    text-align: center !important;
+  }
+}
+
+/* ===== START Catalog Partners Mobile Proposal 01 ===== */
+
+@media (max-width: 767px) {
+
+
+/* =========================================================
+   CATÁLOGO
+   ========================================================= */
+
+[data-testid="catalog-page"] {
+    width: 100% !important;
+    max-width: none !important;
+
+    padding:
+        30px 16px
+        46px !important;
+}
+
+
+/* ---------- título ---------- */
+
+[data-testid="catalog-page"] > div:first-of-type {
+    margin-bottom: 24px !important;
+}
+
+[data-testid="catalog-page"] h1 {
+    margin-bottom: 7px !important;
+
+    font-size: 34px !important;
+    line-height: 1.04 !important;
+    letter-spacing: -0.025em;
+}
+
+
+/* ---------- filtros ---------- */
+
+[data-testid="catalog-filters"] {
+    margin-bottom: 22px !important;
+
+    padding: 14px !important;
+
+    background:
+        linear-gradient(
+            145deg,
+            #F5F8EE 0%,
+            #FAFAF5 100%
+        ) !important;
+
+    border:
+        1px solid
+        #DCE6D5 !important;
+
+    border-radius: 8px !important;
+
+    box-shadow: none !important;
+}
+
+
+/* pesquisa ocupa largura inteira */
+
+[data-testid="catalog-filters"] form {
+    margin-bottom: 11px !important;
+}
+
+[data-testid="catalog-search-input"] {
+    height: 44px !important;
+
+    background: #FFFFFF !important;
+
+    font-size: 14px !important;
+}
+
+
+/* 2 filtros por linha */
+
+[data-testid="catalog-filters"] .grid {
+    display: grid !important;
+
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr)) !important;
+
+    gap: 9px !important;
+}
+
+
+/* selects mais compactos */
+
+[data-testid="catalog-filters"]
+button[role="combobox"] {
+    width: 100% !important;
+
+    height: 42px !important;
+    min-height: 42px !important;
+
+    padding-left: 11px !important;
+    padding-right: 9px !important;
+
+    background: #FFFFFF !important;
+
+    font-size: 13px !important;
+}
+
+
+/* limpar filtros */
+
+[data-testid="clear-filters-btn"] {
+    grid-column: 1 / -1 !important;
+
+    width: 100% !important;
+
+    height: 39px !important;
+
+    margin-top: 1px;
+}
+
+
+/* ---------- contador ---------- */
+
+[data-testid="catalog-count"] {
+    margin-bottom: 13px !important;
+
+    padding: 0 2px;
+
+    font-size: 13px !important;
+}
+
+[data-testid="catalog-count"] span:last-child {
+    font-size: 11px !important;
+}
+
+
+/* ---------- grid de produtos ---------- */
+
+[data-testid="catalog-grid"] {
+    display: grid !important;
+
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr)) !important;
+
+    gap:
+        14px
+        10px !important;
+}
+
+
+/*
+ * Apenas BookCards do catálogo.
+ * O BookCard global não é alterado.
+ */
+
+[data-testid="catalog-grid"] .book-card {
+    min-width: 0 !important;
+
+    border-radius: 6px !important;
+
+    overflow: hidden !important;
+
+    box-shadow: none !important;
+}
+
+
+/* capa */
+
+[data-testid="catalog-grid"]
+.book-card > div:first-child {
+    width: 100% !important;
+
+    min-height: 0 !important;
+
+    padding: 0 !important;
+
+    aspect-ratio: 0.72 !important;
+
+    background: #F7F8F3 !important;
+}
+
+[data-testid="catalog-grid"]
+.book-card > div:first-child img {
+    width: 100% !important;
+    height: 100% !important;
+
+    object-fit: cover !important;
+    object-position: center !important;
+}
+
+
+/* conteúdo */
+
+[data-testid="catalog-grid"]
+.book-card > div:nth-child(2) {
+    min-width: 0 !important;
+
+    padding:
+        11px 10px
+        12px !important;
+}
+
+[data-testid="catalog-grid"]
+.book-card h3 {
+    display: -webkit-box;
+
+    overflow: hidden;
+
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+
+    min-height: 34px;
+
+    margin-bottom: 4px !important;
+
+    font-size: 13px !important;
+    line-height: 1.3 !important;
+}
+
+
+/* disciplina / editora */
+
+[data-testid="catalog-grid"]
+.book-card > div:nth-child(2)
+> div:first-child {
+    font-size: 8px !important;
+}
+
+[data-testid="catalog-grid"]
+.book-card > div:nth-child(2)
+> div:nth-child(3) {
+    margin-bottom: 9px !important;
+
+    font-size: 10px !important;
+}
+
+
+/* preço */
+
+[data-testid="catalog-grid"]
+.book-card > div:nth-child(2)
+> div:last-child > span {
+    font-size: 17px !important;
+}
+
+
+/* botão adicionar */
+
+[data-testid="catalog-grid"]
+.book-card button {
+    min-height: 34px !important;
+    height: 34px !important;
+
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+
+    font-size: 11px !important;
+}
+
+
+/* badges */
+
+[data-testid="catalog-grid"]
+.book-card > div:first-child > span,
+[data-testid="catalog-grid"]
+.book-card [data-testid="stock-badge"] {
+    padding:
+        4px 6px !important;
+
+    font-size: 8px !important;
+}
+
+
+/* ---------- paginação ---------- */
+
+[data-testid="catalog-pagination"] {
+    margin-top: 30px !important;
+
+    padding-bottom: 4px;
+
+    justify-content: flex-start !important;
+
+    flex-wrap: nowrap !important;
+
+    overflow-x: auto;
+
+    scrollbar-width: none;
+}
+
+[data-testid="catalog-pagination"]::-webkit-scrollbar {
+    display: none;
+}
+
+[data-testid="catalog-pagination"] > * {
+    flex: 0 0 auto;
+}
+
+
+/* =========================================================
+   PÁGINA PARCEIROS
+   ========================================================= */
+
+[data-testid="partners-page"] {
+    width: 100% !important;
+    max-width: none !important;
+
+    padding:
+        0 0
+        44px !important;
+}
+
+
+/* ---------- hero da página ---------- */
+
+[data-testid="partners-page"] .partners-hero,
+[data-testid="partners-page"] .partners-page-hero,
+[data-testid="partners-page"] .partner-page-hero {
+    min-height: 0 !important;
+
+    padding:
+        44px 20px
+        38px !important;
+}
+
+
+/*
+ * A composição de fundo mantém Beira-Mar e Vista Alegre,
+ * mas deixa de ocupar quase um ecrã inteiro.
+ */
+
+[data-testid="partners-page"]
+.partners-hero img,
+[data-testid="partners-page"]
+.partners-page-hero img,
+[data-testid="partners-page"]
+.partner-page-hero img {
+    max-height: 280px !important;
+
+    object-fit: cover !important;
+}
+
+
+/* texto introdutório */
+
+[data-testid="partners-page"]
+.partners-hero h1,
+[data-testid="partners-page"]
+.partners-page-hero h1,
+[data-testid="partners-page"]
+.partner-page-hero h1 {
+    font-size: 36px !important;
+    line-height: 1.03 !important;
+}
+
+[data-testid="partners-page"]
+.partners-hero p,
+[data-testid="partners-page"]
+.partners-page-hero p,
+[data-testid="partners-page"]
+.partner-page-hero p {
+    font-size: 15px !important;
+    line-height: 1.58 !important;
+}
+
+
+/* =========================================================
+   CARDS DOS DOIS PARCEIROS
+   ========================================================= */
+
+[data-testid="partners-page"]
+.partner-feature-card {
+    width: calc(100% - 32px) !important;
+    max-width: none !important;
+
+    margin:
+        0 auto
+        18px !important;
+
+    overflow: hidden !important;
+
+    background: #FFFFFF !important;
+
+    border:
+        1px solid
+        #DCE5D7 !important;
+
+    border-radius: 0 !important;
+
+    box-shadow: none !important;
+}
+
+
+/* hero Beira-Mar / Vista Alegre */
+
+[data-testid="partners-page"]
+.partner-card-hero {
+    width: 100% !important;
+
+    aspect-ratio: 16 / 7.5 !important;
+
+    overflow: hidden !important;
+
+    border-radius: 0 !important;
+}
+
+[data-testid="partners-page"]
+.partner-card-hero-image {
+    width: 100% !important;
+    height: 100% !important;
+
+    object-fit: cover !important;
+    object-position: center !important;
+}
+
+
+/* descrição abaixo do hero */
+
+[data-testid="partners-page"]
+.partner-card-content {
+    padding:
+        20px 18px
+        21px !important;
+
+    background: #FFFFFF !important;
+}
+
+[data-testid="partners-page"]
+.partner-card-content::before {
+    content: "";
+
+    display: block;
+
+    width: 48px;
+    height: 3px;
+
+    margin-bottom: 14px;
+
+    background: #7096B0;
+}
+
+
+/* Beira-Mar = dourado */
+
+[data-testid="partners-page"]
+.partner-card-content.partner-tone-gold::before {
+    background: #CFAC35;
+}
+
+
+/* Vista Alegre = azul */
+
+[data-testid="partners-page"]
+.partner-card-content.partner-tone-blue::before {
+    background: #7096B0;
+}
+
+
+[data-testid="partners-page"]
+.partner-card-content h2,
+[data-testid="partners-page"]
+.partner-card-content h3 {
+    margin-bottom: 11px !important;
+
+    font-size: 25px !important;
+    line-height: 1.08 !important;
+    letter-spacing: -0.025em;
+}
+
+[data-testid="partners-page"]
+.partner-card-content p {
+    margin: 0 !important;
+
+    font-size: 14px !important;
+    line-height: 1.58 !important;
+}
+
+
+/* benefício */
+
+[data-testid="partners-page"]
+.partner-card-content span {
+    font-size: 11px !important;
+}
+
+
+/* =========================================================
+   "FAZER PARTE"
+   deixa de parecer outro card gigante
+   ========================================================= */
+
+[data-testid="partners-page"]
+.partner-join-card,
+[data-testid="partners-page"]
+.partners-join-card,
+[data-testid="partners-page"]
+.partner-cta-card {
+    width: calc(100% - 40px) !important;
+    max-width: none !important;
+
+    margin:
+        30px auto
+        36px !important;
+
+    padding:
+        25px 0
+        26px !important;
+
+    background: transparent !important;
+
+    border: 0 !important;
+    border-top:
+        1px solid
+        #CCDCC5 !important;
+    border-bottom:
+        1px solid
+        #CCDCC5 !important;
+
+    border-radius: 0 !important;
+
+    box-shadow: none !important;
+}
+
+
+[data-testid="partners-page"]
+.partner-join-card h2,
+[data-testid="partners-page"]
+.partners-join-card h2,
+[data-testid="partners-page"]
+.partner-cta-card h2 {
+    font-size: 27px !important;
+    line-height: 1.08 !important;
+}
+
+
+[data-testid="partners-page"]
+.partner-join-card p,
+[data-testid="partners-page"]
+.partners-join-card p,
+[data-testid="partners-page"]
+.partner-cta-card p {
+    font-size: 14px !important;
+    line-height: 1.55 !important;
+}
+
+
+[data-testid="partners-page"]
+.partner-join-card a,
+[data-testid="partners-page"]
+.partners-join-card a,
+[data-testid="partners-page"]
+.partner-cta-card a {
+    width: 100%;
+
+    margin-top: 18px;
+
+    justify-content: center;
+}
+
+
+/* =========================================================
+   SUPPORT JOURNEY NA PÁGINA PARCEIROS
+
+   reaproveita o estilo compacto já aprovado.
+   ========================================================= */
+
+[data-testid="partners-page"]
+.home-support-section {
+    margin-top: 20px !important;
+
+    padding:
+        40px 18px
+        44px !important;
+}
+
+
+[data-testid="partners-page"]
+.home-support-heading {
+    margin-bottom: 22px !important;
+}
+
+
+[data-testid="partners-page"]
+.home-support-heading h2 {
+    font-size: 32px !important;
+    line-height: 1.05 !important;
+}
+
+
+[data-testid="partners-page"]
+.home-support-grid {
+    display: grid !important;
+
+    grid-template-columns: 1fr !important;
+
+    gap: 12px !important;
+}
+
+
+[data-testid="partners-page"]
+.home-support-card {
+    min-height: 0 !important;
+
+    padding:
+        19px 17px
+        20px !important;
+
+    border-radius: 8px !important;
+
+    box-shadow: none !important;
+}
+
+
+[data-testid="partners-page"]
+.home-support-card h3 {
+    margin-top: 13px !important;
+
+    font-size: 18px !important;
+}
+
+
+[data-testid="partners-page"]
+.home-support-card p {
+    font-size: 13px !important;
+    line-height: 1.5 !important;
+}
+
+}
+
+/* ===== END Catalog Partners Mobile Proposal 01 ===== */
+
+/* ===== START Public mobile pages 2026 ===== */
+
+@media (max-width: 767px) {
+
+
+/* =========================================================
+   BASE DAS PÁGINAS
+   ========================================================= */
+
+[data-testid="contacts-page"],
+[data-testid="voucher-guide-page"],
+[data-testid="track-order-page"],
+[data-testid="faq-page"],
+[data-testid="about-page"] {
+    width: 100% !important;
+    max-width: none !important;
+
+    padding:
+        36px 20px
+        48px !important;
+}
+
+
+[data-testid="contacts-page"] h1,
+[data-testid="voucher-guide-page"] h1,
+[data-testid="track-order-page"] h1,
+[data-testid="faq-page"] h1,
+[data-testid="about-page"] h1 {
+    font-size: 34px !important;
+    line-height: 1.04 !important;
+    letter-spacing: -0.03em !important;
+}
+
+
+/* =========================================================
+   CONTACTOS
+
+   Em vez de duas grandes caixas:
+   informação principal limpa + bloco verde do responsável.
+   ========================================================= */
+
+[data-testid="contacts-page"] > p {
+    margin-bottom: 28px !important;
+}
+
+
+[data-testid="contacts-page"] > .grid {
+    display: block !important;
+}
+
+
+/* bloco de contactos */
+
+[data-testid="contacts-page"] > .grid > div:first-child {
+    padding:
+        23px 0
+        25px !important;
+
+    background: transparent !important;
+
+    border: 0 !important;
+    border-top:
+        1px solid
+        #DCE5D7 !important;
+    border-bottom:
+        1px solid
+        #DCE5D7 !important;
+
+    border-radius: 0 !important;
+
+    box-shadow: none !important;
+}
+
+
+[data-testid="contacts-page"]
+> .grid > div:first-child h2 {
+    margin-bottom: 19px !important;
+
+    font-size: 24px !important;
+}
+
+
+[data-testid="contacts-page"]
+> .grid > div:first-child ul {
+    display: grid;
+
+    gap: 16px !important;
+}
+
+
+[data-testid="contacts-page"]
+> .grid > div:first-child li {
+    gap: 13px !important;
+
+    font-size: 15px !important;
+    line-height: 1.45;
+}
+
+
+[data-testid="contacts-page"]
+> .grid > div:first-child li svg {
+    width: 19px !important;
+    height: 19px !important;
+
+    flex: 0 0 19px;
+}
+
+
+/* horário */
+
+[data-testid="contacts-page"]
+> .grid > div:first-child
+.border-t {
+    margin-top: 21px !important;
+
+    padding-top: 18px !important;
+}
+
+
+/* Responsável */
+
+[data-testid="contacts-page"] > .grid > div:last-child {
+    margin-top: 18px;
+
+    padding:
+        25px 22px
+        27px !important;
+
+    border-radius: 8px !important;
+
+    box-shadow: none !important;
+}
+
+
+[data-testid="contacts-page"]
+> .grid > div:last-child h2 {
+    font-size: 20px !important;
+}
+
+
+[data-testid="contacts-page"]
+> .grid > div:last-child
+.font-serif {
+    margin-top: 6px;
+
+    font-size: 27px !important;
+    line-height: 1.12;
+}
+
+
+/* =========================================================
+   VOUCHER — COMO FUNCIONA
+
+   Os três cards passam a uma sequência editorial vertical.
+   ========================================================= */
+
+[data-testid="voucher-guide-page"] > p {
+    margin-bottom: 30px !important;
+}
+
+
+[data-testid="voucher-guide-page"]
+> .grid {
+    display: block !important;
+
+    margin-bottom: 30px !important;
+
+    border-top:
+        1px solid
+        #D7E3D2;
+}
+
+
+[data-testid="voucher-guide-page"]
+[data-testid^="voucher-step-"] {
+    position: relative;
+
+    display: grid !important;
+
+    grid-template-columns:
+        50px 1fr !important;
+
+    column-gap: 15px;
+
+    padding:
+        22px 0
+        24px !important;
+
+    background: transparent !important;
+
+    border: 0 !important;
+    border-bottom:
+        1px solid
+        #D7E3D2 !important;
+
+    border-radius: 0 !important;
+
+    box-shadow: none !important;
+}
+
+
+/* número grande */
+
+[data-testid="voucher-guide-page"]
+[data-testid^="voucher-step-"]
+> div:first-child {
+    grid-row: 1 / span 3;
+
+    margin: 0 !important;
+
+    font-size: 46px !important;
+    line-height: 0.9 !important;
+}
+
+
+/* ícone */
+
+[data-testid="voucher-guide-page"]
+[data-testid^="voucher-step-"] svg {
+    grid-column: 2;
+
+    margin-bottom: 8px !important;
+}
+
+
+/* título + descrição */
+
+[data-testid="voucher-guide-page"]
+[data-testid^="voucher-step-"] h3,
+[data-testid="voucher-guide-page"]
+[data-testid^="voucher-step-"] p {
+    grid-column: 2;
+}
+
+
+[data-testid="voucher-guide-page"]
+[data-testid^="voucher-step-"] h3 {
+    margin-bottom: 5px !important;
+
+    font-size: 18px !important;
+}
+
+
+/* nota importante */
+
+[data-testid="voucher-guide-page"]
+> .bg-\[\#F5F8EC\] {
+    padding:
+        20px 0 !important;
+
+    background: transparent !important;
+
+    border: 0 !important;
+    border-top:
+        1px solid
+        #CBDCC4 !important;
+    border-bottom:
+        1px solid
+        #CBDCC4 !important;
+
+    border-radius: 0 !important;
+}
+
+
+/* =========================================================
+   SEGUIR ENCOMENDA
+
+   Formulário simples e compacto.
+   ========================================================= */
+
+[data-testid="track-order-page"] > p {
+    margin-bottom: 27px !important;
+}
+
+
+[data-testid="track-order-page"] form {
+    padding:
+        22px 0
+        24px !important;
+
+    background: transparent !important;
+
+    border: 0 !important;
+    border-top:
+        1px solid
+        #DCE5D7 !important;
+    border-bottom:
+        1px solid
+        #DCE5D7 !important;
+
+    border-radius: 0 !important;
+
+    box-shadow: none !important;
+}
+
+
+[data-testid="track-order-page"] form input {
+    min-height: 45px;
+}
+
+
+[data-testid="track-submit-btn"] {
+    margin-top: 4px;
+
+    min-height: 46px !important;
+}
+
+
+/* resultado */
+
+[data-testid="track-result"] {
+    margin-top: 22px !important;
+
+    padding:
+        22px 0 !important;
+
+    background: transparent !important;
+
+    border: 0 !important;
+    border-top:
+        1px solid
+        #DCE5D7 !important;
+    border-bottom:
+        1px solid
+        #DCE5D7 !important;
+
+    border-radius: 0 !important;
+
+    box-shadow: none !important;
+}
+
+
+[data-testid="track-result"]
+> .grid {
+    gap:
+        18px 14px !important;
+}
+
+
+/* =========================================================
+   FAQ
+
+   Accordions muito mais leves.
+   ========================================================= */
+
+[data-testid="faq-page"] h1 {
+    margin-bottom: 27px !important;
+}
+
+
+[data-testid="faq-page"]
+> .space-y-5 {
+    border-top:
+        1px solid
+        #DCE5D7;
+}
+
+
+[data-testid="faq-page"]
+details {
+    margin: 0 !important;
+
+    padding:
+        18px 2px
+        19px !important;
+
+    background: transparent !important;
+
+    border: 0 !important;
+    border-bottom:
+        1px solid
+        #DCE5D7 !important;
+
+    border-radius: 0 !important;
+
+    box-shadow: none !important;
+}
+
+
+[data-testid="faq-page"]
+details summary {
+    gap: 15px;
+
+    font-size: 16px !important;
+    line-height: 1.35;
+}
+
+
+[data-testid="faq-page"]
+details summary span {
+    flex: 0 0 auto;
+
+    font-size: 22px;
+}
+
+
+/* =========================================================
+   SOBRE NÓS
+
+   Leitura editorial em vez de página longa sem ritmo.
+   ========================================================= */
+
+[data-testid="about-page"]
+> .font-serif {
+    margin-bottom: 28px !important;
+
+    font-size: 19px !important;
+}
+
+
+[data-testid="about-page"]
+> .space-y-10 {
+    display: block;
+}
+
+
+[data-testid="about-page"]
+> .space-y-10 > section {
+    padding:
+        25px 0
+        27px;
+
+    border-top:
+        1px solid
+        #DCE5D7;
+}
+
+
+[data-testid="about-page"]
+> .space-y-10 > section h2 {
+    margin-bottom: 13px !important;
+
+    font-size: 24px !important;
+    line-height: 1.1;
+}
+
+
+[data-testid="about-page"]
+> .space-y-10 > section p {
+    font-size: 15px;
+    line-height: 1.68;
+}
+
+
+/* botões finais */
+
+[data-testid="about-page"]
+.flex.flex-wrap.gap-3 {
+    display: grid !important;
+
+    grid-template-columns: 1fr !important;
+
+    gap: 10px !important;
+
+    padding-top: 24px !important;
+
+    border-top:
+        1px solid
+        #DCE5D7;
+}
+
+
+[data-testid="about-page"]
+.flex.flex-wrap.gap-3 a,
+[data-testid="about-page"]
+.flex.flex-wrap.gap-3 button {
+    width: 100%;
+}
+
+
+/* =========================================================
+   404
+   ========================================================= */
+
+[data-testid="not-found-page"] {
+    padding:
+        70px 20px
+        80px !important;
+}
+
+}
+
+/* ===== END Public mobile pages 2026 ===== */
+
+/* ===== START VERIFIED HOTFIX 2026-08-27 ===== */
+
+
+/* =========================================================
+   HOMEPAGE — MANUAIS
+
+   Existem 2 renderizações no JSX:
+   1) .featured-desktop-grid
+   2) .featured-mobile-track
+
+   Nunca podem aparecer ao mesmo tempo.
+   ========================================================= */
+
+
+/* Até ao breakpoint LG, o grid DESKTOP está sempre escondido. */
+@media (max-width: 1023px) {
+
+    [data-testid="home-featured"]
+    .featured-desktop-grid {
+        display: none !important;
+    }
+
+}
+
+
+/* MOBILE */
+@media (max-width: 767px) {
+
+    [data-testid="home-featured"] {
+        overflow: hidden !important;
+    }
+
+
+    /*
+     * UMA ÚNICA LINHA horizontal.
+     */
+    [data-testid="home-featured"]
+    .featured-mobile-track {
+        display: flex !important;
+
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+
+        align-items: stretch !important;
+
+        gap: 10px !important;
+
+        width: 100% !important;
+
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+
+        padding:
+            2px 0
+            8px !important;
+
+        scrollbar-width: none;
+    }
+
+
+    [data-testid="home-featured"]
+    .featured-mobile-track::-webkit-scrollbar {
+        display: none;
+    }
+
+
+    /*
+     * Dois livros visíveis no ecrã,
+     * como na Proposta 01.
+     */
+    [data-testid="home-featured"]
+    .featured-mobile-item {
+        flex:
+            0 0
+            calc(50% - 5px) !important;
+
+        width:
+            calc(50% - 5px) !important;
+
+        min-width:
+            calc(50% - 5px) !important;
+
+        max-width:
+            calc(50% - 5px) !important;
+
+        scroll-snap-align: start;
+    }
+
+
+    /*
+     * BookCard compacto.
+     */
+    [data-testid="home-featured"]
+    .featured-mobile-item
+    .book-card {
+        width: 100% !important;
+        height: 100% !important;
+
+        display: flex !important;
+        flex-direction: column !important;
+
+        min-width: 0 !important;
+
+        overflow: hidden !important;
+
+        border-radius: 6px !important;
+
+        box-shadow: none !important;
+    }
+
+
+    /* CAPA */
+    [data-testid="home-featured"]
+    .featured-mobile-item
+    .book-card > div:first-child {
+        width: 100% !important;
+
+        min-height: 0 !important;
+
+        padding: 0 !important;
+
+        aspect-ratio: 0.72 !important;
+
+        background: #F7F8F3 !important;
+    }
+
+
+    [data-testid="home-featured"]
+    .featured-mobile-item
+    .book-card > div:first-child img {
+        width: 100% !important;
+        height: 100% !important;
+
+        object-fit: contain !important;
+        object-position: center !important;
+    }
+
+
+    /* CONTEÚDO */
+    [data-testid="home-featured"]
+    .featured-mobile-item
+    .book-card > div:nth-child(2) {
+        flex: 1;
+
+        padding:
+            10px 9px
+            11px !important;
+    }
+
+
+    [data-testid="home-featured"]
+    .featured-mobile-item
+    .book-card h3 {
+        display: -webkit-box;
+
+        min-height: 34px;
+
+        overflow: hidden;
+
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+
+        font-size: 13px !important;
+        line-height: 1.28 !important;
+    }
+
+
+    [data-testid="home-featured"]
+    .featured-mobile-item
+    .book-card button {
+        min-height: 34px !important;
+        height: 34px !important;
+
+        padding:
+            0 10px !important;
+
+        font-size: 11px !important;
+    }
+
+
+    /*
+     * "Ver todo o catálogo" faz parte DA MESMA FILA.
+     */
+    [data-testid="home-featured"]
+    .featured-mobile-see-all {
+        flex:
+            0 0
+            calc(50% - 5px) !important;
+
+        width:
+            calc(50% - 5px) !important;
+
+        min-width:
+            calc(50% - 5px) !important;
+
+        min-height: 100% !important;
+
+        scroll-snap-align: start;
+
+        align-self: stretch;
+    }
+
+}
+
+
+/* =========================================================
+   FOOTER DESKTOP
+   ========================================================= */
+
+@media (min-width: 1024px) {
+
+
+    /*
+     * Parte final:
+     *
+     * © 2026...
+     * Aviso legal...
+     * Website por Jetro Manuel
+     *
+     * tudo realmente CENTRADO.
+     */
+    [data-testid="site-footer"]
+    .footer-desktop-bottom {
+        width: 100% !important;
+
+        display: flex !important;
+
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
+
+        align-items: center !important;
+        justify-content: center !important;
+
+        gap:
+            8px
+            30px !important;
+
+        padding-top: 13px !important;
+        padding-bottom: 13px !important;
+
+        text-align: center !important;
+    }
+
+
+    [data-testid="site-footer"]
+    .footer-desktop-bottom > * {
+        margin: 0 !important;
+
+        text-align: center !important;
+    }
+
+
+    /*
+     * O bloco que CONTÉM Pagamentos seguros
+     * recebe uma linha em baixo a toda a largura.
+     *
+     * :has() é suportado pelos browsers atuais
+     * usados no site.
+     */
+    [data-testid="site-footer"]
+    > div:has([data-testid="footer-payment-methods"]) {
+        border-bottom:
+            1px solid
+            rgba(
+                255,
+                255,
+                255,
+                0.16
+            ) !important;
+    }
+
+
+    /*
+     * Evita que regras antigas ponham outra linha
+     * diretamente à volta dos logos.
+     */
+    [data-testid="footer-payment-methods"] {
+        border-bottom: 0 !important;
+    }
+
+}
+
+
+/* =========================================================
+   FOOTER MOBILE
+
+   Garantir que o footer desktop nunca reaparece por baixo
+   do footer accordion.
+   ========================================================= */
+
+@media (max-width: 767px) {
+
+    [data-testid="site-footer"]
+    > *:not(.mobile-footer-compact) {
+        display: none !important;
+    }
+
+
+    [data-testid="site-footer"]
+    .mobile-footer-compact {
+        display: block !important;
+    }
+
+}
+
+/* ===== END VERIFIED HOTFIX 2026-08-27 ===== */
+
+/* ===== FIX FOOTER BOTTOM CENTER 2026-08-27 ===== */
+
+@media (min-width: 1024px) {
+
+  [data-testid="site-footer"] .footer-desktop-bottom {
+    grid-column: 1 / -1 !important;
+
+    width: 100% !important;
+    max-width: none !important;
+
+    justify-self: stretch !important;
+
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+
+    align-items: center !important;
+    justify-content: center !important;
+
+    gap: 8px 28px !important;
+
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+
+    text-align: center !important;
+  }
+
+  [data-testid="site-footer"] .footer-desktop-bottom > * {
+    margin: 0 !important;
+    text-align: center !important;
+  }
+
+}
+
+/* ===== FOOTER REAL FULL-WIDTH CENTER FIX 2026-08-27 ===== */
+
+@media (min-width: 1024px) {
+
+  /*
+   * O wrapper que contém footer-desktop-bottom
+   * passa a ocupar AS DUAS colunas do footer.
+   */
+  [data-testid="site-footer"]
+  > div:has(.footer-desktop-bottom) {
+    grid-column: 1 / -1 !important;
+
+    width: 100% !important;
+    max-width: none !important;
+
+    margin: 0 !important;
+
+    justify-self: stretch !important;
+
+    border-top: 1px solid rgba(255,255,255,0.16) !important;
+  }
+
+
+  [data-testid="site-footer"]
+  > div:has(.footer-desktop-bottom)
+  > .footer-desktop-bottom {
+    width: 100% !important;
+    max-width: none !important;
+
+    margin: 0 auto !important;
+
+    padding: 13px 30px !important;
+
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+
+    align-items: center !important;
+    justify-content: center !important;
+
+    gap: 8px 28px !important;
+
+    text-align: center !important;
+  }
+
+
+  [data-testid="site-footer"]
+  .footer-desktop-bottom > * {
+    flex: 0 0 auto !important;
+
+    margin: 0 !important;
+
+    text-align: center !important;
+  }
+
+}
+
+/* ===== START CATALOG DESKTOP PROPOSAL 02 ===== */
+
+
+/* =========================================================
+   CATÁLOGO — DESKTOP PROPOSTA 02
+
+   Apenas >= 1024px.
+   Mobile/tablet ficam como estão.
+   ========================================================= */
+
+@media (min-width: 1024px) {
+
+
+    /* -----------------------------------------------------
+       ÁREA GERAL
+       ----------------------------------------------------- */
+
+    [data-testid="catalog-page"] {
+        width: 84% !important;
+        max-width: 1540px !important;
+
+        margin-left: auto !important;
+        margin-right: auto !important;
+
+        padding:
+            46px 0
+            58px !important;
+    }
+
+
+    /* -----------------------------------------------------
+       CABEÇALHO DO CATÁLOGO
+       ----------------------------------------------------- */
+
+    [data-testid="catalog-page"] h1 {
+        position: relative;
+
+        width: fit-content;
+
+        margin:
+            0 0
+            34px !important;
+
+        padding-bottom: 15px;
+
+        font-size: clamp(42px, 3.5vw, 55px) !important;
+        line-height: .98 !important;
+
+        letter-spacing: -0.045em !important;
+
+        color: #10263A;
+    }
+
+
+    [data-testid="catalog-page"] h1::after {
+        content: "";
+
+        position: absolute;
+
+        left: 0;
+        bottom: 0;
+
+        width: 58px;
+        height: 3px;
+
+        background: #5A8F1E;
+
+        border-radius: 999px;
+    }
+
+
+    /*
+     * Eyebrow "CATÁLOGO"
+     */
+    [data-testid="catalog-page"]
+    h1::before {
+        content: none;
+    }
+
+
+    /* -----------------------------------------------------
+       FILTROS
+
+       Pesquisa + filtros numa faixa horizontal profissional.
+       ----------------------------------------------------- */
+
+    [data-testid="catalog-filters"] {
+        display: grid !important;
+
+        grid-template-columns:
+            minmax(270px, 1.8fr)
+            minmax(0, 3.2fr) !important;
+
+        align-items: center !important;
+
+        gap: 18px !important;
+
+        margin:
+            0 0
+            28px !important;
+
+        padding:
+            16px 18px !important;
+
+        background:
+            rgba(255,255,255,.88) !important;
+
+        border:
+            1px solid
+            #DDE5E8 !important;
+
+        border-radius: 8px !important;
+
+        box-shadow:
+            0 14px 35px -28px
+            rgba(16,38,58,.32) !important;
+    }
+
+
+    [data-testid="catalog-filters"] form {
+        width: 100% !important;
+
+        margin: 0 !important;
+    }
+
+
+    [data-testid="catalog-search-input"] {
+        width: 100% !important;
+
+        min-height: 46px !important;
+        height: 46px !important;
+
+        background: #FFFFFF !important;
+
+        border-color: #DCE3E6 !important;
+
+        border-radius: 5px !important;
+
+        font-size: 13px !important;
+    }
+
+
+    /*
+     * Concelho / Escola / Ano / Disciplina / Tipo
+     * todos na mesma linha.
+     */
+    [data-testid="catalog-filters"]
+    .grid {
+        display: grid !important;
+
+        grid-template-columns:
+            repeat(5, minmax(0, 1fr)) !important;
+
+        gap: 10px !important;
+
+        width: 100% !important;
+    }
+
+
+    [data-testid="catalog-filters"]
+    button[role="combobox"] {
+        width: 100% !important;
+
+        min-width: 0 !important;
+
+        height: 46px !important;
+        min-height: 46px !important;
+
+        padding-left: 12px !important;
+        padding-right: 10px !important;
+
+        background: #FFFFFF !important;
+
+        border:
+            1px solid
+            #DCE3E6 !important;
+
+        border-radius: 5px !important;
+
+        font-size: 12px !important;
+
+        box-shadow: none !important;
+    }
+
+
+    [data-testid="catalog-filters"]
+    button[role="combobox"]:hover {
+        border-color: #B9C9B5 !important;
+
+        background: #FCFDF9 !important;
+    }
+
+
+    /*
+     * Caso Limpar filtros apareça,
+     * não destrói a linha principal.
+     */
+    [data-testid="clear-filters-btn"] {
+        grid-column: 1 / -1 !important;
+
+        width: fit-content !important;
+
+        justify-self: end !important;
+
+        height: 32px !important;
+        min-height: 32px !important;
+
+        padding:
+            0 10px !important;
+
+        border: 0 !important;
+
+        color: #E87510 !important;
+
+        font-size: 11px !important;
+    }
+
+
+    /* -----------------------------------------------------
+       RESULTADOS / PÁGINA
+       ----------------------------------------------------- */
+
+    [data-testid="catalog-count"] {
+        display: flex !important;
+
+        align-items: center !important;
+        justify-content: space-between !important;
+
+        width: 100% !important;
+
+        margin:
+            0 0
+            14px !important;
+
+        padding:
+            0 1px !important;
+
+        color: #526174;
+
+        font-size: 13px !important;
+    }
+
+
+    [data-testid="catalog-count"] > *:first-child {
+        color: #10263A;
+
+        font-weight: 500;
+    }
+
+
+    [data-testid="catalog-count"] > *:last-child {
+        font-size: 11px !important;
+
+        color: #536174;
+    }
+
+
+    /* -----------------------------------------------------
+       GRID
+
+       DESKTOP GRANDE = 6 COLUNAS
+       18 produtos = exatamente 3 filas.
+       ----------------------------------------------------- */
+
+    [data-testid="catalog-grid"] {
+        display: grid !important;
+
+        grid-template-columns:
+            repeat(6, minmax(0, 1fr)) !important;
+
+        gap:
+            18px
+            14px !important;
+
+        align-items: stretch !important;
+
+        width: 100% !important;
+    }
+
+
+    /* -----------------------------------------------------
+       CARDS
+       mais compactos e editoriais
+       ----------------------------------------------------- */
+
+    [data-testid="catalog-grid"]
+    .book-card {
+        min-width: 0 !important;
+
+        display: flex !important;
+        flex-direction: column !important;
+
+        overflow: hidden !important;
+
+        background: #FFFFFF !important;
+
+        border:
+            1px solid
+            #DFE6E9 !important;
+
+        border-radius: 6px !important;
+
+        box-shadow: none !important;
+
+        transition:
+            transform 180ms ease,
+            border-color 180ms ease,
+            box-shadow 180ms ease !important;
+    }
+
+
+    [data-testid="catalog-grid"]
+    .book-card:hover {
+        transform:
+            translateY(-3px) !important;
+
+        border-color:
+            #C8D5C3 !important;
+
+        box-shadow:
+            0 18px 34px -28px
+            rgba(16,38,58,.4) !important;
+    }
+
+
+    /* CAPA */
+
+    [data-testid="catalog-grid"]
+    .book-card > div:first-child {
+        width: 100% !important;
+
+        min-height: 0 !important;
+
+        padding: 0 !important;
+
+        aspect-ratio:
+            .72 !important;
+
+        background:
+            #F7F8F3 !important;
+
+        overflow: hidden !important;
+    }
+
+
+    [data-testid="catalog-grid"]
+    .book-card > div:first-child img {
+        display: block !important;
+
+        width: 100% !important;
+        height: 100% !important;
+
+        object-fit: contain !important;
+        object-position: center !important;
+    }
+
+
+    /* CORPO */
+
+    [data-testid="catalog-grid"]
+    .book-card > div:nth-child(2) {
+        flex: 1 !important;
+
+        display: flex !important;
+        flex-direction: column !important;
+
+        min-width: 0 !important;
+
+        padding:
+            12px 11px
+            12px !important;
+    }
+
+
+    /*
+     * disciplina
+     */
+    [data-testid="catalog-grid"]
+    .book-card
+    > div:nth-child(2)
+    > div:first-child {
+        margin-bottom: 6px !important;
+
+        font-size: 8px !important;
+
+        letter-spacing:
+            .18em !important;
+    }
+
+
+    /*
+     * título
+     */
+    [data-testid="catalog-grid"]
+    .book-card h3 {
+        display: -webkit-box !important;
+
+        overflow: hidden !important;
+
+        -webkit-box-orient: vertical !important;
+        -webkit-line-clamp: 2 !important;
+
+        min-height: 34px !important;
+
+        margin-bottom:
+            4px !important;
+
+        font-size: 12px !important;
+        line-height: 1.34 !important;
+
+        letter-spacing:
+            -.01em !important;
+    }
+
+
+    /*
+     * editora
+     */
+    [data-testid="catalog-grid"]
+    .book-card
+    > div:nth-child(2)
+    > div:nth-child(3) {
+        margin-bottom:
+            11px !important;
+
+        font-size: 9px !important;
+
+        color:
+            #758092 !important;
+    }
+
+
+    /*
+     * preço + botão sempre alinhados no fundo
+     */
+    [data-testid="catalog-grid"]
+    .book-card
+    > div:nth-child(2)
+    > div:last-child {
+        margin-top:
+            auto !important;
+
+        align-items:
+            center !important;
+    }
+
+
+    [data-testid="catalog-grid"]
+    .book-card
+    > div:nth-child(2)
+    > div:last-child
+    > span {
+        font-size:
+            16px !important;
+
+        letter-spacing:
+            -.02em !important;
+    }
+
+
+    [data-testid="catalog-grid"]
+    .book-card button {
+        min-height:
+            32px !important;
+
+        height:
+            32px !important;
+
+        padding:
+            0 10px !important;
+
+        border-radius:
+            4px !important;
+
+        font-size:
+            10px !important;
+    }
+
+
+    /* -----------------------------------------------------
+       BADGES
+       ----------------------------------------------------- */
+
+    [data-testid="catalog-grid"]
+    .book-card > div:first-child > span,
+    [data-testid="catalog-grid"]
+    .book-card [data-testid="stock-badge"] {
+        padding:
+            4px 7px !important;
+
+        font-size:
+            7px !important;
+
+        line-height:
+            1.1 !important;
+    }
+
+
+    /* -----------------------------------------------------
+       PAGINAÇÃO
+       ----------------------------------------------------- */
+
+    [data-testid="catalog-pagination"] {
+        display: flex !important;
+
+        align-items: center !important;
+        justify-content: center !important;
+
+        gap: 7px !important;
+
+        margin:
+            30px auto
+            0 !important;
+    }
+
+
+    [data-testid="catalog-pagination"]
+    button {
+        min-width:
+            36px !important;
+
+        height:
+            36px !important;
+        min-height:
+            36px !important;
+
+        padding:
+            0 11px !important;
+
+        border-radius:
+            5px !important;
+
+        font-size:
+            11px !important;
+    }
+
+}
+
+
+/* =========================================================
+   LAPTOPS MAIS ESTREITOS
+
+   Ainda é desktop, mas evitamos esmagar 6 cards.
+   ========================================================= */
+
+@media (min-width: 1024px) and (max-width: 1199px) {
+
+    [data-testid="catalog-page"] {
+        width:
+            90% !important;
+    }
+
+
+    [data-testid="catalog-grid"] {
+        grid-template-columns:
+            repeat(5, minmax(0, 1fr)) !important;
+    }
+
+
+    [data-testid="catalog-filters"] {
+        grid-template-columns:
+            1fr !important;
+    }
+
+}
+
+
+/* =========================================================
+   DESKTOP >= 1200
+   Aqui fica a versão final 6 × 3.
+   ========================================================= */
+
+@media (min-width: 1200px) {
+
+    [data-testid="catalog-grid"] {
+        grid-template-columns:
+            repeat(6, minmax(0, 1fr)) !important;
+    }
+
+}
+
+/* ===== END CATALOG DESKTOP PROPOSAL 02 ===== */
+
+/* ===== FINAL THREE PAGES START ===== */
+
+
+/* =========================================================
+   SHARED
+   ========================================================= */
+
+.final-page-eyebrow {
+  color: #3D7C42;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .22em;
+  line-height: 1;
+  text-transform: uppercase;
+  margin-bottom: 13px;
+}
+
+
+/* =========================================================
+   VOUCHER MEGA
+   ========================================================= */
+
+.voucher-final-page {
+  width: 100%;
+  background: #FAF9F4;
+  color: #10263A;
+  padding-bottom: 54px;
+}
+
+.voucher-final-hero {
+  width: 100%;
+  min-height: 305px;
+  display: grid;
+  grid-template-columns: minmax(380px, .75fr) minmax(600px, 1.45fr);
+  align-items: stretch;
+  overflow: hidden;
+  border-bottom: 1px solid #E1E8D8;
+  background:
+    radial-gradient(circle at 5% 75%, rgba(172,199,125,.19), transparent 25%),
+    linear-gradient(105deg,#FAF9F4 0%,#FAF9F4 36%,#F0F5E6 100%);
+}
+
+.voucher-final-copy {
+  position: relative;
+  z-index: 2;
+  align-self: center;
+  padding: 38px 22px 38px max(6vw, calc((100vw - 1450px)/2));
+}
+
+.voucher-final-copy h1 {
+  max-width: 480px;
+  margin: 0 0 18px !important;
+  font-size: clamp(43px, 4vw, 64px) !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  letter-spacing: -.045em !important;
+  color: #10263A !important;
+}
+
+.voucher-final-copy > p {
+  max-width: 470px !important;
+  margin: 0 !important;
+  font-size: 15px !important;
+  font-family: inherit !important;
+  font-style: normal !important;
+  line-height: 1.62 !important;
+  color: #536174 !important;
+}
+
+.voucher-final-visual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.voucher-final-visual img {
+  width: 100%;
+  height: 100%;
+  max-height: 360px;
+  display: block;
+  object-fit: contain;
+  object-position: center;
+}
+
+.voucher-final-content {
+  width: min(90%, 1400px);
+  margin: 26px auto 0;
+  gap: 28px;
+  align-items: start;
+}
+
+.voucher-final-form {
+  display: grid !important;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 18px 24px !important;
+  padding: 28px 30px !important;
+  border-radius: 10px !important;
+  box-shadow: 0 18px 40px -34px rgba(16,38,58,.38);
+}
+
+.voucher-final-form > div:nth-child(5),
+.voucher-final-form > div:nth-child(6),
+.voucher-final-form > p,
+.voucher-final-form > button,
+.voucher-final-form > [data-testid="voucher-submitted"] {
+  grid-column: 1 / -1;
+}
+
+.voucher-final-form > div:nth-child(6) {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  column-gap: 28px;
+  align-items: start;
+}
+
+.voucher-final-form input,
+.voucher-final-form textarea {
+  border-radius: 4px !important;
+}
+
+.voucher-final-form > button {
+  width: min(310px,100%) !important;
+  justify-self: start;
+  border-radius: 4px !important;
+}
+
+.voucher-final-how {
+  padding: 28px 26px !important;
+  border-radius: 10px !important;
+  box-shadow: 0 16px 36px -32px rgba(16,38,58,.3);
+}
+
+.voucher-final-how h3 {
+  font-size: 21px !important;
+  margin-bottom: 20px !important;
+}
+
+.voucher-final-how h3::after {
+  content: "";
+  display: block;
+  width: 32px;
+  height: 2px;
+  margin-top: 11px;
+  background: #5A8F1E;
+}
+
+.voucher-final-how ol {
+  list-style: none !important;
+  counter-reset: vouchersteps;
+}
+
+.voucher-final-how ol li {
+  position: relative;
+  counter-increment: vouchersteps;
+  padding-left: 38px;
+}
+
+.voucher-final-how ol li::before {
+  content: counter(vouchersteps);
+  position: absolute;
+  left: 0;
+  top: -1px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #5A8F1E;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+
+/* =========================================================
+   TRACK ORDER
+   ========================================================= */
+
+.track-final-page {
+  width: 100%;
+  background: #FAF9F4;
+  color: #10263A;
+}
+
+.track-final-hero {
+  width: min(100%, 1500px);
+  min-height: 470px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(430px,.78fr) minmax(0,1.32fr);
+  overflow: hidden;
+}
+
+.track-final-copy {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 45px 20px 42px max(5vw,48px);
+  background: linear-gradient(90deg,#FAF9F4 82%,rgba(250,249,244,.7));
+}
+
+.track-final-copy h1 {
+  margin: 0 0 17px !important;
+  font-size: clamp(42px,4vw,61px) !important;
+  font-weight: 700 !important;
+  line-height: 1.02 !important;
+  letter-spacing: -.045em !important;
+}
+
+.track-final-intro {
+  max-width: 350px;
+  margin: 0 0 26px !important;
+  color: #536174 !important;
+  font-size: 15px !important;
+  line-height: 1.6 !important;
+}
+
+.track-final-form-stack {
+  position: relative;
+  width: min(100%,430px);
+}
+
+.track-form-layer {
+  position: absolute;
+  inset: 0;
+  border: 1px solid #D6E1CD;
+  background: #F4F8ED;
+  border-radius: 14px;
+}
+
+.track-form-layer.layer-back {
+  transform: translate(18px,-15px);
+  opacity: .65;
+}
+
+.track-form-layer.layer-middle {
+  transform: translate(9px,-7px);
+  opacity: .88;
+}
+
+[data-testid="track-order-page"] .track-final-form {
+  position: relative !important;
+  z-index: 3;
+  display: block !important;
+  margin: 0 !important;
+  padding: 27px 29px !important;
+  background: #FFF !important;
+  border: 1px solid #E0E6E3 !important;
+  border-radius: 14px !important;
+  box-shadow: 0 20px 44px -32px rgba(16,38,58,.48) !important;
+}
+
+[data-testid="track-order-page"] .track-final-form > div {
+  margin-bottom: 17px;
+}
+
+[data-testid="track-order-page"] .track-final-form label {
+  display: block;
+  margin-bottom: 7px;
+  color: #536174;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+}
+
+[data-testid="track-order-page"] .track-final-form input {
+  height: 44px !important;
+  border-radius: 4px !important;
+}
+
+[data-testid="track-order-page"] .track-final-submit {
+  width: 100% !important;
+  height: 46px !important;
+  background: #5A8F1E !important;
+  color: white !important;
+  border-radius: 4px !important;
+}
+
+[data-testid="track-order-page"] .track-final-submit:hover {
+  background: #3E6E11 !important;
+}
+
+.track-final-error {
+  margin: 12px 0 0 !important;
+  color: #C53030 !important;
+  font-size: 13px !important;
+}
+
+.track-final-visual {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.track-final-visual::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset: 0 auto 0 0;
+  width: 14%;
+  background: linear-gradient(90deg,#FAF9F4,transparent);
+  pointer-events: none;
+}
+
+.track-final-visual img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center;
+}
+
+.track-final-result {
+  width: min(90%,1000px);
+  margin: 0 auto 35px;
+  padding: 23px 26px;
+  display: grid;
+  grid-template-columns: repeat(4,minmax(0,1fr));
+  gap: 22px;
+  background: white;
+  border: 1px solid #DDE5E8;
+}
+
+.track-final-result > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.track-final-result span {
+  color: #536174;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+
+/* =========================================================
+   CONTACTOS
+   ========================================================= */
+
+.contacts-final-page {
+  width: 100%;
+  background: #FAF9F4;
+  color: #10263A;
+}
+
+.contacts-final-hero {
+  position: relative;
+  min-height: 330px;
+  overflow: hidden;
+  border-bottom: 1px solid #E1E8DB;
+}
+
+.contacts-final-hero > img {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 70%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.contacts-final-hero::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  background:
+    linear-gradient(
+      90deg,
+      #FAF9F4 0%,
+      #FAF9F4 28%,
+      rgba(250,249,244,.92) 40%,
+      rgba(250,249,244,.20) 68%,
+      transparent 100%
+    );
+}
+
+.contacts-final-hero-copy {
+  position: relative;
+  z-index: 2;
+  width: min(88%,1400px);
+  min-height: 330px;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.contacts-final-hero-copy h1 {
+  margin: 0 0 14px !important;
+  font-size: clamp(47px,4.5vw,68px) !important;
+  font-weight: 700 !important;
+  line-height: .98 !important;
+  letter-spacing: -.045em !important;
+}
+
+.contacts-final-hero-copy > p {
+  max-width: 390px !important;
+  margin: 0 !important;
+  color: #536174 !important;
+  font-family: inherit !important;
+  font-style: normal !important;
+  font-size: 17px !important;
+  line-height: 1.5 !important;
+}
+
+.contacts-final-info {
+  width: min(82%,1200px);
+  margin: 0 auto;
+  padding: 54px 0 62px;
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+}
+
+.contacts-final-business,
+.contacts-final-owner {
+  padding: 0 46px;
+}
+
+.contacts-final-business {
+  border-right: 1px solid #D8E0D3;
+}
+
+.contacts-final-heading {
+  display: flex;
+  align-items: center;
+  gap: 17px;
+  margin-bottom: 24px;
+}
+
+.contacts-final-heading > span {
+  width: 50px;
+  height: 50px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid #CFE0BD;
+  border-radius: 50%;
+  color: #4B8735;
+}
+
+.contacts-final-heading svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 1.6;
+}
+
+.contacts-final-heading h2 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -.025em;
+}
+
+.contacts-final-business ul {
+  margin: 0;
+  padding: 0 0 26px 67px;
+  list-style: none;
+  border-bottom: 1px solid #DDE4E5;
+}
+
+.contacts-final-business li {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  margin-bottom: 17px;
+  color: #283D4E;
+  font-size: 15px;
+}
+
+.contacts-final-business li:last-child {
+  margin-bottom: 0;
+}
+
+.contacts-final-business li > svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: #5A8F1E;
+  stroke-width: 1.7;
+}
+
+.contacts-final-business a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.contacts-final-business a:hover {
+  color: #5A8F1E;
+}
+
+.contacts-final-business small {
+  display: block;
+  margin-top: 2px;
+  color: #667587;
+  font-size: 12px;
+}
+
+.contacts-final-hours {
+  margin-left: 67px;
+  padding-top: 24px;
+}
+
+.contacts-final-hours > div {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 11px;
+  color: #5A8F1E;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.contacts-final-hours svg {
+  width: 18px;
+  height: 18px;
+}
+
+.contacts-final-hours p {
+  margin: 2px 0 !important;
+  color: #334A5C !important;
+  font-family: inherit !important;
+  font-size: 14px !important;
+  font-style: normal !important;
+}
+
+.contacts-owner-name {
+  margin: 2px 0 27px 67px !important;
+  color: #5A8F1E !important;
+  font-family: Georgia,serif !important;
+  font-size: 25px !important;
+  font-style: italic !important;
+}
+
+.contacts-owner-description {
+  max-width: 420px;
+  margin: 0 0 0 67px !important;
+  color: #536174 !important;
+  font-family: inherit !important;
+  font-size: 15px !important;
+  font-style: normal !important;
+  line-height: 1.7 !important;
+}
+
+
+/* =========================================================
+   TABLET
+   ========================================================= */
+
+@media (max-width: 1023px) {
+
+  .voucher-final-hero {
+    grid-template-columns: .8fr 1.2fr;
+  }
+
+  .voucher-final-copy {
+    padding-left: 5vw;
+  }
+
+  .voucher-final-content {
+    width: 93%;
+  }
+
+  .track-final-hero {
+    grid-template-columns: .9fr 1.1fr;
+  }
+
+  .track-final-copy {
+    padding-left: 5vw;
+  }
+
+  .contacts-final-info {
+    width: 94%;
+  }
+
+  .contacts-final-business,
+  .contacts-final-owner {
+    padding: 0 28px;
+  }
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 767px) {
+
+  .final-page-eyebrow {
+    font-size: 9px;
+  }
+
+
+  /* Voucher */
+
+  .voucher-final-page {
+    padding-bottom: 35px;
+  }
+
+  .voucher-final-hero {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .voucher-final-copy {
+    order: 1;
+    width: 100%;
+    padding: 32px 24px 23px;
+  }
+
+  .voucher-final-copy h1 {
+    font-size: clamp(39px,11.5vw,52px) !important;
+  }
+
+  .voucher-final-copy > p {
+    font-size: 15px !important;
+  }
+
+  .voucher-final-visual {
+    order: 2;
+    width: 100%;
+  }
+
+  .voucher-final-visual img {
+    width: 100%;
+    height: auto;
+    max-height: none;
+    object-fit: contain;
+  }
+
+  .voucher-final-content {
+    display: block !important;
+    width: calc(100% - 32px);
+    margin-top: 18px;
+  }
+
+  .voucher-final-form {
+    display: block !important;
+    padding: 21px 18px !important;
+  }
+
+  .voucher-final-form > * {
+    margin-bottom: 18px !important;
+  }
+
+  .voucher-final-form > div:nth-child(6) {
+    display: block;
+  }
+
+  .voucher-final-form > div:nth-child(6) > * {
+    margin-bottom: 15px;
+  }
+
+  .voucher-final-form > button {
+    width: 100% !important;
+  }
+
+  .voucher-final-how {
+    margin-top: 18px;
+    padding: 23px 20px !important;
+  }
+
+
+  /* Track */
+
+  .track-final-hero {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .track-final-visual {
+    order: 1;
+    height: 280px;
+  }
+
+  .track-final-visual::before {
+    inset: auto 0 0;
+    width: 100%;
+    height: 26%;
+    background: linear-gradient(0deg,#FAF9F4,transparent);
+  }
+
+  .track-final-visual img {
+    object-position: center 48%;
+  }
+
+  .track-final-copy {
+    order: 2;
+    padding: 28px 24px 42px;
+    background: #FAF9F4;
+  }
+
+  .track-final-copy h1 {
+    font-size: clamp(39px,11.5vw,51px) !important;
+  }
+
+  .track-final-intro {
+    max-width: 100%;
+  }
+
+  .track-final-form-stack {
+    width: 100%;
+  }
+
+  [data-testid="track-order-page"] .track-final-form {
+    padding: 21px 19px !important;
+  }
+
+  .track-final-result {
+    width: calc(100% - 32px);
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+
+
+  /* Contactos */
+
+  .contacts-final-hero {
+    min-height: 340px;
+    display: flex;
+    align-items: flex-end;
+  }
+
+  .contacts-final-hero > img {
+    width: 100%;
+    object-position: 62% center;
+    opacity: .72;
+  }
+
+  .contacts-final-hero::after {
+    background:
+      linear-gradient(
+        180deg,
+        rgba(250,249,244,.10) 0%,
+        rgba(250,249,244,.55) 38%,
+        #FAF9F4 78%,
+        #FAF9F4 100%
+      );
+  }
+
+  .contacts-final-hero-copy {
+    width: 100%;
+    min-height: 340px;
+    justify-content: flex-end;
+    padding: 34px 24px;
+  }
+
+  .contacts-final-hero-copy h1 {
+    font-size: clamp(43px,13vw,57px) !important;
+  }
+
+  .contacts-final-hero-copy > p {
+    font-size: 16px !important;
+  }
+
+  .contacts-final-info {
+    display: block;
+    width: 100%;
+    padding: 0 24px 42px;
+  }
+
+  .contacts-final-business,
+  .contacts-final-owner {
+    padding: 34px 0;
+  }
+
+  .contacts-final-business {
+    border-right: 0;
+    border-bottom: 1px solid #D8E0D3;
+  }
+
+  .contacts-final-business ul {
+    padding-left: 0;
+  }
+
+  .contacts-final-hours {
+    margin-left: 0;
+  }
+
+  .contacts-owner-name,
+  .contacts-owner-description {
+    margin-left: 0 !important;
+  }
+}
+
+
+/* ===== FINAL THREE PAGES END ===== */
+
+/* ===== FINAL PAGE SIZING TWEAKS START ===== */
+
+
+/* =========================================================
+   VOUCHER MEGA
+   Separadores subtis entre áreas do formulário
+   ========================================================= */
+
+.voucher-final-form > div:nth-child(1),
+.voucher-final-form > div:nth-child(2) {
+    padding-bottom: 18px;
+    border-bottom: 1px solid #E2E8DF;
+}
+
+.voucher-final-form > div:nth-child(3),
+.voucher-final-form > div:nth-child(4) {
+    padding-bottom: 18px;
+    border-bottom: 1px solid #E2E8DF;
+}
+
+.voucher-final-form > div:nth-child(5) {
+    padding-bottom: 19px;
+    border-bottom: 1px solid #E2E8DF;
+}
+
+.voucher-final-form > p {
+    padding-top: 18px;
+    border-top: 1px solid #E2E8DF;
+}
+
+
+/* =========================================================
+   DESKTOP / TABLET
+   ========================================================= */
+
+@media (min-width: 768px) {
+
+    /* =====================================================
+       SEGUIR ENCOMENDA
+       Hero ~60% da dimensão visual anterior
+       ===================================================== */
+
+    .track-final-hero {
+        height: 355px !important;
+        min-height: 355px !important;
+
+        grid-template-columns:
+            minmax(350px, .72fr)
+            minmax(0, 1.38fr) !important;
+    }
+
+    .track-final-copy {
+        justify-content: center;
+
+        padding:
+            23px 18px
+            23px max(4.4vw, 36px) !important;
+    }
+
+    .track-final-copy h1 {
+        margin-bottom: 10px !important;
+
+        font-size:
+            clamp(34px, 3.25vw, 48px) !important;
+
+        line-height: 1 !important;
+    }
+
+    .track-final-copy .final-page-eyebrow {
+        margin-bottom: 9px;
+    }
+
+    .track-final-intro {
+        max-width: 330px;
+
+        margin-bottom: 15px !important;
+
+        font-size: 13.5px !important;
+        line-height: 1.5 !important;
+    }
+
+    .track-final-form-stack {
+        width: min(100%, 390px) !important;
+    }
+
+    .track-form-layer.layer-back {
+        transform: translate(13px, -10px) !important;
+    }
+
+    .track-form-layer.layer-middle {
+        transform: translate(6px, -5px) !important;
+    }
+
+    [data-testid="track-order-page"] .track-final-form {
+        padding: 17px 20px !important;
+        border-radius: 11px !important;
+    }
+
+    [data-testid="track-order-page"] .track-final-form > div {
+        margin-bottom: 11px !important;
+    }
+
+    [data-testid="track-order-page"] .track-final-form label {
+        margin-bottom: 5px !important;
+        font-size: 9px !important;
+    }
+
+    [data-testid="track-order-page"] .track-final-form input {
+        height: 38px !important;
+    }
+
+    [data-testid="track-order-page"] .track-final-submit {
+        height: 40px !important;
+        min-height: 40px !important;
+    }
+
+    .track-final-visual img {
+        object-position: center center !important;
+    }
+
+
+    /* =====================================================
+       CONTACTOS
+       Muito mais compacto
+       ===================================================== */
+
+    .contacts-final-hero {
+        min-height: 205px !important;
+        height: 205px !important;
+    }
+
+    .contacts-final-hero-copy {
+        min-height: 205px !important;
+    }
+
+    .contacts-final-hero-copy h1 {
+        margin-bottom: 9px !important;
+
+        font-size:
+            clamp(38px, 3.7vw, 53px) !important;
+    }
+
+    .contacts-final-hero-copy > p {
+        max-width: 350px !important;
+
+        font-size: 14.5px !important;
+        line-height: 1.45 !important;
+    }
+
+    .contacts-final-hero-copy .final-page-eyebrow {
+        margin-bottom: 9px;
+    }
+
+    .contacts-final-info {
+        width: min(78%, 1080px) !important;
+
+        padding:
+            29px 0
+            32px !important;
+    }
+
+    .contacts-final-business,
+    .contacts-final-owner {
+        padding:
+            0 31px !important;
+    }
+
+    .contacts-final-heading {
+        gap: 13px !important;
+
+        margin-bottom: 17px !important;
+    }
+
+    .contacts-final-heading > span {
+        width: 41px !important;
+        height: 41px !important;
+    }
+
+    .contacts-final-heading svg {
+        width: 19px !important;
+        height: 19px !important;
+    }
+
+    .contacts-final-heading h2 {
+        font-size: 21px !important;
+    }
+
+    .contacts-final-business ul {
+        padding:
+            0 0 17px
+            54px !important;
+    }
+
+    .contacts-final-business li {
+        gap: 12px !important;
+
+        margin-bottom: 11px !important;
+
+        font-size: 13.5px !important;
+    }
+
+    .contacts-final-business li > svg {
+        width: 16px !important;
+        height: 16px !important;
+    }
+
+    .contacts-final-business small {
+        font-size: 10.5px !important;
+    }
+
+    .contacts-final-hours {
+        margin-left: 54px !important;
+        padding-top: 16px !important;
+    }
+
+    .contacts-final-hours > div {
+        gap: 9px !important;
+
+        margin-bottom: 8px !important;
+
+        font-size: 12.5px !important;
+    }
+
+    .contacts-final-hours p {
+        font-size: 12.5px !important;
+    }
+
+    .contacts-owner-name {
+        margin:
+            0 0 17px
+            54px !important;
+
+        font-size: 21px !important;
+    }
+
+    .contacts-owner-description {
+        max-width: 360px !important;
+
+        margin-left: 54px !important;
+
+        font-size: 13.5px !important;
+        line-height: 1.55 !important;
+    }
+}
+
+
+/* =========================================================
+   MOBILE — apenas preservar separadores do Voucher.
+   Não alteramos ainda os layouts mobile.
+   ========================================================= */
+
+@media (max-width: 767px) {
+
+    .voucher-final-form > div:nth-child(1),
+    .voucher-final-form > div:nth-child(2),
+    .voucher-final-form > div:nth-child(3),
+    .voucher-final-form > div:nth-child(4),
+    .voucher-final-form > div:nth-child(5) {
+        padding-bottom: 17px;
+        border-bottom: 1px solid #E2E8DF;
+    }
+
+}
+
+
+/* ===== FINAL PAGE SIZING TWEAKS END ===== */
+
+/* ===== TRACK + VOUCHER FINAL REFINEMENT START ===== */
+
+/* =========================================================
+   SEGUIR ENCOMENDA
+   Manter hero baixo, mas menos zoom e com caixa proporcional
+   ========================================================= */
+
+@media (min-width: 768px) {
+  .track-final-hero {
+    height: 355px !important;
+    min-height: 355px !important;
+    grid-template-columns: minmax(320px, 0.62fr) minmax(0, 1.38fr) !important;
+    overflow: hidden !important;
+  }
+
+  .track-final-copy {
+    padding: 24px 14px 24px max(3vw, 28px) !important;
+    justify-content: center !important;
+  }
+
+  .track-final-copy h1 {
+    font-size: clamp(32px, 3.15vw, 46px) !important;
+    line-height: 0.98 !important;
+    margin-bottom: 10px !important;
+  }
+
+  .track-final-intro {
+    max-width: 310px !important;
+    font-size: 13.5px !important;
+    line-height: 1.5 !important;
+    margin-bottom: 14px !important;
+  }
+
+  .track-final-form-stack {
+    width: min(100%, 305px) !important;
+  }
+
+  .track-form-layer.layer-back {
+    transform: translate(10px, -8px) !important;
+  }
+
+  .track-form-layer.layer-middle {
+    transform: translate(5px, -4px) !important;
+  }
+
+  [data-testid="track-order-page"] .track-final-form {
+    padding: 14px 16px !important;
+    border-radius: 12px !important;
+  }
+
+  [data-testid="track-order-page"] .track-final-form > div {
+    margin-bottom: 9px !important;
+  }
+
+  [data-testid="track-order-page"] .track-final-form label {
+    font-size: 9px !important;
+    margin-bottom: 4px !important;
+  }
+
+  [data-testid="track-order-page"] .track-final-form input {
+    height: 34px !important;
+    font-size: 13px !important;
+  }
+
+  [data-testid="track-order-page"] .track-final-submit {
+    height: 38px !important;
+    min-height: 38px !important;
+    font-size: 14px !important;
+  }
+
+  .track-final-visual {
+    display: flex !important;
+    align-items: stretch !important;
+    justify-content: stretch !important;
+    overflow: hidden !important;
+  }
+
+  .track-final-visual img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    object-position: 62% center !important;
+    transform: scale(0.92) !important;
+    transform-origin: center center !important;
+  }
+
+  /* Secção "Apoiamos o seu percurso" ~88% */
+  [data-testid="track-order-page"] .support-journey,
+  [data-testid="track-order-page"] .support-journey-section,
+  [data-testid="track-order-page"] .support-journey-wrapper {
+    transform: scale(0.88);
+    transform-origin: top center;
+    margin-bottom: -70px !important;
+  }
+
+  [data-testid="track-order-page"] .support-journey h2,
+  [data-testid="track-order-page"] .support-journey-section h2,
+  [data-testid="track-order-page"] .support-journey-wrapper h2 {
+    font-size: 88% !important;
+  }
+
+  [data-testid="track-order-page"] .support-journey p,
+  [data-testid="track-order-page"] .support-journey-section p,
+  [data-testid="track-order-page"] .support-journey-wrapper p {
+    font-size: 88% !important;
+  }
+}
+
+/* =========================================================
+   VOUCHER HERO
+   -10% visual + mais encostado à direita
+   ========================================================= */
+
+@media (min-width: 768px) {
+  .voucher-final-hero,
+  .voucher-mega-hero,
+  .voucher-mega-page .voucher-hero {
+    min-height: 360px !important;
+  }
+
+  .voucher-final-hero,
+  .voucher-mega-page .voucher-hero {
+    grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.3fr) !important;
+  }
+
+  .voucher-final-copy,
+  .voucher-mega-page .voucher-copy {
+    padding-right: 22px !important;
+  }
+
+  .voucher-final-visual,
+  .voucher-mega-page .voucher-visual {
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    padding-right: 0 !important;
+    margin-right: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .voucher-final-visual img,
+  .voucher-mega-page .voucher-visual img {
+    width: 90% !important;
+    max-width: 90% !important;
+    margin-left: auto !important;
+    margin-right: 0 !important;
+    display: block !important;
+  }
+}
+
+/* ===== TRACK + VOUCHER FINAL REFINEMENT END ===== */
+
+
+/* ===== TRACK EDITORIAL LAYOUT START ===== */
+
+
+/* =========================================================
+   DESKTOP
+   título + descrição | formulário | imagem
+   ========================================================= */
+
+@media (min-width: 1024px) {
+
+  .track-final-hero {
+    width: 100% !important;
+    max-width: none !important;
+
+    height: 380px !important;
+    min-height: 380px !important;
+
+    display: grid !important;
+
+    grid-template-columns:
+      minmax(380px, 34fr)
+      minmax(250px, 21fr)
+      minmax(500px, 45fr) !important;
+
+    align-items: stretch !important;
+
+    overflow: hidden !important;
+
+    background: #FAF9F4 !important;
+  }
+
+
+  /* -----------------------------------------
+     BLOCO EDITORIAL
+     ----------------------------------------- */
+
+  .track-final-editorial {
+    display: grid;
+
+    grid-template-columns:
+      minmax(210px, 1.15fr)
+      minmax(145px, .85fr);
+
+    align-items: center;
+
+    min-width: 0;
+
+    padding:
+      30px 22px
+      30px max(4vw, 42px);
+
+    background: #FAF9F4;
+  }
+
+
+  .track-final-title-block {
+    min-width: 0;
+
+    padding-right: 24px;
+  }
+
+
+  .track-final-title-block .final-page-eyebrow {
+    margin-bottom: 9px !important;
+  }
+
+
+  .track-final-title-block h1 {
+    margin: 0 !important;
+
+    font-size:
+      clamp(30px, 2.75vw, 41px) !important;
+
+    line-height: 1 !important;
+
+    letter-spacing: -.04em !important;
+
+    font-weight: 700 !important;
+
+    color: #10263A !important;
+  }
+
+
+  /*
+   * Linha subtil entre título e descrição.
+   */
+  .track-final-intro-block {
+    display: flex;
+
+    align-items: center;
+
+    min-height: 118px;
+
+    padding-left: 24px;
+
+    border-left:
+      1px solid #D6E0D1;
+  }
+
+
+  .track-final-intro-block p {
+    max-width: 180px;
+
+    margin: 0 !important;
+
+    color: #586A7D !important;
+
+    font-size: 13px !important;
+
+    line-height: 1.58 !important;
+  }
+
+
+  /* -----------------------------------------
+     FORMULÁRIO
+     ----------------------------------------- */
+
+  .track-final-form-column {
+    position: relative;
+
+    z-index: 4;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    padding:
+      24px 18px;
+
+    background:
+      linear-gradient(
+        90deg,
+        #FAF9F4 0%,
+        #FAF9F4 72%,
+        rgba(250,249,244,.82) 100%
+      );
+  }
+
+
+  .track-final-form-stack {
+    width:
+      min(100%, 285px) !important;
+
+    margin: 0 !important;
+  }
+
+
+  .track-form-layer.layer-back {
+    transform:
+      translate(9px, -7px) !important;
+  }
+
+
+  .track-form-layer.layer-middle {
+    transform:
+      translate(4px, -3px) !important;
+  }
+
+
+  [data-testid="track-order-page"] .track-final-form {
+    padding:
+      15px 16px !important;
+
+    border-radius:
+      11px !important;
+  }
+
+
+  [data-testid="track-order-page"] .track-final-form > div {
+    margin-bottom:
+      10px !important;
+  }
+
+
+  [data-testid="track-order-page"] .track-final-form label {
+    margin-bottom:
+      5px !important;
+
+    font-size:
+      8.5px !important;
+  }
+
+
+  [data-testid="track-order-page"] .track-final-form input {
+    height:
+      36px !important;
+
+    font-size:
+      13px !important;
+  }
+
+
+  [data-testid="track-order-page"] .track-final-submit {
+    height:
+      38px !important;
+
+    min-height:
+      38px !important;
+
+    font-size:
+      13px !important;
+  }
+
+
+  /* -----------------------------------------
+     IMAGEM
+     ----------------------------------------- */
+
+  .track-final-visual {
+    position: relative !important;
+
+    width: 100% !important;
+
+    height: 380px !important;
+
+    min-width: 0 !important;
+
+    overflow: hidden !important;
+
+    background: #FAF9F4 !important;
+  }
+
+
+  .track-final-visual::before {
+    display: none !important;
+  }
+
+
+  .track-final-visual img {
+    width: 100% !important;
+    height: 100% !important;
+
+    max-width: none !important;
+
+    display: block !important;
+
+    /*
+     * Preenche completamente a coluna da fotografia.
+     */
+    object-fit: cover !important;
+
+    /*
+     * Mantém visíveis:
+     * caixa, mapa, tracking card e caderno.
+     */
+    object-position:
+      49% 53% !important;
+
+    transform: none !important;
+    scale: none !important;
+  }
+
+
+  /* =======================================================
+     APOIAMOS O SEU PERCURSO — 88% REAL
+     ======================================================= */
+
+  .track-final-support {
+    width: 88% !important;
+
+    max-width: 1260px !important;
+
+    margin:
+      0 auto !important;
+  }
+
+
+  .track-final-support .support-journey-section {
+    width: 100% !important;
+
+    margin: 0 !important;
+
+    padding:
+      36px 0
+      39px !important;
+
+    transform: none !important;
+  }
+
+
+  .track-final-support .support-journey-section > div {
+    width: 100% !important;
+
+    max-width: none !important;
+
+    margin: 0 auto !important;
+  }
+
+
+  .track-final-support .support-journey-section h2 {
+    font-size:
+      clamp(27px, 2.55vw, 35px) !important;
+
+    line-height:
+      1.05 !important;
+  }
+
+
+  .track-final-support .support-journey-section > div > p {
+    max-width: 820px !important;
+
+    font-size:
+      13px !important;
+
+    line-height:
+      1.55 !important;
+  }
+
+
+  .track-final-support .support-journey-section .grid {
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr)) !important;
+
+    gap:
+      16px !important;
+  }
+
+
+  .track-final-support .support-journey-section .grid > * {
+    min-height: 0 !important;
+
+    padding:
+      18px 20px !important;
+  }
+
+
+  .track-final-support .support-journey-section .grid h3 {
+    font-size:
+      14.5px !important;
+  }
+
+
+  .track-final-support .support-journey-section .grid p {
+    font-size:
+      11.5px !important;
+
+    line-height:
+      1.5 !important;
+  }
+
+}
+
+
+/* =========================================================
+   TABLET
+   ========================================================= */
+
+@media (min-width: 768px) and (max-width: 1023px) {
+
+  .track-final-hero {
+    display: grid !important;
+
+    grid-template-columns:
+      1fr 1fr !important;
+
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+
+  .track-final-editorial {
+    grid-column:
+      1 / 2;
+
+    display: block;
+
+    padding:
+      30px 26px 18px;
+  }
+
+
+  .track-final-intro-block {
+    min-height: 0;
+
+    margin-top: 15px;
+
+    padding:
+      15px 0 0;
+
+    border-left: 0;
+
+    border-top:
+      1px solid #D6E0D1;
+  }
+
+
+  .track-final-intro-block p {
+    max-width:
+      320px;
+  }
+
+
+  .track-final-form-column {
+    grid-column:
+      1 / 2;
+
+    padding:
+      5px 26px 30px;
+
+    justify-content:
+      flex-start;
+  }
+
+
+  .track-final-visual {
+    grid-column:
+      2 / 3;
+
+    grid-row:
+      1 / 3;
+
+    height:
+      100% !important;
+
+    min-height:
+      420px;
+  }
+
+}
+
+
+/* =========================================================
+   MOBILE
+   título -> descrição -> formulário -> imagem
+   ========================================================= */
+
+@media (max-width: 767px) {
+
+  .track-final-hero {
+    display: flex !important;
+
+    flex-direction: column !important;
+
+    height: auto !important;
+
+    min-height: 0 !important;
+  }
+
+
+  .track-final-editorial {
+    order: 1;
+
+    display: block;
+
+    padding:
+      30px 24px
+      17px;
+
+    background: #FAF9F4;
+  }
+
+
+  .track-final-title-block {
+    padding: 0;
+  }
+
+
+  .track-final-title-block h1 {
+    margin:
+      0 !important;
+
+    font-size:
+      clamp(38px, 11vw, 50px) !important;
+
+    line-height:
+      1 !important;
+  }
+
+
+  .track-final-intro-block {
+    min-height: 0;
+
+    margin-top:
+      19px;
+
+    padding:
+      17px 0 0;
+
+    border-left: 0;
+
+    border-top:
+      1px solid #D6E0D1;
+  }
+
+
+  .track-final-intro-block p {
+    max-width:
+      330px;
+
+    margin: 0 !important;
+
+    font-size:
+      14px !important;
+
+    line-height:
+      1.55 !important;
+
+    color:
+      #586A7D !important;
+  }
+
+
+  .track-final-form-column {
+    order: 2;
+
+    padding:
+      8px 24px
+      34px;
+
+    background: #FAF9F4;
+  }
+
+
+  .track-final-form-stack {
+    width:
+      100% !important;
+  }
+
+
+  [data-testid="track-order-page"] .track-final-form {
+    padding:
+      20px !important;
+  }
+
+
+  [data-testid="track-order-page"] .track-final-form input {
+    height:
+      42px !important;
+  }
+
+
+  [data-testid="track-order-page"] .track-final-submit {
+    height:
+      44px !important;
+  }
+
+
+  .track-final-visual {
+    order: 3;
+
+    width: 100% !important;
+
+    height:
+      260px !important;
+
+    min-height:
+      260px !important;
+  }
+
+
+  .track-final-visual img {
+    width:
+      100% !important;
+
+    height:
+      100% !important;
+
+    object-fit:
+      cover !important;
+
+    object-position:
+      50% 53% !important;
+
+    transform:
+      none !important;
+  }
+
+
+  .track-final-support {
+    width:
+      100% !important;
+  }
+
+}
+
+
+/* ===== TRACK EDITORIAL LAYOUT END ===== */
+
+/* ===== TRACK IMAGE FORM OVERLAY START ===== */
+
+@media (min-width: 1024px) {
+
+  /* =====================================================
+     HERO
+     Texto à esquerda.
+     Imagem começa já por baixo do formulário.
+     ===================================================== */
+
+  .track-final-hero {
+    position: relative !important;
+
+    display: grid !important;
+
+    grid-template-columns:
+      minmax(390px, 34fr)
+      minmax(255px, 21fr)
+      minmax(500px, 45fr) !important;
+
+    height: 380px !important;
+    min-height: 380px !important;
+
+    overflow: hidden !important;
+
+    background: #FAF9F4 !important;
+  }
+
+
+  /* =====================================================
+     TEXTO
+     Continua totalmente fora da fotografia.
+     ===================================================== */
+
+  .track-final-editorial {
+    position: relative !important;
+    z-index: 5 !important;
+
+    grid-column: 1 / 2 !important;
+    grid-row: 1 !important;
+
+    background: #FAF9F4 !important;
+  }
+
+
+  /*
+   * Pequena transição visual entre texto e fotografia,
+   * sem criar uma parede dura.
+   */
+  .track-final-editorial::after {
+    content: "";
+
+    position: absolute;
+
+    z-index: -1;
+
+    top: 0;
+    right: -42px;
+    bottom: 0;
+
+    width: 44px;
+
+    background:
+      linear-gradient(
+        90deg,
+        #FAF9F4 0%,
+        rgba(250,249,244,.96) 38%,
+        rgba(250,249,244,0) 100%
+      );
+
+    pointer-events: none;
+  }
+
+
+  /* =====================================================
+     IMAGEM
+     Começa na coluna do formulário e vai até ao fim.
+     ===================================================== */
+
+  .track-final-visual {
+    position: relative !important;
+
+    z-index: 1 !important;
+
+    grid-column: 2 / 4 !important;
+    grid-row: 1 !important;
+
+    width: 100% !important;
+    height: 380px !important;
+
+    min-width: 0 !important;
+
+    overflow: hidden !important;
+
+    background: #FAF9F4 !important;
+  }
+
+
+  .track-final-visual::before {
+    display: none !important;
+  }
+
+
+  .track-final-visual img {
+    width: 100% !important;
+    height: 100% !important;
+
+    max-width: none !important;
+
+    display: block !important;
+
+    object-fit: cover !important;
+
+    /*
+     * Mantém visíveis:
+     * caixa,
+     * mapa,
+     * cartão "A caminho de si",
+     * caderno e caneta.
+     */
+    object-position: 50% 53% !important;
+
+    transform: none !important;
+    scale: none !important;
+  }
+
+
+  /* =====================================================
+     FORMULÁRIO SOBRE A IMAGEM
+     ===================================================== */
+
+  .track-final-form-column {
+    position: relative !important;
+
+    z-index: 6 !important;
+
+    grid-column: 2 / 3 !important;
+    grid-row: 1 !important;
+
+    display: flex !important;
+
+    align-items: center !important;
+    justify-content: center !important;
+
+    padding: 24px 15px !important;
+
+    /*
+     * Importante:
+     * retiramos o fundo sólido da coluna.
+     */
+    background: transparent !important;
+  }
+
+
+  .track-final-form-stack {
+    width: min(100%, 285px) !important;
+
+    margin: 0 !important;
+  }
+
+
+  /* =====================================================
+     CAMADAS DECORATIVAS ATRÁS DA BOX
+     Também ficam semitransparentes.
+     ===================================================== */
+
+  .track-form-layer {
+    background:
+      rgba(241, 247, 232, .58) !important;
+
+    border-color:
+      rgba(203, 220, 188, .75) !important;
+
+    backdrop-filter:
+      blur(7px);
+
+    -webkit-backdrop-filter:
+      blur(7px);
+  }
+
+
+  .track-form-layer.layer-back {
+    opacity: .62 !important;
+  }
+
+
+  .track-form-layer.layer-middle {
+    opacity: .78 !important;
+  }
+
+
+  /* =====================================================
+     BOX — ESTADO NORMAL
+     Vidro subtil, não demasiado transparente.
+     ===================================================== */
+
+  [data-testid="track-order-page"] .track-final-form {
+    background:
+      rgba(255, 255, 255, .88) !important;
+
+    border:
+      1px solid rgba(221, 230, 216, .92) !important;
+
+    box-shadow:
+      0 18px 38px -27px
+      rgba(16, 38, 58, .40) !important;
+
+    backdrop-filter:
+      blur(11px) saturate(110%);
+
+    -webkit-backdrop-filter:
+      blur(11px) saturate(110%);
+
+    transition:
+      background-color .22s ease,
+      box-shadow .22s ease,
+      border-color .22s ease,
+      transform .22s ease !important;
+  }
+
+
+  /* =====================================================
+     HOVER
+     ===================================================== */
+
+  [data-testid="track-order-page"] .track-final-form:hover {
+    background:
+      rgba(255, 255, 255, 1) !important;
+
+    border-color:
+      rgba(204, 218, 197, 1) !important;
+
+    box-shadow:
+      0 22px 44px -27px
+      rgba(16, 38, 58, .48) !important;
+  }
+
+
+  /* =====================================================
+     FOCUS-WITHIN
+     Assim que clicar/escrever num input -> branco 100%.
+     ===================================================== */
+
+  [data-testid="track-order-page"] .track-final-form:focus-within {
+    background:
+      rgba(255, 255, 255, 1) !important;
+
+    border-color:
+      #C9DDB9 !important;
+
+    box-shadow:
+      0 22px 46px -26px
+      rgba(16, 38, 58, .50) !important;
+  }
+
+
+  /* Inputs ligeiramente translúcidos em repouso. */
+
+  [data-testid="track-order-page"] .track-final-form input {
+    background:
+      rgba(255, 255, 255, .83) !important;
+
+    transition:
+      background-color .18s ease,
+      border-color .18s ease,
+      box-shadow .18s ease !important;
+  }
+
+
+  [data-testid="track-order-page"] .track-final-form:hover input {
+    background:
+      rgba(255, 255, 255, .94) !important;
+  }
+
+
+  [data-testid="track-order-page"] .track-final-form input:focus {
+    background:
+      #FFFFFF !important;
+  }
+
+}
+
+
+/*
+ * Tablet e mobile mantêm o layout que já tínhamos.
+ * Nada de transparência por cima de fotografia nesses tamanhos.
+ */
+
+@media (max-width: 1023px) {
+
+  [data-testid="track-order-page"] .track-final-form {
+    background:
+      #FFFFFF !important;
+
+    backdrop-filter: none !important;
+
+    -webkit-backdrop-filter: none !important;
+  }
+
+}
+
+
+/* ===== TRACK IMAGE FORM OVERLAY END ===== */
+
+
+/* ===== HOME SELECTOR GLASS START ===== */
+
+/*
+ * Versão aprovada:
+ * transparência subtil + blur;
+ * sem layers decorativas.
+ * Dimensões e funcionalidade intactas.
+ */
+
+.hero-selector-card {
+    background: rgba(255, 255, 255, .88) !important;
+    border-color: rgba(221, 230, 216, .92) !important;
+
+    box-shadow:
+        0 18px 38px -27px
+        rgba(16, 38, 58, .40) !important;
+
+    backdrop-filter: blur(11px) saturate(110%);
+    -webkit-backdrop-filter: blur(11px) saturate(110%);
+
+    transition:
+        background-color .22s ease,
+        border-color .22s ease,
+        box-shadow .22s ease !important;
+}
+
+.hero-selector-card::before,
+.hero-selector-card::after {
+    content: none !important;
+    display: none !important;
+}
+
+.hero-selector-card:hover {
+    background: #FFFFFF !important;
+    border-color: rgba(204, 218, 197, 1) !important;
+
+    box-shadow:
+        0 22px 44px -27px
+        rgba(16, 38, 58, .48) !important;
+}
+
+.hero-selector-card:focus-within {
+    background: #FFFFFF !important;
+    border-color: #C9DDB9 !important;
+
+    box-shadow:
+        0 22px 46px -26px
+        rgba(16, 38, 58, .50) !important;
+}
+
+.hero-selector-card select,
+.hero-selector-card input,
+.hero-selector-card [role="combobox"] {
+    background: rgba(255, 255, 255, .83) !important;
+}
+
+.hero-selector-card select:focus,
+.hero-selector-card input:focus,
+.hero-selector-card [role="combobox"]:focus,
+.hero-selector-card [role="combobox"][data-state="open"] {
+    background: #FFFFFF !important;
+}
+
+/* ===== HOME SELECTOR GLASS END ===== */

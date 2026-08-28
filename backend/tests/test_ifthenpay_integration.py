@@ -300,6 +300,126 @@ class IfthenpayIntegrationTests(unittest.IsolatedAsyncioTestCase):
         partner_after_dup = await partners.find_one({"promo_code": "PROMO10"})
         self.assertEqual(partner_after_dup["usage_count"], 1)
 
+
+    async def test_email_failure_does_not_undo_paid_order(self):
+        orders = FakeCollection([{
+            "order_no": "TS-EMAIL-FAIL",
+            "status": "pending_payment",
+            "payment_status": "pending",
+            "invoice_status": "not_issued",
+            "contract_status": "pending",
+            "payment_provider": "ifthenpay",
+            "payment": {
+                "provider": "ifthenpay",
+                "method": "multibanco",
+                "order_id": "PAY-EMAIL-FAIL",
+                "amount": "10.00",
+                "status": "pending",
+            },
+            "totals": {"total": 10.0},
+        }])
+
+        partners = FakeCollection([])
+        server.db = SimpleNamespace(
+            orders=orders,
+            partners=partners,
+        )
+
+        async def fake_email(_order):
+            return "send_failed"
+
+        async def fake_log(*args, **kwargs):
+            return None
+
+        server._send_contract_confirmation_if_available = fake_email
+        server.log_action = fake_log
+
+        order = await orders.find_one({
+            "order_no": "TS-EMAIL-FAIL"
+        })
+
+        result = await server._mark_order_paid(
+            order,
+            callback_received_at=server.iso(server.now_utc()),
+            provider_payment_datetime="2026-08-28 10:00:00",
+        )
+
+        self.assertEqual(result, "paid")
+
+        after = await orders.find_one({
+            "order_no": "TS-EMAIL-FAIL"
+        })
+
+        self.assertEqual(after["payment_status"], "paid")
+        self.assertEqual(after["status"], "paid")
+        self.assertEqual(
+            after["confirmation_email_status"],
+            "send_failed",
+        )
+
+
+    async def test_duplicate_paid_transition_sends_email_once(self):
+        orders = FakeCollection([{
+            "order_no": "TS-EMAIL-ONCE",
+            "status": "pending_payment",
+            "payment_status": "pending",
+            "invoice_status": "not_issued",
+            "contract_status": "pending",
+            "payment_provider": "ifthenpay",
+            "payment": {
+                "provider": "ifthenpay",
+                "method": "multibanco",
+                "order_id": "PAY-EMAIL-ONCE",
+                "amount": "10.00",
+                "status": "pending",
+            },
+            "totals": {"total": 10.0},
+        }])
+
+        partners = FakeCollection([])
+        server.db = SimpleNamespace(
+            orders=orders,
+            partners=partners,
+        )
+
+        calls = 0
+
+        async def fake_email(_order):
+            nonlocal calls
+            calls += 1
+            return "sent"
+
+        async def fake_log(*args, **kwargs):
+            return None
+
+        server._send_contract_confirmation_if_available = fake_email
+        server.log_action = fake_log
+
+        order = await orders.find_one({
+            "order_no": "TS-EMAIL-ONCE"
+        })
+
+        first = await server._mark_order_paid(
+            order,
+            callback_received_at=server.iso(server.now_utc()),
+            provider_payment_datetime="2026-08-28 10:00:00",
+        )
+
+        paid_order = await orders.find_one({
+            "order_no": "TS-EMAIL-ONCE"
+        })
+
+        second = await server._mark_order_paid(
+            paid_order,
+            callback_received_at=server.iso(server.now_utc()),
+            provider_payment_datetime="2026-08-28 10:00:01",
+        )
+
+        self.assertEqual(first, "paid")
+        self.assertEqual(second, "already_paid")
+        self.assertEqual(calls, 1)
+
+
     async def test_callback_invalid_secret(self):
         server.IFTHENPAY_MB_CALLBACK_KEY = "expected-secret"
         with self.assertRaises(HTTPException) as ctx:

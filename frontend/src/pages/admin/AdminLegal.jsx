@@ -736,14 +736,6 @@ export default function AdminLegal() {
       </div>
 
 
-      <div className="mb-5 bg-[#F5F8EC] border border-[#DCE8C9] rounded p-3 sm:p-4">
-        <p className="text-sm text-slate-700 leading-relaxed">
-          <strong>Dica de formatação:</strong>{" "}
-          podes copiar diretamente de ChatGPT, Word ou Google Docs.
-          O editor remove automaticamente estilos externos e mantém apenas
-          a estrutura compatível com o website.
-        </p>
-      </div>
 
 
       {loading ? (

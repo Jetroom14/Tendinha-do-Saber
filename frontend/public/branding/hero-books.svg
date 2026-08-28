@@ -1,0 +1,70 @@
+<svg width="540" height="500" viewBox="0 0 540 500" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bookGreen" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#829F6A"/>
+      <stop offset="1" stop-color="#587C46"/>
+    </linearGradient>
+    <linearGradient id="bookSage" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#B5C6A3"/>
+      <stop offset="1" stop-color="#91A97C"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#FCF6E9"/>
+      <stop offset="1" stop-color="#E8DDC8"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="18" stdDeviation="15" flood-color="#234127" flood-opacity=".16"/>
+    </filter>
+  </defs>
+
+  <ellipse cx="282" cy="447" rx="207" ry="29" fill="#5E7F52" opacity=".12"/>
+
+  <g opacity=".82">
+    <path d="M384 255C405 201 420 151 420 94" stroke="#557B46" stroke-width="7" stroke-linecap="round"/>
+    <path d="M417 130C453 105 468 75 464 50C430 57 410 84 417 130Z" fill="#6F955D"/>
+    <path d="M416 160C382 135 364 105 368 80C402 88 423 113 416 160Z" fill="#91AE79"/>
+    <path d="M412 198C449 175 467 146 465 120C429 125 408 152 412 198Z" fill="#779B64"/>
+    <path d="M404 226C370 204 351 176 354 150C389 156 409 182 404 226Z" fill="#A0B88B"/>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="74" y="166" width="72" height="262" rx="8" fill="url(#paper)"/>
+    <rect x="80" y="173" width="11" height="247" rx="3" fill="#D7C8AD"/>
+
+    <rect x="139" y="132" width="94" height="296" rx="9" fill="url(#bookSage)"/>
+    <rect x="148" y="144" width="9" height="271" rx="3" fill="#789165" opacity=".7"/>
+
+    <rect x="224" y="105" width="112" height="323" rx="10" fill="url(#bookGreen)"/>
+    <rect x="236" y="118" width="10" height="295" rx="3" fill="#456838" opacity=".65"/>
+
+    <text x="280" y="245" text-anchor="middle"
+      font-family="Georgia, serif"
+      font-size="17"
+      font-style="italic"
+      fill="#E9F0E2">
+      Mais educação
+    </text>
+    <text x="280" y="270" text-anchor="middle"
+      font-family="Georgia, serif"
+      font-size="17"
+      font-style="italic"
+      fill="#E9F0E2">
+      mais futuro
+    </text>
+
+    <rect x="327" y="145" width="82" height="283" rx="8" fill="url(#paper)"/>
+    <rect x="337" y="155" width="9" height="262" rx="3" fill="#D2C3A9"/>
+  </g>
+
+  <g filter="url(#shadow)">
+    <path d="M427 291L441 420H503L516 291H427Z" fill="#F2EBDD"/>
+    <path d="M427 291H516" stroke="#D3C6B0" stroke-width="8" stroke-linecap="round"/>
+
+    <path d="M451 286L462 195" stroke="#D7852C" stroke-width="7" stroke-linecap="round"/>
+    <path d="M472 287L472 176" stroke="#3D6845" stroke-width="7" stroke-linecap="round"/>
+    <path d="M492 287L509 204" stroke="#E1A33C" stroke-width="7" stroke-linecap="round"/>
+  </g>
+
+  <path d="M54 365C36 343 30 320 34 296C59 304 72 329 54 365Z" fill="#91AE79" opacity=".7"/>
+  <path d="M53 365C70 342 88 330 109 327C105 352 85 369 53 365Z" fill="#6F955D" opacity=".75"/>
+</svg>

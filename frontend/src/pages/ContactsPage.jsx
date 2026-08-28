@@ -1,35 +1,127 @@
-import { Phone, Mail, MapPin, Instagram, Clock } from "lucide-react";
+import {
+  Phone,
+  Mail,
+  MapPin,
+  Instagram,
+  Clock,
+  MessageCircle,
+  UserRound,
+} from "lucide-react";
 
 export default function ContactsPage() {
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16" data-testid="contacts-page">
-      <div className="text-[10px] tracking-[0.2em] uppercase text-[#4A5568] font-semibold mb-2">Contactos</div>
-      <h1 className="font-display text-3xl md:text-5xl font-medium mb-3">Fale connosco</h1>
-      <p className="text-[#4A5568] mb-12 max-w-2xl font-serif italic text-lg">Estamos aqui para ajudar com a sua lista escolar.</p>
+    <div className="contacts-final-page" data-testid="contacts-page">
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="bg-white border border-[#E2E8F0] rounded-md p-7 space-y-5">
-          <h2 className="font-display text-xl font-medium">Tendinha do Saber</h2>
-          <ul className="space-y-3 text-sm">
-            <li className="flex items-start gap-3"><MapPin className="w-4 h-4 mt-0.5 text-[#5A8F1E]" strokeWidth={1.5}/> Aveiro, Portugal</li>
-            <li className="flex items-start gap-3"><Phone className="w-4 h-4 mt-0.5 text-[#5A8F1E]" strokeWidth={1.5}/> <span><a href="tel:+351961194491" className="hover:text-[#5A8F1E]">+351 961 194 491</a><span className="block text-xs text-[#4A5568]">Chamada para rede móvel nacional</span></span></li>
-            <li className="flex items-start gap-3"><Mail className="w-4 h-4 mt-0.5 text-[#5A8F1E]" strokeWidth={1.5}/> <a href="mailto:tendinhadosaber@gmail.com" className="hover:text-[#5A8F1E]">tendinhadosaber@gmail.com</a></li>
-            <li className="flex items-start gap-3"><Instagram className="w-4 h-4 mt-0.5 text-[#5A8F1E]" strokeWidth={1.5}/> <a href="https://instagram.com" target="_blank" rel="noreferrer" className="hover:text-[#5A8F1E]">@tendinhadosaber</a></li>
-          </ul>
-          <div className="border-t border-[#E2E8F0] pt-5">
-            <div className="text-[10px] uppercase tracking-wider text-[#4A5568] font-semibold mb-2 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5"/> Horário de atendimento</div>
-            <p className="text-sm">Segunda a Sábado · 9h00 — 19h00</p>
-            <p className="text-sm text-[#4A5568]">Encomendas online disponíveis 24h.</p>
+      <section className="contacts-final-hero">
+        <img
+          src="/branding/heroes/hero-contactos.png"
+          alt=""
+          aria-hidden="true"
+        />
+
+        <div className="contacts-final-hero-copy">
+          <div className="final-page-eyebrow">
+            Contactos
           </div>
-        </div>
-        <div className="bg-[#5A8F1E] text-white rounded-md p-7 space-y-3">
-          <h2 className="font-display text-xl font-medium">Responsável</h2>
-          <p className="font-serif italic text-2xl">Francisco Neves Tendinha</p>
-          <p className="text-white/80 text-sm leading-relaxed">
-            Há mais de uma década dedicado a equipar as escolas e famílias da região com os melhores manuais e materiais educativos.
+
+          <h1>Fale connosco</h1>
+
+          <p>
+            Estamos aqui para ajudar com a sua lista escolar.
           </p>
         </div>
-      </div>
+      </section>
+
+
+      <section className="contacts-final-info">
+
+        <div className="contacts-final-business">
+
+          <div className="contacts-final-heading">
+            <span>
+              <MessageCircle />
+            </span>
+
+            <h2>Tendinha do Saber</h2>
+          </div>
+
+
+          <ul>
+            <li>
+              <MapPin />
+              <div>Aveiro, Portugal</div>
+            </li>
+
+            <li>
+              <Phone />
+
+              <div>
+                <a href="tel:+351961194491">
+                  +351 961 194 491
+                </a>
+
+                <small>
+                  Chamada para rede móvel nacional
+                </small>
+              </div>
+            </li>
+
+            <li>
+              <Mail />
+
+              <a href="mailto:tendinhadosaber@gmail.com">
+                tendinhadosaber@gmail.com
+              </a>
+            </li>
+
+            <li>
+              <Instagram />
+
+              <a
+                href="https://www.instagram.com/tendinhadosaber/"
+                target="_blank"
+                rel="noreferrer"
+              >
+                @tendinhadosaber
+              </a>
+            </li>
+          </ul>
+
+
+          <div className="contacts-final-hours">
+            <div>
+              <Clock />
+              <span>Horário de atendimento</span>
+            </div>
+
+            <p>Segunda a Sábado · 9h00 — 19h00</p>
+            <p>Encomendas online disponíveis 24h.</p>
+          </div>
+        </div>
+
+
+        <div className="contacts-final-owner">
+
+          <div className="contacts-final-heading">
+            <span>
+              <UserRound />
+            </span>
+
+            <h2>Responsável</h2>
+          </div>
+
+          <p className="contacts-owner-name">
+            Francisco Neves Tendinha
+          </p>
+
+          <p className="contacts-owner-description">
+            Há mais de uma década dedicado a equipar as escolas e famílias
+            da região com os melhores manuais e materiais educativos.
+          </p>
+
+        </div>
+
+      </section>
     </div>
   );
 }
